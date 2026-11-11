@@ -1,0 +1,23 @@
+import { loadViewer } from '@/lib/viewer';
+import { Feed } from '@/components/Feed';
+import type { FeedItem } from '@/lib/ranking';
+
+export const dynamic = 'force-dynamic';
+
+export default async function Home() {
+  const { sb, viewer, signed, followed, settings, weights } = await loadViewer();
+  const { data } = await sb.from('video_feed').select('*').order('created_at', { ascending: false }).limit(60);
+  const rows = data ?? [];
+  // private bucket: hand out short-lived links for approved videos only
+  const paths = rows.flatMap((r: any) => [r.storage_path, r.cover_path].filter(Boolean));
+  const signedUrls = paths.length ? (await sb.storage.from('videos').createSignedUrls(paths, 60 * 60)).data ?? [] : [];
+  const url = (p: string | null) => (p ? signedUrls.find((s: any) => s.path === p)?.signedUrl ?? null : null);
+  const items: FeedItem[] = rows.map((r: any) => ({
+    id: r.id, petition_id: r.petition_id, topic: r.topic, caption: r.caption, petition_title: r.petition_title,
+    uploader_handle: r.uploader_handle, role: r.role, combined: Number(r.combined), last_hour: Number(r.last_hour), goal: r.goal,
+    united_count: Number(r.united_count), trim_start: Number(r.trim_start), trim_end: Number(r.trim_end), blur_faces: r.blur_faces,
+    created_at: r.created_at, video_url: url(r.storage_path), cover_url: url(r.cover_path),
+  }));
+  return <Feed items={items} viewer={viewer} signed={[...signed]} followed={[...followed]} serverWeights={weights}
+    chronological={!!settings?.chronological_feed} autoplay={settings?.autoplay !== false && !settings?.is_minor} />;
+}
