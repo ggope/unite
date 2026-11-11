@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN } from '@/lib/i18n/dict';
 import { review, petitionStatus, setOfficial, unite, separate, resolveReport, setModerator, importNews, newsAction, toggleSource } from './actions';
@@ -12,9 +12,13 @@ const n = (x: number) => fmtN(x, 'en');
 
 export default async function Admin({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string; err?: string }> }) {
   const { sb, user } = await currentUser();
-  if (!user) notFound();
+  if (!user) redirect('/login?next=/admin');
   const { data: me } = await sb.from('profiles').select('is_moderator').eq('id', user.id).single();
-  if (!me?.is_moderator) notFound();
+  if (!me?.is_moderator) return (
+    <div className="empty"><h2>Admin is for moderators</h2>
+      <p>You are signed in as <b>{user.email}</b>, but this account is not a moderator yet. Make it one in the Supabase SQL editor, then reload this page.</p>
+      <Link className="btn" href="/">← Back to UNIER</Link></div>
+  );
   const { tab: raw = 'overview', q = '', err } = await searchParams;
   const tab = (TABS.some(([k]) => k === raw) ? raw : 'overview') as Tab;
   const { data: stats } = await sb.rpc('admin_stats');
