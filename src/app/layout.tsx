@@ -7,7 +7,7 @@ const archivo = Archivo({ subsets: ['latin', 'latin-ext'], axes: ['wdth'], varia
 const plex = IBM_Plex_Sans({ subsets: ['latin', 'latin-ext'], weight: ['400', '500', '600'], variable: '--font-plex' });
 const mono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['500'], variable: '--font-mono' });
 
-export const metadata: Metadata = { title: 'UNITE', description: 'See what is happening. Sign what matters. Hear what happened next.' };
+export const metadata: Metadata = { title: 'UNIER', description: 'See what is happening. Sign what matters. Hear what happened next.' };
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#05060C' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -16,7 +16,7 @@ export function Nav() {
   return (
     <>
       <aside className="rail" aria-label="Main">
-        <Link className="logo" href="/">UNITE</Link>
+        <Link className="logo" href="/">UNIER</Link>
         {ITEMS.map((i) => (
           <Link key={i.href} href={i.href} aria-current={active(i.href) ? 'page' : undefined}><Icon name={i.icon} />{i.label}</Link>
         ))}

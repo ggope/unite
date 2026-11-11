@@ -13,7 +13,7 @@ export const GOALS = [1000, 10000, 50000, 100000, 250000, 500000, 1000000];
 export const DAILY_LIMIT = 10;
 export const CONSENT_VERSION = 'signatures-v1';
 export const CONSENT_TEXT =
-  'I agree that UNITE records the petitions I choose to sign. A signature shows a political opinion, so UNITE needs my explicit consent. ' +
+  'I agree that UNIER records the petitions I choose to sign. A signature shows a political opinion, so UNIER needs my explicit consent. ' +
   'Only total counts are shared with petition targets, never my email. I can withdraw any signature, or this consent, at any time.';
 export const ROLE_LABEL = { founder: 'Petition Founder', supporter: 'Petition Supporter' } as const;
 export const fmt = (n: number) => Number(n || 0).toLocaleString('en-US');

@@ -17,7 +17,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   return new ImageResponse(
     (
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: 80, color: '#fff', background: `radial-gradient(circle at 75% 28%, ${t.b}cc, transparent 55%), linear-gradient(170deg, ${t.a}, #070812)` }}>
-        <div style={{ fontSize: 64, fontWeight: 900, letterSpacing: 2 }}>UNITE</div>
+        <div style={{ fontSize: 64, fontWeight: 900, letterSpacing: 2 }}>UNIER</div>
         <div style={{ marginTop: 300, fontSize: 190, fontWeight: 900, lineHeight: 1 }}>I signed.</div>
         <div style={{ marginTop: 40, fontSize: 70, fontWeight: 700, lineHeight: 1.15 }}>{p.title}</div>
         <div style={{ marginTop: 'auto', fontSize: 120, fontWeight: 700 }}>{fmt(n)}</div>
