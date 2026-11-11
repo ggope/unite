@@ -8,12 +8,16 @@ import { useT } from '@/lib/i18n/client';
 import { fmtN } from '@/lib/i18n/dict';
 import { SignButton, type Viewer } from './SignButton';
 import { Icon } from './Icon';
+import { NewsCard } from './NewsCard';
+import type { NewsStory } from '@/lib/news/load';
+import { TOPICS } from '@/lib/topics';
 
-type Slot = { item: FeedItem; explore: boolean } | { end: true };
+type Slot = { item: FeedItem; explore: boolean } | { news: NewsStory } | { end: true };
+const NEWS_EVERY = 3;   // one headline after every three videos
 const LS = 'unite-weights';
 
-export function Feed({ items, viewer, signed, followed, serverWeights, chronological, autoplay }: {
-  items: FeedItem[]; viewer: Viewer; signed: string[]; followed: string[]; serverWeights: Weights; chronological: boolean; autoplay: boolean;
+export function Feed({ items, news = [], viewer, signed, followed, serverWeights, chronological, autoplay }: {
+  items: FeedItem[]; news?: NewsStory[]; viewer: Viewer; signed: string[]; followed: string[]; serverWeights: Weights; chronological: boolean; autoplay: boolean;
 }) {
   const sb = supabaseBrowser();
   const { lang, t } = useT();
@@ -42,14 +46,21 @@ export function Feed({ items, viewer, signed, followed, serverWeights, chronolog
       if (cur.length && ('end' in cur[cur.length - 1] || cur.length - active >= 3)) return cur;
       const next = [...cur];
       const taken = new Set(next.flatMap((s) => ('item' in s ? [s.item.id] : [])));
+      const usedNews = new Set(next.flatMap((s) => ('news' in s ? [s.news.id] : [])));
       while (next.length - active < 3) {
+        let since = 0; for (let k = next.length - 1; k >= 0 && 'item' in next[k]; k--) since++;
+        if (since >= NEWS_EVERY) {
+          // the headline closest to what this person cares about, among the biggest stories
+          const n = news.filter((x) => !usedNews.has(x.id)).sort((a, b) => (weights[b.topic] ?? 0) + b.outlets - ((weights[a.topic] ?? 0) + a.outlets))[0];
+          if (n) { usedNews.add(n.id); next.push({ news: n }); continue; }
+        }
         const pick = pickNext(items.filter((i) => !taken.has(i.id)), weights, ctx, chronological);
         if (!pick) { next.push({ end: true }); break; }
         taken.add(pick.item.id); next.push(pick);
       }
       return next;
     });
-  }, [active, items, weights, ctx, chronological]);
+  }, [active, items, news, weights, ctx, chronological]);
 
   // which slide is on screen
   useEffect(() => {
@@ -100,7 +111,14 @@ export function Feed({ items, viewer, signed, followed, serverWeights, chronolog
   return (
     <div className="reel">
       <div className="scroller" ref={scroller}>
-        {slots.map((s, i) => 'end' in s ? (
+        {slots.map((s, i) => 'news' in s ? (
+          <section className="slide" data-i={i} key={'n' + s.news.id}>
+            <div className="frame" style={{ background: `radial-gradient(circle at 80% 18%, ${TOPICS[s.news.topic].b}aa, transparent 55%), linear-gradient(170deg, ${TOPICS[s.news.topic].a}, #070812)` }}>
+              <span className="newskind">{t('news.title')}</span>
+              <div className="newsslide"><NewsCard n={s.news} viewer={viewer} signed={!!s.news.petition && ctx.signed.has(s.news.petition.id)} onDark /></div>
+            </div>
+          </section>
+        ) : 'end' in s ? (
           <section className="slide" data-i={i} key="end"><div className="endcard">
             <h2>{t('feed.caughtUp')}</h2><p>{t('feed.caughtUpText')}</p>
             <Link className="btn primary" href="/updates">{t('feed.seeNext')}</Link>

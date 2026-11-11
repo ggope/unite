@@ -5,11 +5,13 @@ import { fmtN } from '@/lib/i18n/dict';
 import { SignButton, type Viewer } from './SignButton';
 import { InstallApp } from './InstallApp';
 import { LegalLinks } from './LegalLinks';
+import { NewsCard } from './NewsCard';
+import type { NewsStory } from '@/lib/news/load';
 
 type P = { id: string; title: string; target: string; topic: keyof typeof TOPICS; goal: number; combined: number };
 
 // What a visitor sees while the feed has no videos yet: what UNIER is, and petitions to sign right away.
-export async function Welcome({ petitions, viewer, signed }: { petitions: P[]; viewer: Viewer; signed: string[] }) {
+export async function Welcome({ petitions, news, viewer, signed }: { petitions: P[]; news: NewsStory[]; viewer: Viewer; signed: string[] }) {
   const { lang, t } = await getT();
   const fmt = (n: number) => fmtN(n, lang);
   return (
@@ -21,6 +23,13 @@ export async function Welcome({ petitions, viewer, signed }: { petitions: P[]; v
         <div className="row"><Link className="btn primary big" href="/petitions">{t('welcome.browse')}</Link><Link className="btn big" href="/post">{t('welcome.postFirst')}</Link></div>
       </section>
       <InstallApp />
+      {news.length > 0 && (
+        <section className="stack" style={{ gap: 0 }}>
+          <h2>{t('news.title')}</h2>
+          <p className="hint" style={{ margin: '4px 0 0' }}>{t('news.note')}</p>
+          {news.slice(0, 6).map((n) => <NewsCard key={n.id} n={n} viewer={viewer} signed={!!n.petition && signed.includes(n.petition.id)} />)}
+        </section>
+      )}
       {petitions.length > 0 && (
         <section className="stack" style={{ gap: 0 }}>
           <div className="row between" style={{ marginBottom: 4 }}><h2>{t('welcome.signToday')}</h2><Link href="/petitions">{t('welcome.seeAll')}</Link></div>

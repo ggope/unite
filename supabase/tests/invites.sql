@@ -34,3 +34,18 @@ insert into public.petition_updates (petition_id, kind, title, created_by) value
 delete from public.petition_updates where title = 'Delivered to the ministry';
 reset role;
 select 'invite and update tests passed' as result;
+-- news: public can read live items only; only moderators can hide
+reset role;
+insert into public.news_items (source_id, url, title, lang, topic, story_key, published_at) values
+ ('bbc', 'https://ex.com/1', 'Heatwave hits workers', 'en', 'labour', '00000000-0000-0000-0000-0000000000a1', now()),
+ ('guardian', 'https://ex.com/2', 'Workers hit by heatwave', 'en', 'labour', '00000000-0000-0000-0000-0000000000a1', now() - interval '1 hour'),
+ ('telex', 'https://ex.com/3', 'Hidden story here', 'hu', 'health', '00000000-0000-0000-0000-0000000000a2', now());
+update public.news_items set status = 'hidden' where url = 'https://ex.com/3';
+set role authenticated;
+select set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111', false);
+do $$ begin if (select count(*) from public.news_items) <> 2 then raise exception 'hidden news visible'; end if; end $$;
+do $$ begin if (select outlets from public.news_stories where story_key = '00000000-0000-0000-0000-0000000000a1') <> 2 then raise exception 'outlet count wrong'; end if; end $$;
+update public.news_items set status = 'hidden' where url = 'https://ex.com/1';
+do $$ begin if (select count(*) from public.news_items where status = 'live') <> 2 then raise exception 'non-moderator could hide news'; end if; end $$;
+reset role;
+select 'news tests passed' as result;

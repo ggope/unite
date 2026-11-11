@@ -298,6 +298,16 @@ export const en = {
   'legal.draft': 'Draft. This text has not been checked by a lawyer yet.',
   'consent.more': 'How we protect your data',
 
+  'news.title': 'In the news',
+  'news.read': 'Read on {source}',
+  'news.outlets': 'Reported by {n} outlets',
+  'news.start': 'Start a petition about this',
+  'news.related': 'Petition about this',
+  'news.ago.m': '{n} min ago',
+  'news.ago.h': '{n} h ago',
+  'news.ago.d': '{n} d ago',
+  'news.note': 'Headlines from trusted news outlets, chosen automatically by topic. Tap to read the full story on their site.',
+
   'card.signed': 'I signed.',
   'card.with': 'people with me · goal {goal}',
   'card.cta': 'Sign with one tap',
@@ -603,6 +613,16 @@ export const hu: Record<Key, string> = {
   'legal.imprint': 'Impresszum',
   'legal.draft': 'Tervezet. Ezt a szöveget még nem ellenőrizte jogász.',
   'consent.more': 'Így védjük az adataidat',
+
+  'news.title': 'A hírekben',
+  'news.read': 'Elolvasom: {source}',
+  'news.outlets': '{n} hírforrás írt róla',
+  'news.start': 'Petíció indítása erről',
+  'news.related': 'Kapcsolódó petíció',
+  'news.ago.m': '{n} perce',
+  'news.ago.h': '{n} órája',
+  'news.ago.d': '{n} napja',
+  'news.note': 'Megbízható hírforrások címei, téma szerint automatikusan válogatva. Koppints, és a teljes cikket a forrás oldalán olvashatod.',
 
   'card.signed': 'Aláírtam.',
   'card.with': 'ember velem együtt · cél: {goal}',

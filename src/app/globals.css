@@ -144,3 +144,19 @@ main{min-width:0;width:100%;max-width:680px;margin:0 auto;padding:16px max(16px,
 .doc p,.doc li{color:var(--ink)}
 .doc ul{padding-left:20px;margin:0;display:flex;flex-direction:column;gap:6px}
 .ph{background:var(--warn-soft);color:var(--warn);border-radius:4px;padding:0 4px;font-weight:600}
+/* news */
+.news{display:flex;flex-direction:column;gap:8px;padding:16px 0;border-bottom:1px solid var(--line)}
+.news h3{font-size:19px;font-weight:750;font-stretch:88%}
+.news h3 a{color:inherit;text-decoration:none}
+.news h3 a:hover{text-decoration:underline}
+.news p{margin:0;color:var(--muted);font-size:14.5px}
+.newspet{display:flex;flex-direction:column;gap:6px;align-items:flex-start;background:var(--sunk);border-radius:12px;padding:12px 14px}
+.newspet a{color:var(--ink);text-decoration:none}
+.newsslide{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:24px 18px 32px;color:#fff}
+.newsslide .news{border:0;padding:0;max-width:440px}
+.news.dark h3{font-size:28px;line-height:1.12}
+.news.dark p,.news.dark .hint{color:rgba(255,255,255,.82)}
+.news.dark .btn:not(.primary):not(.signed){background:rgba(255,255,255,.14);border-color:transparent;color:#fff}
+.news.dark .newspet{background:rgba(255,255,255,.14)}
+.news.dark .newspet a,.news.dark .label{color:#fff}
+.newskind{position:absolute;top:18px;left:18px;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;background:rgba(0,0,0,.4);padding:4px 10px;border-radius:999px;color:#fff}

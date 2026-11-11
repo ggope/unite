@@ -31,13 +31,14 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
   const fmt = (n: number) => fmtN(n, lang);
   const { data: p } = await sb.from('petitions').select('*').eq('id', id).maybeSingle();
   if (!p) notFound();
-  const [{ data: st }, { data: members }, { data: updates }, { data: videos }, friends, { data: me }] = await Promise.all([
+  const [{ data: st }, { data: members }, { data: updates }, { data: videos }, friends, { data: me }, { data: news }] = await Promise.all([
     sb.from('petition_stats').select('*').eq('id', id).maybeSingle(),
     p.cluster_id ? sb.from('petitions').select('id, title, organiser_name, origin, petition_stats(signatures)').eq('cluster_id', p.cluster_id) : Promise.resolve({ data: [] as any[] }),
     sb.from('petition_updates').select('*').eq('petition_id', id).order('created_at', { ascending: false }),
     sb.from('video_feed').select('id, caption, uploader_handle, role').eq('petition_id', id).limit(20),
     user ? sb.rpc('friends_who_signed', { p_petition: id }) : Promise.resolve({ data: [] as any[] }),
     user ? sb.from('profiles').select('is_moderator').eq('id', user.id).maybeSingle() : Promise.resolve({ data: null as any }),
+    sb.from('news_items').select('id, url, title, published_at, news_sources(name)').eq('petition_id', id).order('published_at', { ascending: false }).limit(10),
   ]);
   const combined = Number(st?.combined ?? 0);
   const isFounder = user && p.created_by === user.id;
@@ -76,6 +77,8 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
         {updates?.length ? updates.map((u: any) => <div key={u.id}><b>{u.title}</b><div className="hint">{t(`kind.${u.kind as 'win'}`)} · {new Date(u.created_at).toLocaleDateString(locale(lang))}</div>{u.body && <p style={{ margin: '4px 0 0' }}>{u.body}</p>}{user && (u.created_by === user.id || me?.is_moderator) && <RemoveUpdate id={u.id} />}</div>)
           : <p className="note">{t('p.noUpdates')}</p>}
       </section>
+      {!!news?.length && <section className="stack" style={{ gap: 8 }}><h2>{t('news.title')}</h2>
+        {news.map((n: any) => <div key={n.id}><a href={n.url} target="_blank" rel="noopener nofollow"><b>{n.title}</b></a><div className="hint">{n.news_sources?.name} · {new Date(n.published_at).toLocaleDateString(locale(lang))}</div></div>)}</section>}
       {!!videos?.length && <section className="stack" style={{ gap: 8 }}><h2>{t('p.videos')}</h2>
         {videos.map((v: any) => <div key={v.id}><b>{v.caption}</b><div className="hint">@{v.uploader_handle} <span className={`role ${v.role}`}>({t(`role.${v.role as 'founder' | 'supporter'}`)})</span></div></div>)}</section>}
     </div>

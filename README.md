@@ -44,3 +44,4 @@ npm run test:db              # schema + privacy tests on a local Postgres
 - **Starter petitions:** `supabase/starter.sql` (edit the email on the last line first), then approve them at `/moderate`.
 - **Legal pages** (`/privacy`, `/terms`, `/imprint`) are drafts in `src/lib/legal.tsx`. Fill in the highlighted placeholders and have a lawyer check them before launch.
 - **Languages:** all text lives in `src/lib/i18n/dict.ts` (English and Hungarian).
+- **News:** run `supabase/migrations/0003_news.sql`, add a `CRON_SECRET` environment variable in Vercel (any long random text), and redeploy. News then imports once a day; moderators can also press "Import news now" on `/moderate`. Sources live in the `news_sources` table. Only headlines, a short teaser and the link are stored; the full article stays on the publisher's site.

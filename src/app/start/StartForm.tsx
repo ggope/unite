@@ -5,7 +5,7 @@ import { TOPIC_KEYS, GOALS } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
 import { fmtN } from '@/lib/i18n/dict';
 
-export function StartForm({ then }: { then: 'video' | 'page' }) {
+export function StartForm({ then, source, topic }: { then: 'video' | 'page'; source?: string; topic?: string }) {
   const { lang, t } = useT();
   const [state, action, pending] = useActionState<StartState, FormData>(createPetition, {});
   return (
@@ -17,8 +17,8 @@ export function StartForm({ then }: { then: 'video' | 'page' }) {
         <datalist id="regions"><option value={t('start.rWorld')} /><option value={t('start.rEu')} /><option value={t('start.rHu')} /><option value="Budapest" /></datalist></div>
       <div className="field"><label htmlFor="ask">{t('start.ask')}</label><textarea id="ask" name="ask" required minLength={20} placeholder={t('start.askPh')} /></div>
       <div className="field"><label htmlFor="why">{t('start.why')}</label><textarea id="why" name="why" required minLength={20} placeholder={t('start.whyPh')} /></div>
-      <div className="field"><label htmlFor="source_url">{t('start.source')}</label><input id="source_url" name="source_url" type="url" placeholder="https://" /></div>
-      <div className="field"><label htmlFor="topic">{t('start.topic')}</label><select id="topic" name="topic">{TOPIC_KEYS.map((k) => <option key={k} value={k}>{t(`topic.${k}`)}</option>)}</select></div>
+      <div className="field"><label htmlFor="source_url">{t('start.source')}</label><input id="source_url" name="source_url" type="url" defaultValue={source} placeholder="https://" /></div>
+      <div className="field"><label htmlFor="topic">{t('start.topic')}</label><select id="topic" name="topic" defaultValue={topic && (TOPIC_KEYS as string[]).includes(topic) ? topic : undefined}>{TOPIC_KEYS.map((k) => <option key={k} value={k}>{t(`topic.${k}`)}</option>)}</select></div>
       <div className="field"><label htmlFor="goal">{t('start.goal')}</label><select id="goal" name="goal" defaultValue="10000">{GOALS.map((g) => <option key={g} value={g}>{fmtN(g, lang)}</option>)}</select></div>
       <div className="field"><label htmlFor="organiser_name">{t('start.organiser')}</label><input id="organiser_name" name="organiser_name" required placeholder={t('start.organiserPh')} /></div>
       <div className="field"><label htmlFor="ends_on">{t('start.ends')}</label><input id="ends_on" name="ends_on" type="date" /></div>
