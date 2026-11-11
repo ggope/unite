@@ -133,3 +133,7 @@ main{min-width:0;width:100%;max-width:680px;margin:0 auto;padding:16px max(16px,
 .hero p{margin:0;max-width:52ch}
 .tdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
 .install{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+/* language switch */
+.langs{display:inline-flex;gap:4px;background:var(--sunk);border-radius:999px;padding:3px;align-self:flex-start}
+.langs button{border:0;background:transparent;border-radius:999px;padding:6px 12px;font-weight:600;font-size:13px;color:var(--muted);cursor:pointer}
+.langs button[aria-pressed=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}

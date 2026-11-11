@@ -1,2 +1,6 @@
 import Link from 'next/link';
-export default function NotFound() { return <div className="empty"><h2>Not found</h2><p>This page does not exist.</p><Link href="/">Back to the feed</Link></div>; }
+import { getT } from '@/lib/i18n/server';
+export default async function NotFound() {
+  const { t } = await getT();
+  return <div className="empty"><h2>{t('notfound.title')}</h2><p>{t('notfound.text')}</p><Link href="/">{t('notfound.back')}</Link></div>;
+}

@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { applySignal, pickNext, type FeedItem, type Signal, type Weights } from '@/lib/ranking';
-import { TOPICS, ROLE_LABEL, fmt, type Topic } from '@/lib/topics';
+import { type Topic } from '@/lib/topics';
+import { useT } from '@/lib/i18n/client';
+import { fmtN } from '@/lib/i18n/dict';
 import { SignButton, type Viewer } from './SignButton';
 import { Icon } from './Icon';
 
@@ -14,6 +16,8 @@ export function Feed({ items, viewer, signed, followed, serverWeights, chronolog
   items: FeedItem[]; viewer: Viewer; signed: string[]; followed: string[]; serverWeights: Weights; chronological: boolean; autoplay: boolean;
 }) {
   const sb = supabaseBrowser();
+  const { lang, t } = useT();
+  const fmt = (n: number) => fmtN(n, lang);
   const [weights, setWeights] = useState<Weights>(serverWeights);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [active, setActive] = useState(0);
@@ -90,7 +94,7 @@ export function Feed({ items, viewer, signed, followed, serverWeights, chronolog
   }, [active, autoplay]);
 
   if (!items.length) return (
-    <div className="empty"><h2>No videos yet</h2><p>Be the first to show what is happening.</p><Link className="btn primary" href="/post">Post a video</Link></div>
+    <div className="empty"><h2>{t('feed.noVideos')}</h2><p>{t('feed.noVideosText')}</p><Link className="btn primary" href="/post">{t('common.postVideo')}</Link></div>
   );
 
   return (
@@ -98,8 +102,8 @@ export function Feed({ items, viewer, signed, followed, serverWeights, chronolog
       <div className="scroller" ref={scroller}>
         {slots.map((s, i) => 'end' in s ? (
           <section className="slide" data-i={i} key="end"><div className="endcard">
-            <h2>You are all caught up</h2><p>That is everything new for you right now.</p>
-            <Link className="btn primary" href="/updates">See what happened next</Link>
+            <h2>{t('feed.caughtUp')}</h2><p>{t('feed.caughtUpText')}</p>
+            <Link className="btn primary" href="/updates">{t('feed.seeNext')}</Link>
           </div></section>
         ) : (
           <section className={`slide ${quiet[i] ? 'quiet' : ''}`} data-i={i} key={s.item.id}>
@@ -112,23 +116,23 @@ export function Feed({ items, viewer, signed, followed, serverWeights, chronolog
               )}
               <div className="shade" />
               <div className="txt">
-                {s.item.uploader_handle && <span className="byline">@{s.item.uploader_handle} <span className={`role ${s.item.role}`}>({ROLE_LABEL[s.item.role]})</span></span>}
+                {s.item.uploader_handle && <span className="byline">@{s.item.uploader_handle} <span className={`role ${s.item.role}`}>({t(`role.${s.item.role}`)})</span></span>}
                 <div className="more"><div>
-                  <span className="whytag">{s.explore ? `Something new for you: ${TOPICS[s.item.topic].label}` : (weights[s.item.topic] ?? 0) > 1 ? `You often watch ${TOPICS[s.item.topic].label}` : 'Popular now'}</span>
+                  <span className="whytag">{s.explore ? t('feed.newForYou', { topic: t(`topic.${s.item.topic}`) }) : (weights[s.item.topic] ?? 0) > 1 ? t('feed.oftenWatch', { topic: t(`topic.${s.item.topic}`) }) : t('feed.popular')}</span>
                   <h2>{s.item.caption}</h2>
                 </div></div>
                 <div className="peek">{s.item.caption}</div>
                 <Link className="pcard" href={`/p/${s.item.petition_id}`}>
                   <strong>{s.item.petition_title}</strong>
                   <span className="bar"><i style={{ width: `${Math.min(100, (s.item.combined / s.item.goal) * 100)}%` }} /></span>
-                  <small><span className="num">{fmt(s.item.combined)} of {fmt(s.item.goal)}</span><span>+{fmt(s.item.last_hour)} this hour</span></small>
+                  <small><span className="num">{fmt(s.item.combined)} {t('common.of')} {fmt(s.item.goal)}</span><span>{t('feed.thisHour', { n: fmt(s.item.last_hour) })}</span></small>
                 </Link>
               </div>
               <div className="col">
                 <SignButton variant="reel" petitionId={s.item.petition_id} title={s.item.petition_title} signed={ctx.signed.has(s.item.petition_id)} viewer={viewer}
                   onChange={(on) => on && learn(s.item.topic, 'sign')} />
-                <button className="rb" onClick={() => learn(s.item.topic, 'care')}><span className="c"><Icon name="heart" /></span>Care</button>
-                <a className="rb" href={`/api/card/${s.item.petition_id}`} target="_blank" rel="noopener" onClick={() => learn(s.item.topic, 'share')}><span className="c"><Icon name="share" /></span>Share</a>
+                <button className="rb" onClick={() => learn(s.item.topic, 'care')}><span className="c"><Icon name="heart" /></span>{t('feed.care')}</button>
+                <a className="rb" href={`/api/card/${s.item.petition_id}`} target="_blank" rel="noopener" onClick={() => learn(s.item.topic, 'share')}><span className="c"><Icon name="share" /></span>{t('feed.share')}</a>
               </div>
             </div>
           </section>

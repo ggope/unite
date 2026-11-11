@@ -1,8 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useT } from '@/lib/i18n/client';
 
 // Offers "Install UNIER" where the browser supports it, and Add-to-Home-Screen steps on iPhone.
 export function InstallApp() {
+  const { t } = useT();
   const [prompt, setPrompt] = useState<any>(null);
   const [ios, setIos] = useState(false);
   const [hidden, setHidden] = useState(true);
@@ -21,11 +23,11 @@ export function InstallApp() {
   return (
     <div className="install">
       <div style={{ flex: 1, minWidth: 0 }}>
-        <b>Get the UNIER app</b>
-        <span className="hint" style={{ display: 'block' }}>{prompt ? 'Opens full screen, straight from your home screen.' : 'Tap the Share button, then “Add to Home Screen”.'}</span>
+        <b>{t('install.title')}</b>
+        <span className="hint" style={{ display: 'block' }}>{prompt ? t('install.android') : t('install.ios')}</span>
       </div>
-      {prompt && <button className="btn primary small" onClick={async () => { prompt.prompt(); await prompt.userChoice; setPrompt(null); close(); }}>Install</button>}
-      <button className="btn ghost small" onClick={close} aria-label="Not now">✕</button>
+      {prompt && <button className="btn primary small" onClick={async () => { prompt.prompt(); await prompt.userChoice; setPrompt(null); close(); }}>{t('install.btn')}</button>}
+      <button className="btn ghost small" onClick={close} aria-label={t('install.notNow')}>✕</button>
     </div>
   );
 }

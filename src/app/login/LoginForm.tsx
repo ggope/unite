@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
+import { useT } from '@/lib/i18n/client';
 
 type Mode = 'signin' | 'signup' | 'link' | 'forgot';
 
@@ -18,6 +19,7 @@ function GoogleLogo() {
 
 export function LoginForm({ next, initialError }: { next: string; initialError?: string }) {
   const router = useRouter();
+  const { t } = useT();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,7 +31,7 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
   async function google() {
     setBusy(true); setErr('');
     const { error } = await supabaseBrowser().auth.signInWithOAuth({ provider: 'google', options: { redirectTo: callback(next) } });
-    if (error) { setBusy(false); setErr('Google sign-in is not available right now. Try email instead.'); }
+    if (error) { setBusy(false); setErr(t('login.errGoogle')); }
   }
 
   async function submit(e: React.FormEvent) {
@@ -39,62 +41,62 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
       const { error } = await sb.auth.signInWithPassword({ email, password });
       setBusy(false);
       if (!error) { router.replace(next); router.refresh(); return; }
-      if (/confirm/i.test(error.message)) setErr('Please confirm your email first. Check your inbox for our link.');
-      else setErr('Wrong email or password.');
+      if (/confirm/i.test(error.message)) setErr(t('login.errConfirm'));
+      else setErr(t('login.errWrong'));
     } else if (mode === 'signup') {
       const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: callback(next) } });
       setBusy(false);
-      if (error) { setErr(/password/i.test(error.message) ? error.message : 'Could not create the account. Try again.'); return; }
+      if (error) { setErr(/password/i.test(error.message) ? t('login.errWeak') : t('login.errCreate')); return; }
       if (data.session) { router.replace(next); router.refresh(); return; }
-      setSent(`We sent a confirmation link to ${email}. Open it to finish creating your account.`);
+      setSent(t('login.sentConfirm', { email }));
     } else if (mode === 'link') {
       const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: callback(next) } });
       setBusy(false);
-      if (error) setErr('Could not send the link. Check the address and try again.');
-      else setSent(`We sent a sign-in link to ${email}. Open it on this device.`);
+      if (error) setErr(t('login.errSend'));
+      else setSent(t('login.sentLink', { email }));
     } else {
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: callback('/reset') });
       setBusy(false);
-      if (error) setErr('Could not send the reset link. Try again.');
-      else setSent(`If ${email} has an account, a link to set a new password is on its way.`);
+      if (error) setErr(t('login.errReset'));
+      else setSent(t('login.sentReset', { email }));
     }
   }
 
   if (sent) return (
-    <div className="panel"><b>Check your inbox</b><p style={{ margin: 0 }}>{sent}</p>
-      <button className="btn ghost" onClick={() => { setSent(''); setMode('signin'); }}>Back to sign in</button></div>
+    <div className="panel"><b>{t('login.inbox')}</b><p style={{ margin: 0 }}>{sent}</p>
+      <button className="btn ghost" onClick={() => { setSent(''); setMode('signin'); }}>{t('login.back')}</button></div>
   );
 
   const needsPassword = mode === 'signin' || mode === 'signup';
-  const label = { signin: 'Sign in', signup: 'Create account', link: 'Email me a link', forgot: 'Send reset link' }[mode];
+  const label = { signin: t('login.btnSignIn'), signup: t('login.btnSignUp'), link: t('login.btnLink'), forgot: t('login.btnForgot') }[mode];
 
   return (
     <div className="stack">
       {(mode === 'signin' || mode === 'signup') && (
         <div className="seg" role="tablist">
-          <button role="tab" aria-selected={mode === 'signin'} className={mode === 'signin' ? 'on' : ''} onClick={() => { setMode('signin'); setErr(''); }}>Sign in</button>
-          <button role="tab" aria-selected={mode === 'signup'} className={mode === 'signup' ? 'on' : ''} onClick={() => { setMode('signup'); setErr(''); }}>Create account</button>
+          <button role="tab" aria-selected={mode === 'signin'} className={mode === 'signin' ? 'on' : ''} onClick={() => { setMode('signin'); setErr(''); }}>{t('login.tabSignIn')}</button>
+          <button role="tab" aria-selected={mode === 'signup'} className={mode === 'signup' ? 'on' : ''} onClick={() => { setMode('signup'); setErr(''); }}>{t('login.tabSignUp')}</button>
         </div>
       )}
       <div className="panel">
-        {process.env.NEXT_PUBLIC_GOOGLE_LOGIN === "on" && <><button type="button" className="btn big block" onClick={google} disabled={busy}><GoogleLogo /> Continue with Google</button>
-        <div className="or"><span>or</span></div></>}
+        {process.env.NEXT_PUBLIC_GOOGLE_LOGIN === "on" && <><button type="button" className="btn big block" onClick={google} disabled={busy}><GoogleLogo /> {t('login.google')}</button>
+        <div className="or"><span>{t('login.or')}</span></div></>}
         <form onSubmit={submit} className="stack">
-          <div className="field"><label htmlFor="email">Email</label>
+          <div className="field"><label htmlFor="email">{t('login.email')}</label>
             <input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
           {needsPassword && (
-            <div className="field"><label htmlFor="pw">Password</label>
+            <div className="field"><label htmlFor="pw">{t('login.password')}</label>
               <input id="pw" type="password" required minLength={8} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} value={password} onChange={(e) => setPassword(e.target.value)} />
-              {mode === 'signup' && <span className="muted" style={{ fontSize: 13 }}>At least 8 characters.</span>}
+              {mode === 'signup' && <span className="muted" style={{ fontSize: 13 }}>{t('login.pwHint')}</span>}
             </div>
           )}
           {err && <p className="error" style={{ margin: 0 }}>{err}</p>}
-          <button className="btn primary big block" disabled={busy}>{busy ? 'One moment…' : label}</button>
+          <button className="btn primary big block" disabled={busy}>{busy ? t('login.wait') : label}</button>
         </form>
         <div className="links">
-          {mode === 'signin' && <button className="linkbtn" onClick={() => { setMode('forgot'); setErr(''); }}>Forgot password?</button>}
-          {mode !== 'link' && <button className="linkbtn" onClick={() => { setMode('link'); setErr(''); }}>Email me a sign-in link instead</button>}
-          {(mode === 'link' || mode === 'forgot') && <button className="linkbtn" onClick={() => { setMode('signin'); setErr(''); }}>Back to password sign-in</button>}
+          {mode === 'signin' && <button className="linkbtn" onClick={() => { setMode('forgot'); setErr(''); }}>{t('login.forgot')}</button>}
+          {mode !== 'link' && <button className="linkbtn" onClick={() => { setMode('link'); setErr(''); }}>{t('login.useLink')}</button>}
+          {(mode === 'link' || mode === 'forgot') && <button className="linkbtn" onClick={() => { setMode('signin'); setErr(''); }}>{t('login.usePassword')}</button>}
         </div>
       </div>
     </div>
