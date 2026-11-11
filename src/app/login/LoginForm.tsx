@@ -4,6 +4,16 @@ import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n/client';
 
+// Turn Supabase's error into something a person can act on; keep the raw text for anything unknown.
+function authError(t: (k: any) => string, e: { message: string; code?: string }, fallback: string) {
+  const m = `${e.code ?? ''} ${e.message}`;
+  if (/rate.?limit/i.test(m)) return t('login.errRate');
+  if (/not.?authori[sz]ed/i.test(m)) return t('login.errNotAllowed');
+  if (/already|exists/i.test(m)) return t('login.errExists');
+  if (/weak|password/i.test(m)) return t('login.errWeak');
+  return `${t(fallback)} (${e.message})`;
+}
+
 type Mode = 'signin' | 'signup' | 'link' | 'forgot';
 
 function GoogleLogo() {
@@ -46,18 +56,18 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
     } else if (mode === 'signup') {
       const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: callback(next) } });
       setBusy(false);
-      if (error) { setErr(/password/i.test(error.message) ? t('login.errWeak') : t('login.errCreate')); return; }
+      if (error) { setErr(authError(t, error, 'login.errCreate')); return; }
       if (data.session) { router.replace(next); router.refresh(); return; }
       setSent(t('login.sentConfirm', { email }));
     } else if (mode === 'link') {
       const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: callback(next) } });
       setBusy(false);
-      if (error) setErr(t('login.errSend'));
+      if (error) setErr(authError(t, error, 'login.errSend'));
       else setSent(t('login.sentLink', { email }));
     } else {
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: callback('/reset') });
       setBusy(false);
-      if (error) setErr(t('login.errReset'));
+      if (error) setErr(authError(t, error, 'login.errReset'));
       else setSent(t('login.sentReset', { email }));
     }
   }
