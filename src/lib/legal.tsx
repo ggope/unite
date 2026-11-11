@@ -81,7 +81,7 @@ const termsEn: Doc = { title: 'Terms of use', updated: 'Last updated: 11 Novembe
   </ul>
   <h2>Videos</h2>
   <ul>
-    <li>You keep the rights to your videos. You allow UNIER to host, show and adapt them (for example trim or blur) as part of the service, for as long as they are online.</li>
+    <li>You keep the rights to your videos. You allow UNIER to host, show and adapt them (for example trim them) as part of the service, for as long as they are online.</li>
     <li>Only post what you filmed or may share, and what really happened. Never put yourself or others in danger for a shot.</li>
     <li>No hate, harassment, violence, private information about others, or deliberately false content.</li>
   </ul>
@@ -108,7 +108,7 @@ const termsHu: Doc = { title: 'Felhasználási feltételek', updated: 'Utolsó m
   </ul>
   <h2>Videók</h2>
   <ul>
-    <li>A videóid jogai nálad maradnak. Megengeded az UNIER-nek, hogy a szolgáltatás részeként tárolja, megjelenítse és átalakítsa őket (például megvágja vagy homályosítson rajtuk), amíg elérhetők.</li>
+    <li>A videóid jogai nálad maradnak. Megengeded az UNIER-nek, hogy a szolgáltatás részeként tárolja, megjelenítse és átalakítsa őket (például megvágja), amíg elérhetők.</li>
     <li>Csak olyat tölts fel, amit te vettél fel vagy megoszthatsz, és ami valóban megtörtént. Egy felvételért se magadat, se mást ne sodorj veszélybe.</li>
     <li>Tilos a gyűlöletkeltés, zaklatás, erőszak, mások magánadatainak közzététele és a szándékosan hamis tartalom.</li>
   </ul>

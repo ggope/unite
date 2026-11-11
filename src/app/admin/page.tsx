@@ -66,14 +66,14 @@ const Decide = ({ kind, id }: { kind: string; id: string }) => (
 async function Queue({ sb }: { sb: any }) {
   const [{ data: pets }, { data: vids }] = await Promise.all([
     sb.from('petitions').select('id, title, target, region, ask, why, source_url, organiser_name, topic, goal, created_at').eq('status', 'pending').order('created_at').limit(30),
-    sb.from('videos').select('id, caption, storage_path, petition_id, created_at, petitions(title)').eq('status', 'pending').order('created_at').limit(30),
+    sb.from('videos').select('id, caption, storage_path, petition_id, created_at, blur_faces, audience, petitions(title)').eq('status', 'pending').order('created_at').limit(30),
   ]);
   const urls = vids?.length ? (await sb.storage.from('videos').createSignedUrls(vids.map((v: any) => v.storage_path), 3600)).data ?? [] : [];
   return (<>
     <h2>Petitions ({pets?.length ?? 0})</h2>
     {pets?.length ? pets.map((p: any) => <div className="panel" key={p.id}><b>{p.title}</b><span className="hint">{p.organiser_name} → {p.target} · {p.region} · {p.topic} · goal {n(p.goal)} · {when(p.created_at)}</span><p style={{ margin: 0 }}>{p.ask}</p><p className="hint" style={{ margin: 0 }}>{p.why}</p>{p.source_url && <a href={p.source_url} target="_blank" rel="noopener nofollow">Source</a>}<Decide kind="petition" id={p.id} /></div>) : <p className="hint">Nothing waiting.</p>}
     <h2>Videos ({vids?.length ?? 0})</h2>
-    {vids?.length ? vids.map((v: any, i: number) => <div className="panel" key={v.id}><b>{v.caption}</b><span className="hint">For: {v.petitions?.title} · {when(v.created_at)}</span>{urls[i]?.signedUrl && <video src={urls[i].signedUrl} controls muted playsInline style={{ width: '100%', maxHeight: 420, background: '#000', borderRadius: 10 }} />}<Decide kind="video" id={v.id} /></div>) : <p className="hint">Nothing waiting.</p>}
+    {vids?.length ? vids.map((v: any, i: number) => <div className="panel" key={v.id}><b>{v.caption}</b><span className="hint">For: {v.petitions?.title} · {v.audience === 'friends' ? 'friends only · ' : ''}{when(v.created_at)}</span>{v.blur_faces && <p className="error" style={{ margin: 0 }}>The uploader says other people can be recognised. Approve only if they clearly agreed to be filmed or cannot be identified.</p>}{urls[i]?.signedUrl && <video src={urls[i].signedUrl} controls muted playsInline style={{ width: '100%', maxHeight: 420, background: '#000', borderRadius: 10 }} />}<Decide kind="video" id={v.id} /></div>) : <p className="hint">Nothing waiting.</p>}
   </>);
 }
 
@@ -98,6 +98,7 @@ async function Petitions({ sb, q }: { sb: any; q: string }) {
   if (q) query = query.ilike('title', `%${q}%`);
   const [{ data: ps }, { data: all }] = await Promise.all([query, sb.from('petitions').select('id, title').eq('status', 'live').order('title').limit(500)]);
   return (<>
+    <LiveList items={all} />
     <form className="field" action="/admin"><input type="hidden" name="tab" value="petitions" /><input name="q" type="search" defaultValue={q} placeholder="Search petitions" aria-label="Search petitions" /></form>
     {ps?.map((p: any) => (
       <div className="panel" key={p.id} style={{ gap: 8 }}>
@@ -108,7 +109,7 @@ async function Petitions({ sb, q }: { sb: any; q: string }) {
           {p.status === 'live' && <button className="btn small" name="status" value="closed">Close</button>}
           {p.status !== 'removed' && <button className="btn small danger" name="status" value="removed">Remove</button>}</form>
         {p.status === 'live' && <form action={unite} className="row"><input type="hidden" name="id" value={p.id} />
-          <select name="with" defaultValue="" style={{ flex: 1, minWidth: 0 }}><option value="" disabled>Unite with a petition asking the same thing…</option>{all?.filter((o: any) => o.id !== p.id).map((o: any) => <option key={o.id} value={o.id}>{o.title}</option>)}</select>
+          <input name="with" list="live-petitions" required placeholder="Unite with… (type a title or paste a link)" style={{ flex: 1, minWidth: 0 }} />
           <button className="btn small">Unite</button></form>}
         {p.cluster_id && <form action={separate}><input type="hidden" name="id" value={p.id} /><button className="btn ghost small">Separate from its group</button></form>}
       </div>))}
@@ -122,6 +123,7 @@ async function News({ sb }: { sb: any }) {
     sb.from('petitions').select('id, title').eq('status', 'live').order('title').limit(500),
   ]);
   return (<>
+    <LiveList items={live} />
     <form action={importNews} className="row"><button className="btn primary">Import news now</button><span className="hint">Also runs on its own every morning.</span></form>
     <div className="panel" style={{ gap: 6 }}><b>Sources</b>
       {sources?.map((s: any) => <form key={s.id} action={toggleSource} className="row between"><input type="hidden" name="id" value={s.id} /><input type="hidden" name="active" value={String(!s.active)} />
@@ -134,13 +136,16 @@ async function News({ sb }: { sb: any }) {
           <a href={x.url} target="_blank" rel="noopener nofollow"><b>{x.title}</b></a>
           <span className="hint">{x.news_sources?.name} · {x.topic} · {x.lang} · {when(x.published_at)}{x.status === 'hidden' ? ' · hidden' : ''}</span>
           <form action={newsAction} className="row"><input type="hidden" name="id" value={x.id} />
-            <select name="petition_id" defaultValue={x.petition_id ?? ''} style={{ flex: 1, minWidth: 0 }}><option value="">No petition attached</option>{live?.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}</select>
+            <input name="petition_id" list="live-petitions" defaultValue={x.petition_id ?? ''} placeholder="Attach a petition (type a title)" style={{ flex: 1, minWidth: 0 }} />
             <button className="btn small" name="do" value="attach">Attach</button>
             {x.status !== 'hidden' && <button className="btn small danger" name="do" value="hide">Hide</button>}</form>
         </div>))}
     </div>
   </>);
 }
+
+// One shared list of live petitions for every "unite" and "attach" box (typing a title suggests the match).
+const LiveList = ({ items }: { items: any[] | null }) => <datalist id="live-petitions">{items?.map((o) => <option key={o.id} value={o.id} label={o.title} />)}</datalist>;
 
 async function People({ sb, q, me }: { sb: any; q: string; me: string }) {
   const { data: people } = await sb.rpc('admin_find_people', { p_query: q });

@@ -6,7 +6,7 @@ import { CONSENT_VERSION } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
 
 // A signature started while signed out waits here until the email link signs the person in.
-type Pending = { petitionId: string; why: string; show: boolean; lang: string; at: number };
+type Pending = { petitionId: string; email: string; why: string; show: boolean; lang: string; at: number };
 const KEY = 'unier-pending-sign';
 const DAY = 24 * 3600 * 1000;
 
@@ -29,7 +29,8 @@ export function PendingSign() {
     const sb = supabaseBrowser();
     (async () => {
       const { data } = await sb.auth.getSession();
-      if (!data.session) return;
+      // Only finish it for the person who asked for the link.
+      if (!data.session || data.session.user.email?.toLowerCase() !== p.email) return;
       try { localStorage.removeItem(KEY); } catch {}
       const c = await sb.rpc('give_signature_consent', { p_text_version: p.lang === 'en' ? CONSENT_VERSION : `${CONSENT_VERSION}-${p.lang}` });
       const s = c.error ? c : await sb.rpc('sign_petition', { p_petition: p.petitionId, p_why: p.why || null, p_show_reason: p.show && !!p.why });

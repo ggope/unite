@@ -72,7 +72,7 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
   async function guestSign() {
     setBusy(true); setErr('');
     const clean = email.trim().toLowerCase();
-    savePending({ petitionId, why: why.trim(), show, lang, at: Date.now() });
+    savePending({ petitionId, email: clean, why: why.trim(), show, lang, at: Date.now() });
     const next = `/p/${petitionId}`;
     const { error } = await sb.auth.signInWithOtp({ email: clean, options: { shouldCreateUser: true, emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}` } });
     setBusy(false);

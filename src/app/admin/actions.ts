@@ -20,6 +20,8 @@ async function done(error?: { message: string } | null) {
   redirect(u.pathname + u.search);
 }
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
+// Accepts a petition id or a pasted link to one.
+const pid = (v: string) => v.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? '';
 
 export async function review(f: FormData) {
   const sb = await mod();
@@ -41,9 +43,9 @@ export async function petitionStatus(f: FormData) {
 // Unite: both petitions join one group; each keeps its own count, and the total is shown on both.
 export async function unite(f: FormData) {
   const sb = await mod();
-  const a = s(f, 'id'), b = s(f, 'with'); if (!a || !b || a === b) return;
+  const a = s(f, 'id'), b = pid(s(f, 'with')); if (!a || !b || a === b) return done({ message: 'Pick another petition from the list' });
   const { data: ps } = await sb.from('petitions').select('id, title, cluster_id').in('id', [a, b]);
-  if (!ps || ps.length !== 2) return;
+  if (!ps || ps.length !== 2) return done({ message: 'Petition not found' });
   let cluster = ps.find((p: any) => p.cluster_id)?.cluster_id as string | undefined;
   if (!cluster) { const { data } = await sb.from('clusters').insert({ label: ps.find((p: any) => p.id === a)!.title }).select('id').single(); cluster = data?.id; }
   if (!cluster) return done({ message: 'Could not create the group' });
@@ -89,7 +91,7 @@ export async function importNews() {
 }
 export async function newsAction(f: FormData) {
   const sb = await mod();
-  const patch = s(f, 'do') === 'hide' ? { status: 'hidden' } : { petition_id: s(f, 'petition_id') || null };
+  const patch = s(f, 'do') === 'hide' ? { status: 'hidden' } : { petition_id: pid(s(f, 'petition_id')) || null };
   await done((await sb.from('news_items').update(patch).eq('id', s(f, 'id'))).error);
 }
 export async function toggleSource(f: FormData) {

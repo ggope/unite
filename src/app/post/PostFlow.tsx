@@ -14,7 +14,7 @@ export function PostFlow({ userId, petitions, initial, viewer }: { userId: strin
   const [q, setQ] = useState('');
   const [file, setFile] = useState<File | null>(null); const [url, setUrl] = useState<string | null>(null);
   const [dur, setDur] = useState(0); const [ts, setTs] = useState(0); const [te, setTe] = useState(0);
-  const [caption, setCaption] = useState(''); const [blur, setBlur] = useState(true); const [aud, setAud] = useState<'everyone' | 'friends'>('everyone');
+  const [caption, setCaption] = useState(''); const [blur, setBlur] = useState(false); const [aud, setAud] = useState<'everyone' | 'friends'>('everyone');
   const [ok, setOk] = useState(false); const [stage, setStage] = useState<'' | 'uploading' | 'done'>(''); const [pct, setPct] = useState(0); const [err, setErr] = useState('');
   const vid = useRef<HTMLVideoElement>(null);
   const pet = petitions.find((p) => p.id === pid);
