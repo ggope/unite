@@ -45,4 +45,5 @@ npm run test:db              # schema + privacy tests on a local Postgres
 - **Legal pages** (`/privacy`, `/terms`, `/imprint`) are drafts in `src/lib/legal.tsx`. Fill in the highlighted placeholders and have a lawyer check them before launch.
 - **Languages:** all text lives in `src/lib/i18n/dict.ts` (English and Hungarian).
 - **Delivery reports and donations:** run `supabase/migrations/0005_report.sql`. Every live petition gets a printable report at `/p/ID/report`. For donations, create Stripe Payment Links and add `NEXT_PUBLIC_DONATE_URL` (and optionally `NEXT_PUBLIC_DONATE_MONTHLY_URL`) in Vercel.
+- **People:** run `supabase/migrations/0006_social.sql`. Profiles at `/u/handle`, friend requests, blocking, and messages between friends at `/messages`.
 - **News:** run `supabase/migrations/0003_news.sql`, add a `CRON_SECRET` environment variable in Vercel (any long random text), and redeploy. News then imports once a day; moderators can also press "Import news now" on `/admin` (News tab). Sources live in the `news_sources` table. Only headlines, a short teaser and the link are stored; the full article stays on the publisher's site.

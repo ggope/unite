@@ -78,17 +78,21 @@ async function Queue({ sb }: { sb: any }) {
 }
 
 async function Reports({ sb }: { sb: any }) {
-  const { data: reports } = await sb.from('reports').select('id, reason, video_id, petition_id, created_at, videos(caption, storage_path), petitions(title)').eq('status', 'open').order('created_at').limit(50);
+  const base = 'id, reason, video_id, petition_id, created_at, videos(caption, storage_path), petitions(title)';
+  let { data: reports, error } = await sb.from('reports').select(`${base}, profile_id, person:profiles!reports_profile_id_fkey(handle, display_name, bio)`).eq('status', 'open').order('created_at').limit(50);
+  if (error) ({ data: reports } = await sb.from('reports').select(base).eq('status', 'open').order('created_at').limit(50));   // before 0006_social.sql
   return (<>
     <p className="hint" style={{ margin: 0 }}>Removing something sends your reason to its author. Dismiss keeps it online.</p>
     {reports?.length ? reports.map((r: any) => (
       <div className="panel" key={r.id}>
-        <span className="hint">{when(r.created_at)} · {r.video_id ? 'Video' : 'Petition'}</span>
-        <b>{r.video_id ? r.videos?.caption : <Link href={`/p/${r.petition_id}`}>{r.petitions?.title}</Link>}</b>
+        <span className="hint">{when(r.created_at)} · {r.video_id ? 'Video' : r.petition_id ? 'Petition' : 'Person'}</span>
+        <b>{r.video_id ? r.videos?.caption : r.petition_id ? <Link href={`/p/${r.petition_id}`}>{r.petitions?.title}</Link>
+          : <Link href={`/u/${r.person?.handle ?? r.profile_id}`}>{r.person?.display_name || (r.person?.handle ? '@' + r.person.handle : 'Profile')}</Link>}</b>
+        {r.profile_id && r.person?.bio && <span className="hint">Bio: “{r.person.bio}”</span>}
         <p style={{ margin: 0 }}>“{r.reason}”</p>
-        <form action={resolveReport} className="row"><input type="hidden" name="report_id" value={r.id} /><input type="hidden" name="video_id" value={r.video_id ?? ''} /><input type="hidden" name="petition_id" value={r.petition_id ?? ''} />
+        <form action={resolveReport} className="row"><input type="hidden" name="report_id" value={r.id} /><input type="hidden" name="video_id" value={r.video_id ?? ''} /><input type="hidden" name="petition_id" value={r.petition_id ?? ''} /><input type="hidden" name="profile_id" value={r.profile_id ?? ''} />
           <input name="note" placeholder="Reason shown to the author if removed" style={{ flex: 1, minWidth: 0 }} />
-          <button className="btn small" name="action" value="dismiss">Dismiss</button><button className="btn small danger" name="action" value="remove">Remove</button></form>
+          <button className="btn small" name="action" value="dismiss">Dismiss</button><button className="btn small danger" name="action" value="remove">{r.profile_id && !r.video_id && !r.petition_id ? 'Clear name and bio' : 'Remove'}</button></form>
       </div>)) : <p className="hint">No open reports.</p>}
   </>);
 }

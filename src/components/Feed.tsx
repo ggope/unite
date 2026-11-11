@@ -167,7 +167,7 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
               )}
               <div className="shade" />
               <div className="txt">
-                {s.item.uploader_handle && <span className="byline">@{s.item.uploader_handle} <span className={`role ${s.item.role}`}>({t(`role.${s.item.role}`)})</span></span>}
+                {s.item.uploader_handle && <span className="byline"><a href={`/u/${s.item.uploader_handle}`} style={{ color: 'inherit' }}>@{s.item.uploader_handle}</a> <span className={`role ${s.item.role}`}>({t(`role.${s.item.role}`)})</span></span>}
                 <div className="more"><div>
                   <span className="whytag">{s.explore ? t('feed.newForYou', { topic: t(`topic.${s.item.topic}`) }) : (weights[s.item.topic] ?? 0) > 1 ? t('feed.oftenWatch', { topic: t(`topic.${s.item.topic}`) }) : t('feed.popular')}</span>
                   <h2>{s.item.caption}</h2>

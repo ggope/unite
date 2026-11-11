@@ -90,7 +90,7 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
       {!!news?.length && <section className="stack" style={{ gap: 8 }}><h2>{t('news.title')}</h2>
         {news.map((n: any) => <div key={n.id}><a href={n.url} target="_blank" rel="noopener nofollow"><b>{n.title}</b></a><div className="hint">{n.news_sources?.name} · {new Date(n.published_at).toLocaleDateString(locale(lang))}</div></div>)}</section>}
       {!!videos?.length && <section className="stack" style={{ gap: 8 }}><h2>{t('p.videos')}</h2>
-        {videos.map((v: any) => <div key={v.id}><b>{v.caption}</b><div className="hint">@{v.uploader_handle} <span className={`role ${v.role}`}>({t(`role.${v.role as 'founder' | 'supporter'}`)})</span></div></div>)}</section>}
+        {videos.map((v: any) => <div key={v.id}><b>{v.caption}</b><div className="hint">{v.uploader_handle ? <Link href={`/u/${v.uploader_handle}`}>@{v.uploader_handle}</Link> : null} <span className={`role ${v.role}`}>({t(`role.${v.role as 'founder' | 'supporter'}`)})</span></div></div>)}</section>}
     </div>
   );
 }

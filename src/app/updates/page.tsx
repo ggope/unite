@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { loadViewer } from '@/lib/viewer';
 import { getT } from '@/lib/i18n/server';
 import { locale } from '@/lib/i18n/dict';
+import { InboxTabs } from '@/components/InboxTabs';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export default async function Updates() {
     : { data: [] as any[] };
   await sb.from('user_settings').update({ updates_seen_at: new Date().toISOString() }).eq('user_id', user.id);
   return (
-    <div className="stack"><h1>{t('upd.title')}</h1><p className="muted" style={{ margin: 0 }}>{t('upd.intro')}</p>
+    <div className="stack"><h1>{t('upd.title')}</h1><InboxTabs active="updates" /><p className="muted" style={{ margin: 0 }}>{t('upd.intro')}</p>
       {data?.length ? data.map((u: any) => (
         <div className="panel" key={u.id} style={{ gap: 4 }}>
           <span className="hint">{t(`kind.${u.kind as 'win'}`)} · {new Date(u.created_at).toLocaleDateString(locale(lang))}</span>

@@ -8,16 +8,16 @@ import { Icon } from './Icon';
 const REASONS = ['false', 'hate', 'violence', 'privacy', 'spam', 'other'] as const;
 
 // Notice and action (EU Digital Services Act): anyone signed in can report a video or petition.
-export function ReportButton({ videoId, petitionId, loggedIn, variant = 'ghost' }: { videoId?: string; petitionId?: string; loggedIn: boolean; variant?: 'ghost' | 'reel' }) {
+export function ReportButton({ videoId, petitionId, profileId, loggedIn, variant = 'ghost' }: { videoId?: string; petitionId?: string; profileId?: string; loggedIn: boolean; variant?: 'ghost' | 'reel' }) {
   const { t } = useT(); const router = useRouter(); const path = usePathname();
   const [open, setOpen] = useState(false); const [why, setWhy] = useState<(typeof REASONS)[number] | ''>(''); const [txt, setTxt] = useState('');
   const [state, setState] = useState<'' | 'busy' | 'done' | 'err'>('');
-  const what = videoId ? t('report.video') : t('report.petition');
+  const what = videoId ? t('report.video') : profileId ? t('report.profile') : t('report.petition');
   function start() { if (!loggedIn) { router.push(`/login?next=${encodeURIComponent(path)}`); return; } setOpen(true); setState(''); }
   async function send() {
     setState('busy');
     const { data: s } = await supabaseBrowser().auth.getSession();
-    const { error } = await supabaseBrowser().from('reports').insert({ reporter_id: s.session?.user.id, video_id: videoId ?? null, petition_id: videoId ? null : petitionId ?? null, reason: `${why}${txt.trim() ? ': ' + txt.trim() : ''}`.slice(0, 500) });
+    const { error } = await supabaseBrowser().from('reports').insert({ reporter_id: s.session?.user.id, video_id: videoId ?? null, petition_id: videoId ? null : petitionId ?? null, ...(profileId ? { profile_id: profileId } : {}), reason: `${why}${txt.trim() ? ': ' + txt.trim() : ''}`.slice(0, 500) });
     setState(error ? 'err' : 'done');
   }
   return (

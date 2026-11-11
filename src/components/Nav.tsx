@@ -19,14 +19,17 @@ export function Nav() {
   const { t } = useT();
   const [unread, setUnread] = useState(0);
   useEffect(() => {
-    if (path.startsWith('/updates')) { setUnread(0); return; }
     if (!document.cookie.includes('-auth-token')) return;
     let gone = false;
-    supabaseBrowser().rpc('unread_updates').then(({ data }: { data: number | null }) => { if (!gone && typeof data === 'number') setUnread(data); });
+    const sb = supabaseBrowser();
+    const count = (r: { data: unknown }) => (typeof r.data === 'number' ? r.data : 0);
+    // Updates and messages share the inbox badge.
+    Promise.all([path.startsWith('/updates') ? { data: 0 } : sb.rpc('unread_updates'), sb.rpc('unread_messages')])
+      .then(([u, m]) => { if (!gone) setUnread(count(u) + count(m)); });
     return () => { gone = true; };
   }, [path]);
   const dot = (h: string) => h === '/updates' && unread > 0 ? <span className="badge" aria-label={`${unread} ${t('nav.new')}`}>{unread > 9 ? '9+' : unread}</span> : null;
-  const active = (h: string) => (h === '/' ? path === '/' : path.startsWith(h) || (h === '/petitions' && (path.startsWith('/p/') || path === '/start')));
+  const active = (h: string) => (h === '/' ? path === '/' : path.startsWith(h) || (h === '/updates' && path.startsWith('/messages')) || (h === '/petitions' && (path.startsWith('/p/') || path === '/start')));
   return (
     <>
       <aside className="rail" aria-label={t('nav.main')}>

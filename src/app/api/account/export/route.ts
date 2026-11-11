@@ -19,7 +19,13 @@ export async function GET() {
     q(sb.from('petition_updates').select('*').eq('created_by', user.id)),
     q(sb.from('topic_weights').select('topic, weight')),
   ]);
-  const body = { exported_at: new Date().toISOString(), account: { id: user.id, email: user.email }, profile, settings, consents, signatures, follows, friends, petitions, videos, updates_posted: updates, feed_learning: weights,
+  // People features (0006_social.sql): your messages, requests and blocks.
+  const [messages, friend_requests, blocks] = await Promise.all([
+    q(sb.from('messages').select('id, sender_id, recipient_id, body, created_at, read_at').order('id')),
+    q(sb.from('friend_requests').select('from_id, to_id, created_at')),
+    q(sb.from('blocks').select('blocked_id, created_at')),
+  ]);
+  const body = { exported_at: new Date().toISOString(), account: { id: user.id, email: user.email }, profile, settings, consents, signatures, follows, friends, petitions, videos, updates_posted: updates, feed_learning: weights, messages, friend_requests, blocks,
     note: 'Video files are stored privately; they are deleted with your account. Write to us if you want copies of the files.' };
   return new NextResponse(JSON.stringify(body, null, 2), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': `attachment; filename="unier-my-data-${new Date().toISOString().slice(0, 10)}.json"`, 'Cache-Control': 'no-store' } });
 }

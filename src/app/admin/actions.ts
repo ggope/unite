@@ -71,16 +71,17 @@ export async function separate(f: FormData) {
 export async function resolveReport(f: FormData) {
   const sb = await mod();
   const action = s(f, 'action'), note = s(f, 'note') || null;
-  const video = s(f, 'video_id'), petition = s(f, 'petition_id');
+  const video = s(f, 'video_id'), petition = s(f, 'petition_id'), person = s(f, 'profile_id');
   const resolved = { status: 'resolved', resolved_at: new Date().toISOString() };
   if (action === 'remove') {
     const { error } = video
       ? await sb.from('videos').update({ status: 'rejected', moderation_note: note }).eq('id', video)
-      : await sb.from('petitions').update({ status: 'removed', moderation_note: note }).eq('id', petition);
+      : petition ? await sb.from('petitions').update({ status: 'removed', moderation_note: note }).eq('id', petition)
+      : await sb.rpc('clear_profile', { p_user: person });
     if (error) return done(error);
     // Removing the item settles every open report about it, not just this one.
     const q = sb.from('reports').update(resolved).eq('status', 'open');
-    return done((await (video ? q.eq('video_id', video) : q.eq('petition_id', petition))).error);
+    return done((await (video ? q.eq('video_id', video) : petition ? q.eq('petition_id', petition) : q.eq('profile_id', person).is('video_id', null).is('petition_id', null))).error);
   }
   await done((await sb.from('reports').update(resolved).eq('id', Number(s(f, 'report_id')))).error);
 }

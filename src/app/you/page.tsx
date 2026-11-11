@@ -12,32 +12,42 @@ import { Icon } from '@/components/Icon';
 
 export const dynamic = 'force-dynamic';
 
-export default async function You({ searchParams }: { searchParams: Promise<{ friend?: string }> }) {
-  const { friend } = await searchParams;
+export default async function You({ searchParams }: { searchParams: Promise<{ friend?: string; err?: string }> }) {
+  const { friend, err } = await searchParams;
   const [{ sb, user, viewer, settings, weights }, { t }] = await Promise.all([loadViewer(), getT()]);
   if (!user) return <div className="stack"><div className="empty"><h2>{t('you.title')}</h2><p>{t('you.signedOut')}</p><Link className="btn primary" href="/login?next=/you">{t('common.signIn')}</Link></div><InstallApp /><div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div><LegalLinks /></div>;
   const [{ data: profile }, { data: sigs }, { data: vids }, { data: code }, { data: fr }, { data: mine }] = await Promise.all([
-    sb.from('profiles').select('handle, display_name, is_moderator').eq('id', user.id).single(),
+    sb.from('profiles').select('*').eq('id', user.id).single(),
     sb.from('signatures').select('petition_id, why, created_at, petitions(title)').order('created_at', { ascending: false }),
     sb.from('videos').select('id, caption, status, moderation_note, created_at').eq('uploader_id', user.id).order('created_at', { ascending: false }),
     sb.rpc('my_invite_code'),
     sb.from('friendships').select('friend_id, profiles!friendships_friend_id_fkey(handle, display_name)').eq('user_id', user.id),
     sb.from('petitions').select('id, title, status, moderation_note, created_at').eq('created_by', user.id).order('created_at', { ascending: false }),
   ]);
+  const { data: reqs } = await sb.from('friend_requests').select('from_id, profiles!friend_requests_from_id_fkey(handle, display_name)').eq('to_id', user.id);
+  const requests = (reqs ?? []).map((r: any) => ({ id: r.from_id, handle: r.profiles?.handle ?? null, display_name: r.profiles?.display_name ?? null }));
+  const interests: string[] = profile?.interests ?? [];
   const friends = (fr ?? []).map((f: any) => ({ id: f.friend_id, handle: f.profiles?.handle ?? null, display_name: f.profiles?.display_name ?? null }));
   const today = (sigs ?? []).filter((s: any) => new Date(s.created_at) >= new Date(new Date().toISOString().slice(0, 10))).length;
   const max = Math.max(1, ...Object.values(weights).map(Math.abs));
   const on = (k: string) => (settings?.[k] ? true : false);
   return (
     <div className="stack">
-      <div className="row between"><h1>{t('you.title')}</h1>{profile?.is_moderator && <Link className="btn small" href="/admin">Admin</Link>}</div>
+      <div className="row between"><h1>{t('you.title')}</h1><div className="row">{profile?.handle && <Link className="btn small" href={`/u/${profile.handle}`}>{t('pr.view')}</Link>}{profile?.is_moderator && <Link className="btn small" href="/admin">Admin</Link>}</div></div>
       {friend && <p className="note" style={{ margin: 0 }}>{t('invite.done')}</p>}
       <InstallApp />
       <div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div>
-      <form action={saveSettings} className="panel">
+      <form action={saveSettings} className="panel" id="profile">
         <span className="label">{t('you.profile')}</span><span className="hint">{user.email}</span>
+        {err === 'handle' && <p className="error" role="alert" style={{ margin: 0 }}>{t('you.handleTaken')}</p>}
         <div className="field"><label htmlFor="handle">{t('you.handle')}</label><input id="handle" name="handle" defaultValue={profile?.handle ?? ''} placeholder={t('you.handlePh')} /></div>
-        <div className="field"><label htmlFor="display_name">{t('you.name')}</label><input id="display_name" name="display_name" defaultValue={profile?.display_name ?? ''} /></div>
+        <div className="field"><label htmlFor="display_name">{t('you.name')}</label><input id="display_name" name="display_name" maxLength={40} defaultValue={profile?.display_name ?? ''} /></div>
+        <div className="field"><label htmlFor="bio">{t('you.bio')}</label><input id="bio" name="bio" maxLength={160} defaultValue={profile?.bio ?? ''} placeholder={t('you.bioPh')} /></div>
+        <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}><legend style={{ fontWeight: 600, marginBottom: 6 }}>{t('you.interests')}</legend>
+          <div className="row">{Object.keys(TOPICS).map((k) => <label key={k} className="chip"><input type="checkbox" name="interests" value={k} defaultChecked={interests.includes(k)} style={{ marginRight: 6 }} />{t(`topic.${k as keyof typeof TOPICS}`)}</label>)}</div></fieldset>
+        <span className="label">{t('you.people')}</span>
+        <label className="check"><input type="checkbox" name="allow_messages" defaultChecked={(settings?.allow_messages ?? 'friends') === 'friends'} /><span>{t('you.allowMessages')}</span></label>
+        <label className="check"><input type="checkbox" name="signatures_public" defaultChecked={on('signatures_public')} /><span>{t('you.sigsPublic')}</span></label>
         <span className="label">{t('you.signing')}</span>
         <label className="check"><input type="checkbox" name="one_tap" defaultChecked={on('one_tap')} /><span>{t('you.oneTap')}</span></label>
         <label className="check"><input type="checkbox" name="share_signatures_with_friends" defaultChecked={on('share_signatures_with_friends')} /><span>{t('you.shareFriends')}</span></label>
@@ -48,7 +58,7 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
         <div className="field"><label htmlFor="br">{t('you.breakReminder')}</label><select id="br" name="break_reminder_minutes" defaultValue={settings?.break_reminder_minutes ?? 20}>{[10, 20, 30, 60].map((m) => <option key={m} value={m}>{t('you.minutes', { n: m })}</option>)}</select></div>
         <button className="btn primary">{t('common.save')}</button>
       </form>
-      <Friends code={(code as string) ?? null} friends={friends} />
+      <Friends code={(code as string) ?? null} friends={friends} requests={requests} />
       <div className="panel"><span className="label">{t('you.today')}</span><b>{t('you.left', { n: Math.max(0, DAILY_LIMIT - today), max: DAILY_LIMIT })}</b></div>
       <div className="panel"><span className="label">{t('you.learns')}</span>
         {Object.keys(weights).length ? Object.entries(TOPICS).map(([k, tp]) => <div key={k} className="row"><span style={{ width: 110 }}>{t(`topic.${k as keyof typeof TOPICS}`)}</span><span className="prog"><i style={{ width: `${Math.max(0, weights[k] ?? 0) / max * 100}%`, background: tp.b }} /></span></div>)
