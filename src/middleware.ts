@@ -18,4 +18,4 @@ export async function middleware(request: NextRequest) {
   await sb.auth.getClaims();   // refreshes an expired token; verifies locally otherwise
   return response;
 }
-export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico|api/card|manifest.webmanifest|icon|apple-icon|icons/|.*\\.(?:png|svg|jpg|webp|ico)$).*)'] };
+export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico|api/card|manifest.webmanifest|icon|apple-icon|icons/|opengraph-image|.*\\.(?:png|svg|jpg|webp|ico)$).*)'] };

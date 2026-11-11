@@ -4,25 +4,32 @@ import { TOPICS, DAILY_LIMIT } from '@/lib/topics';
 import { getT } from '@/lib/i18n/server';
 import { LangSwitch } from '@/lib/i18n/client';
 import { InstallApp } from '@/components/InstallApp';
+import { Friends } from '@/components/Friends';
+import { LegalLinks } from '@/components/LegalLinks';
 import { saveSettings, withdraw, revokeConsent, resetFeed, signOut } from './actions';
 import { DeleteAccount } from './DeleteAccount';
 
 export const dynamic = 'force-dynamic';
 
-export default async function You() {
+export default async function You({ searchParams }: { searchParams: Promise<{ friend?: string }> }) {
+  const { friend } = await searchParams;
   const [{ sb, user, viewer, settings, weights }, { t }] = await Promise.all([loadViewer(), getT()]);
-  if (!user) return <div className="stack"><div className="empty"><h2>{t('you.title')}</h2><p>{t('you.signedOut')}</p><Link className="btn primary" href="/login?next=/you">{t('common.signIn')}</Link></div><InstallApp /><div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div></div>;
-  const [{ data: profile }, { data: sigs }, { data: vids }] = await Promise.all([
+  if (!user) return <div className="stack"><div className="empty"><h2>{t('you.title')}</h2><p>{t('you.signedOut')}</p><Link className="btn primary" href="/login?next=/you">{t('common.signIn')}</Link></div><InstallApp /><div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div><LegalLinks /></div>;
+  const [{ data: profile }, { data: sigs }, { data: vids }, { data: code }, { data: fr }] = await Promise.all([
     sb.from('profiles').select('handle, display_name').eq('id', user.id).single(),
     sb.from('signatures').select('petition_id, why, created_at, petitions(title)').order('created_at', { ascending: false }),
     sb.from('videos').select('id, caption, status, created_at').eq('uploader_id', user.id).order('created_at', { ascending: false }),
+    sb.rpc('my_invite_code'),
+    sb.from('friendships').select('friend_id, profiles!friendships_friend_id_fkey(handle, display_name)').eq('user_id', user.id),
   ]);
+  const friends = (fr ?? []).map((f: any) => ({ id: f.friend_id, handle: f.profiles?.handle ?? null, display_name: f.profiles?.display_name ?? null }));
   const today = (sigs ?? []).filter((s: any) => new Date(s.created_at) >= new Date(new Date().toISOString().slice(0, 10))).length;
   const max = Math.max(1, ...Object.values(weights).map(Math.abs));
   const on = (k: string) => (settings?.[k] ? true : false);
   return (
     <div className="stack">
       <h1>{t('you.title')}</h1>
+      {friend && <p className="note" style={{ margin: 0 }}>{t('invite.done')}</p>}
       <InstallApp />
       <div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div>
       <form action={saveSettings} className="panel">
@@ -39,6 +46,7 @@ export default async function You() {
         <div className="field"><label htmlFor="br">{t('you.breakReminder')}</label><select id="br" name="break_reminder_minutes" defaultValue={settings?.break_reminder_minutes ?? 20}>{[10, 20, 30, 60].map((m) => <option key={m} value={m}>{t('you.minutes', { n: m })}</option>)}</select></div>
         <button className="btn primary">{t('common.save')}</button>
       </form>
+      <Friends code={(code as string) ?? null} friends={friends} />
       <div className="panel"><span className="label">{t('you.today')}</span><b>{t('you.left', { n: Math.max(0, DAILY_LIMIT - today), max: DAILY_LIMIT })}</b></div>
       <div className="panel"><span className="label">{t('you.learns')}</span>
         {Object.keys(weights).length ? Object.entries(TOPICS).map(([k, tp]) => <div key={k} className="row"><span style={{ width: 110 }}>{t(`topic.${k as keyof typeof TOPICS}`)}</span><span className="prog"><i style={{ width: `${Math.max(0, weights[k] ?? 0) / max * 100}%`, background: tp.b }} /></span></div>)
@@ -60,6 +68,7 @@ export default async function You() {
         <DeleteAccount />
         <form action={signOut}><button className="btn small">{t('you.signOut')}</button></form>
       </div>
+      <LegalLinks />
     </div>
   );
 }

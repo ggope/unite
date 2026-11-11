@@ -1,4 +1,6 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { supabaseServer } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import { loadViewer } from '@/lib/viewer';
 import { TOPICS } from '@/lib/topics';
@@ -6,8 +8,22 @@ import { getT } from '@/lib/i18n/server';
 import { fmtN, locale } from '@/lib/i18n/dict';
 import { SignButton } from '@/components/SignButton';
 import { FollowButton } from '@/components/FollowButton';
+import { PostUpdate, RemoveUpdate } from '@/components/PostUpdate';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const sb = await supabaseServer();
+  const [{ data: p }, { data: st }, { lang, t }] = await Promise.all([
+    sb.from('petitions').select('title, ask, target').eq('id', id).maybeSingle(),
+    sb.from('petition_stats').select('combined').eq('id', id).maybeSingle(),
+    getT(),
+  ]);
+  if (!p) return {};
+  const description = `${fmtN(Number(st?.combined ?? 0), lang)} ${t('p.signatures')} · ${p.ask}`.slice(0, 200);
+  return { title: `${p.title} · UNIER`, description, openGraph: { title: p.title, description, type: 'article', siteName: 'UNIER' }, twitter: { card: 'summary_large_image', title: p.title, description } };
+}
 
 export default async function Petition({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,15 +31,17 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
   const fmt = (n: number) => fmtN(n, lang);
   const { data: p } = await sb.from('petitions').select('*').eq('id', id).maybeSingle();
   if (!p) notFound();
-  const [{ data: st }, { data: members }, { data: updates }, { data: videos }, friends] = await Promise.all([
+  const [{ data: st }, { data: members }, { data: updates }, { data: videos }, friends, { data: me }] = await Promise.all([
     sb.from('petition_stats').select('*').eq('id', id).maybeSingle(),
     p.cluster_id ? sb.from('petitions').select('id, title, organiser_name, origin, petition_stats(signatures)').eq('cluster_id', p.cluster_id) : Promise.resolve({ data: [] as any[] }),
     sb.from('petition_updates').select('*').eq('petition_id', id).order('created_at', { ascending: false }),
     sb.from('video_feed').select('id, caption, uploader_handle, role').eq('petition_id', id).limit(20),
     user ? sb.rpc('friends_who_signed', { p_petition: id }) : Promise.resolve({ data: [] as any[] }),
+    user ? sb.from('profiles').select('is_moderator').eq('id', user.id).maybeSingle() : Promise.resolve({ data: null as any }),
   ]);
   const combined = Number(st?.combined ?? 0);
   const isFounder = user && p.created_by === user.id;
+  const canUpdate = !!user && p.status === 'live' && (isFounder || !!me?.is_moderator);
   const stat = (m: any) => (Array.isArray(m.petition_stats) ? m.petition_stats[0] : m.petition_stats)?.signatures ?? 0;
 
   return (
@@ -54,7 +72,8 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
         </section>
       )}
       <section className="stack" style={{ gap: 8 }}><h2>{t('p.next')}</h2>
-        {updates?.length ? updates.map((u: any) => <div key={u.id}><b>{u.title}</b><div className="hint">{t(`kind.${u.kind as 'win'}`)} · {new Date(u.created_at).toLocaleDateString(locale(lang))}</div>{u.body && <p style={{ margin: '4px 0 0' }}>{u.body}</p>}</div>)
+        {canUpdate && <PostUpdate petitionId={p.id} userId={user!.id} />}
+        {updates?.length ? updates.map((u: any) => <div key={u.id}><b>{u.title}</b><div className="hint">{t(`kind.${u.kind as 'win'}`)} · {new Date(u.created_at).toLocaleDateString(locale(lang))}</div>{u.body && <p style={{ margin: '4px 0 0' }}>{u.body}</p>}{user && (u.created_by === user.id || me?.is_moderator) && <RemoveUpdate id={u.id} />}</div>)
           : <p className="note">{t('p.noUpdates')}</p>}
       </section>
       {!!videos?.length && <section className="stack" style={{ gap: 8 }}><h2>{t('p.videos')}</h2>

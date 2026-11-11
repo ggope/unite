@@ -3,6 +3,7 @@ import { Archivo, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import { Nav } from '@/components/Nav';
 import { LangProvider } from '@/lib/i18n/client';
 import { getT } from '@/lib/i18n/server';
+import { siteUrl } from '@/lib/topics';
 import './globals.css';
 
 const archivo = Archivo({ subsets: ['latin', 'latin-ext'], axes: ['wdth'], variable: '--font-archivo' });
@@ -12,7 +13,10 @@ const mono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['500'], variable: '--f
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getT();
   return {
+    metadataBase: new URL(siteUrl()),
     title: 'UNIER', description: t('meta.description'),
+    openGraph: { siteName: 'UNIER', title: 'UNIER', description: t('meta.description'), type: 'website' },
+    twitter: { card: 'summary_large_image' },
     appleWebApp: { capable: true, title: 'UNIER', statusBarStyle: 'black-translucent' },
     applicationName: 'UNIER',
   };

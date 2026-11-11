@@ -90,7 +90,7 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
               <input id={`why-${petitionId}`} maxLength={90} value={why} onChange={(e) => setWhy(e.target.value)} placeholder={t('sign.whyPh')} /></div>
             <label className="check"><input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /><span>{t('sign.showReason')}</span></label>
             {sheet === 'form' && !consented && (
-              <label className="check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>{t('consent.text')}</span></label>
+              <label className="check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>{t('consent.text')} <a href="/privacy" target="_blank" rel="noopener">{t('consent.more')}</a></span></label>
             )}
             {err && <p className="error">{err}</p>}
             {sheet === 'form'

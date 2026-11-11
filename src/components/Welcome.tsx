@@ -4,6 +4,7 @@ import { getT } from '@/lib/i18n/server';
 import { fmtN } from '@/lib/i18n/dict';
 import { SignButton, type Viewer } from './SignButton';
 import { InstallApp } from './InstallApp';
+import { LegalLinks } from './LegalLinks';
 
 type P = { id: string; title: string; target: string; topic: keyof typeof TOPICS; goal: number; combined: number };
 
@@ -40,6 +41,7 @@ export async function Welcome({ petitions, viewer, signed }: { petitions: P[]; v
         <p className="muted" style={{ margin: 0 }}>{t('welcome.startText')}</p>
         <div className="row"><Link className="btn primary" href="/start">{t('common.startPetition')}</Link></div>
       </section>
+      <LegalLinks />
     </div>
   );
 }

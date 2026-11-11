@@ -38,3 +38,9 @@ npm install
 npm run dev
 npm run test:db              # schema + privacy tests on a local Postgres
 ```
+
+## Updates after the first launch
+- **Run `supabase/migrations/0002_updates_invites.sql`** once in the SQL Editor (founder/moderator updates, friend invites).
+- **Starter petitions:** `supabase/starter.sql` (edit the email on the last line first), then approve them at `/moderate`.
+- **Legal pages** (`/privacy`, `/terms`, `/imprint`) are drafts in `src/lib/legal.tsx`. Fill in the highlighted placeholders and have a lawyer check them before launch.
+- **Languages:** all text lives in `src/lib/i18n/dict.ts` (English and Hungarian).
