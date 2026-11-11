@@ -146,9 +146,10 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
       <div className="scroller" ref={scroller}>
         {slots.map((s, i) => 'news' in s ? (
           <section className="slide" data-i={i} key={'n' + s.news.id}>
-            <div className="frame" style={{ background: `radial-gradient(circle at 80% 18%, ${TOPICS[s.news.topic].b}aa, transparent 55%), linear-gradient(170deg, ${TOPICS[s.news.topic].a}, #070812)` }}>
+            <div className="frame paper">
+              <span className="band" style={{ background: TOPICS[s.news.topic].b }} />
               <span className="newskind">{t('news.title')}</span>
-              <div className="newsslide"><NewsCard n={s.news} viewer={viewer} signed={!!s.news.petition && ctx.signed.has(s.news.petition.id)} onDark /></div>
+              <div className="newsslide"><NewsCard n={s.news} viewer={viewer} signed={!!s.news.petition && ctx.signed.has(s.news.petition.id)} /></div>
             </div>
           </section>
         ) : 'end' in s ? (

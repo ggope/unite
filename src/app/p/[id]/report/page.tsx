@@ -44,7 +44,7 @@ export default async function DeliveryReport({ params }: { params: Promise<{ id:
       <p className="muted" style={{ margin: 0 }}>{t('rep.to', { target: p.target })} · {p.region} · {t('p.startedBy', { name: p.organiser_name })}</p>
 
       <div className="panel">
-        <div><span className="num" style={{ fontSize: 48, fontWeight: 700 }}>{n(rep.verified)}</span> <span className="muted">{t('rep.verified')}</span></div>
+        <div><span className="bignum">{n(rep.verified)}</span> <span className="muted">{t('rep.verified')}</span></div>
         {rep.imported > 0 && <span className="hint">{t('rep.imported', { n: n(rep.imported) })}</span>}
         <span className="hint">{t('rep.first', { d: day(rep.first_at) })} · {t('rep.last', { d: day(rep.last_at) })} · {t('rep.week', { n: n(rep.last_7d) })}{rep.reasons ? ` · ${t('rep.reasons', { n: n(rep.reasons) })}` : ''}</span>
       </div>

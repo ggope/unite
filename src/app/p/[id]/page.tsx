@@ -56,8 +56,8 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
       <h1>{p.title}</h1>
       <p className="muted" style={{ margin: 0 }}>{t('p.to', { target: p.target })}</p>
       <div className="panel">
-        <div><span className="num" style={{ fontSize: 40, fontWeight: 700 }}>{fmt(combined)}</span> <span className="muted">{Number(st?.united_count) > 1 ? t('p.acrossUnited') : t('p.signatures')}</span></div>
-        <span className="prog" style={{ height: 8 }}><i style={{ width: `${Math.min(100, combined / p.goal * 100)}%` }} /></span>
+        <div><span className="bignum">{fmt(combined)}</span> <span className="muted">{Number(st?.united_count) > 1 ? t('p.acrossUnited') : t('p.signatures')}</span></div>
+        <span className="prog" style={{ height: 14 }}><i style={{ width: `${Math.min(100, combined / p.goal * 100)}%` }} /></span>
         <span className="hint">{t('p.goal', { n: fmt(p.goal) })} · {t('p.lastHour', { n: fmt(Number(st?.last_hour ?? 0)) })}{p.ends_on ? ` · ${t('p.ends', { d: new Date(p.ends_on).toLocaleDateString(locale(lang)) })}` : ''}</span>
         {!!friends.data?.length && <span className="hint">{(() => { const names = friends.data.map((f: any) => f.display_name || '@' + f.handle).slice(0, 3).join(', '); return friends.data.length > 3 ? t('p.friendsMore', { names, n: friends.data.length - 3 }) : t('p.friendsSigned', { names }); })()}</span>}
         <div className="row">

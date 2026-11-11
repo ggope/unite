@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { createClient } from '@supabase/supabase-js';
-import { TOPICS, siteUrl } from '@/lib/topics';
+import { siteUrl } from '@/lib/topics';
+import { antonFont } from '@/lib/ogfont';
 import { makeT, pickLang, fmtN } from '@/lib/i18n/dict';
 
 export const runtime = 'edge';
@@ -16,20 +17,25 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     sb.from('petition_stats').select('combined').eq('id', id).maybeSingle(),
   ]);
   if (!p) return new Response('Not found', { status: 404 });
-  const tp = TOPICS[p.topic as keyof typeof TOPICS]; const n = Number(st?.combined ?? 0); const pct = Math.min(100, (n / p.goal) * 100);
+  const n = Number(st?.combined ?? 0); const pct = Math.min(100, (n / p.goal) * 100);
+  const signedTxt = t('card.signed').toUpperCase(); const title = p.title.toUpperCase();
+  const fonts = await antonFont(`UNIER${signedTxt}${title}${fmt(n)}0123456789,. `);
+  const display = fonts.length ? 'Anton' : 'sans-serif';
   return new ImageResponse(
     (
-      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: 80, color: '#fff', background: `radial-gradient(circle at 75% 28%, ${tp.b}cc, transparent 55%), linear-gradient(170deg, ${tp.a}, #070812)` }}>
-        <div style={{ fontSize: 64, fontWeight: 900, letterSpacing: 2 }}>UNIER</div>
-        <div style={{ marginTop: 300, fontSize: 190, fontWeight: 900, lineHeight: 1 }}>{t('card.signed')}</div>
-        <div style={{ marginTop: 40, fontSize: 70, fontWeight: 700, lineHeight: 1.15 }}>{p.title}</div>
-        <div style={{ marginTop: 'auto', fontSize: 120, fontWeight: 700 }}>{fmt(n)}</div>
-        <div style={{ fontSize: 46, opacity: 0.85 }}>{t('card.with', { goal: fmt(p.goal) })}</div>
-        <div style={{ display: 'flex', marginTop: 40, height: 26, borderRadius: 13, background: 'rgba(255,255,255,.22)' }}><div style={{ width: `${pct}%`, borderRadius: 13, background: '#fff' }} /></div>
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 120, padding: 40, borderRadius: 80, background: '#fff', color: '#11142B', fontSize: 60, fontWeight: 800 }}>{t('card.cta')}</div>
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 30, fontSize: 40, opacity: 0.8 }}>{`${siteUrl().replace(/^https?:\/\//, '')}/p/${id}`}</div>
+      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: 80, color: '#111', backgroundColor: '#FF5A1F' }}>
+        <div style={{ display: 'flex', fontFamily: display, fontSize: 80, letterSpacing: 3 }}>UNIER</div>
+        <div style={{ display: 'flex', marginTop: 200, fontFamily: display, fontSize: 230, lineHeight: 0.95 }}>{signedTxt}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 60, padding: 50, background: '#F2EEE6', border: '8px solid #111' }}>
+          <div style={{ display: 'flex', fontFamily: display, fontSize: 84, lineHeight: 1.02 }}>{title}</div>
+          <div style={{ display: 'flex', marginTop: 50, fontFamily: display, fontSize: 130, lineHeight: 1 }}>{fmt(n)}</div>
+          <div style={{ display: 'flex', fontSize: 44, fontWeight: 700, color: '#4A453E' }}>{t('card.with', { goal: fmt(p.goal) })}</div>
+          <div style={{ display: 'flex', marginTop: 30, height: 40, border: '6px solid #111', background: '#E6E0D3' }}><div style={{ width: `${pct}%`, background: '#FF5A1F' }} /></div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 'auto', padding: 40, background: '#111', color: '#F2EEE6', fontSize: 60, fontWeight: 800 }}>{t('card.cta')}</div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 26, fontSize: 40, fontWeight: 700 }}>{`${siteUrl().replace(/^https?:\/\//, '')}/p/${id}`}</div>
       </div>
     ),
-    { width: 1080, height: 1920, headers: { 'Cache-Control': 'private, max-age=300', Vary: 'Cookie, Accept-Language' } },
+    { width: 1080, height: 1920, fonts, headers: { 'Cache-Control': 'private, max-age=300', Vary: 'Cookie, Accept-Language' } },
   );
 }
