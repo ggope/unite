@@ -1,6 +1,7 @@
 import { loadViewer } from '@/lib/viewer';
 import { Feed } from '@/components/Feed';
 import type { FeedItem } from '@/lib/ranking';
+import { Welcome } from '@/components/Welcome';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,11 @@ export default async function Home() {
   const { sb, viewer, signed, followed, settings, weights } = await loadViewer();
   const { data } = await sb.from('video_feed').select('*').order('created_at', { ascending: false }).limit(60);
   const rows = data ?? [];
+  if (!rows.length) {
+    const { data: ps } = await sb.from('petitions').select('id, title, target, topic, goal, petition_stats(combined)').eq('status', 'live').order('created_at', { ascending: false }).limit(8);
+    const petitions = (ps ?? []).map((p: any) => ({ ...p, combined: Number((Array.isArray(p.petition_stats) ? p.petition_stats[0] : p.petition_stats)?.combined ?? 0) }));
+    return <Welcome petitions={petitions} viewer={viewer} signed={[...signed]} />;
+  }
   // private bucket: hand out short-lived links for approved videos only
   const paths = rows.flatMap((r: any) => [r.storage_path, r.cover_path].filter(Boolean));
   const signedUrls = paths.length ? (await sb.storage.from('videos').createSignedUrls(paths, 60 * 60)).data ?? [] : [];

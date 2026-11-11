@@ -113,3 +113,23 @@ main{min-width:0;width:100%;max-width:680px;margin:0 auto;padding:16px max(16px,
 .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
 .links{display:flex;flex-direction:column;align-items:center;gap:6px}
 .linkbtn{border:0;background:none;color:var(--muted);text-decoration:underline;font-size:14px;cursor:pointer;padding:4px}
+/* loading skeletons */
+.sk{background:linear-gradient(90deg,var(--sunk) 0,color-mix(in srgb,var(--sunk) 55%,var(--surface)) 50%,var(--sunk) 100%);background-size:200% 100%;animation:sk 1.2s ease-in-out infinite;border-radius:8px}
+.sk.dark{background:linear-gradient(90deg,rgba(255,255,255,.08) 0,rgba(255,255,255,.16) 50%,rgba(255,255,255,.08) 100%);background-size:200% 100%}
+@keyframes sk{0%{background-position:100% 0}100%{background-position:-100% 0}}
+.sk-title{height:34px;width:45%}
+.sk-input{height:44px;border-radius:12px}
+.sk-row{display:flex;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.sk-line{height:14px;width:100%}
+.sk-line.short{width:35%;height:11px}
+.sk-line.mid{width:70%}
+.sk-pill{width:72px;height:32px;border-radius:999px}
+.sk-reel{position:absolute;left:18px;right:84px;bottom:32px;display:flex;flex-direction:column;gap:10px;max-width:400px}
+.sk-reel .sk-line{height:18px}
+.sk-card{height:74px;border-radius:12px}
+/* welcome */
+.hero{display:flex;flex-direction:column;gap:12px;padding:8px 0 4px}
+.hero h1{font-size:clamp(30px,7vw,44px)}
+.hero p{margin:0;max-width:52ch}
+.tdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.install{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}

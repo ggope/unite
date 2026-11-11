@@ -1,0 +1,5 @@
+import { ImageResponse } from 'next/og';
+import { LogoMark } from '@/lib/logo';
+export const size = { width: 180, height: 180 };
+export const contentType = 'image/png';
+export default function AppleIcon() { return new ImageResponse(<LogoMark size={180} pad={0.14} />, size); }
