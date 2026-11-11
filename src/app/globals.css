@@ -176,3 +176,13 @@ main{min-width:0;width:100%;max-width:680px;margin:0 auto;padding:16px max(16px,
 .rail a .badge{margin-left:auto}
 .ok{color:var(--ok,#1E9E5A);font-weight:600;margin:0}
 .sheethead{flex-wrap:nowrap;align-items:flex-start}.sheethead>div{flex:1;min-width:0}
+/* delivery report */
+.ticks{margin:0;padding-left:20px;display:grid;gap:6px}
+.bars{display:grid;gap:6px}
+.bar{display:grid;grid-template-columns:minmax(90px,38%) 1fr auto;align-items:center;gap:10px}
+.bar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar i{display:block;height:10px;border-radius:5px;background:var(--accent);min-width:3px}
+.spark{display:flex;align-items:flex-end;gap:3px;height:80px;padding:6px 0;border-bottom:1px solid var(--line)}
+.spark i{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:3px}
+@media print{.rail,.tabbar,.noprint{display:none!important}.app main{padding:0!important;max-width:none!important}body{background:#fff!important;color:#000!important}.panel{break-inside:avoid;border-color:#ccc!important}.bar i,.spark i{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+.official{border-color:var(--accent)!important}

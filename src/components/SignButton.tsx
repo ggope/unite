@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { CONSENT_VERSION, DAILY_LIMIT } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
+import { signRpc } from '@/lib/sign';
 import { fmtN, type Key, type T } from '@/lib/i18n/dict';
 import { Icon } from './Icon';
 import { authError } from '@/lib/authError';
@@ -43,7 +44,7 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
       if (c.error) { setBusy(false); setErr(errorText(t, c.error.message)); return false; }
       setConsented(true);
     }
-    const { data, error } = await sb.rpc('sign_petition', { p_petition: petitionId, p_why: reason || null, p_show_reason: show });
+    const { data, error } = await signRpc(sb, { petition: petitionId, why: reason || null, show });
     setBusy(false);
     if (error) { setErr(errorText(t, error.message)); return false; }
     setSigned(true); onChange?.(true, data as number); router.refresh();

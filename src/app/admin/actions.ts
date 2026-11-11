@@ -40,6 +40,14 @@ export async function petitionStatus(f: FormData) {
   await done(error);
 }
 
+// The optional official channel (ECI, parliament e-petition) shown to signers who want to go further.
+export async function setOfficial(f: FormData) {
+  const sb = await mod();
+  const url = s(f, 'url');
+  if (url && !url.startsWith('https://')) return done({ message: 'The link must start with https://' });
+  await done((await sb.from('petitions').update({ official_url: url || null }).eq('id', s(f, 'id'))).error);
+}
+
 // Unite: both petitions join one group; each keeps its own count, and the total is shown on both.
 export async function unite(f: FormData) {
   const sb = await mod();

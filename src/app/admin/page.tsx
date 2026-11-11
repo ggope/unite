@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN } from '@/lib/i18n/dict';
-import { review, petitionStatus, unite, separate, resolveReport, setModerator, importNews, newsAction, toggleSource } from './actions';
+import { review, petitionStatus, setOfficial, unite, separate, resolveReport, setModerator, importNews, newsAction, toggleSource } from './actions';
 
 export const dynamic = 'force-dynamic';
 const TABS = [['overview', 'Overview'], ['queue', 'Review queue'], ['reports', 'Reports'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People']] as const;
@@ -94,7 +94,7 @@ async function Reports({ sb }: { sb: any }) {
 }
 
 async function Petitions({ sb, q }: { sb: any; q: string }) {
-  let query = sb.from('petitions').select('id, title, status, cluster_id, organiser_name, created_at, petition_stats(combined)').order('created_at', { ascending: false }).limit(60);
+  let query = sb.from('petitions').select('*, petition_stats(combined)').order('created_at', { ascending: false }).limit(60);
   if (q) query = query.ilike('title', `%${q}%`);
   const [{ data: ps }, { data: all }] = await Promise.all([query, sb.from('petitions').select('id, title').eq('status', 'live').order('title').limit(500)]);
   return (<>
@@ -111,6 +111,9 @@ async function Petitions({ sb, q }: { sb: any; q: string }) {
         {p.status === 'live' && <form action={unite} className="row"><input type="hidden" name="id" value={p.id} />
           <input name="with" list="live-petitions" required placeholder="Unite with… (type a title or paste a link)" style={{ flex: 1, minWidth: 0 }} />
           <button className="btn small">Unite</button></form>}
+        <form action={setOfficial} className="row"><input type="hidden" name="id" value={p.id} />
+          <input name="url" type="url" defaultValue={p.official_url ?? ''} placeholder="Official petition link (https://…)" style={{ flex: 1, minWidth: 0 }} />
+          <button className="btn small">Save link</button></form>
         {p.cluster_id && <form action={separate}><input type="hidden" name="id" value={p.id} /><button className="btn ghost small">Separate from its group</button></form>}
       </div>))}
   </>);

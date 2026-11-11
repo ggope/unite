@@ -18,6 +18,7 @@ export function StartForm({ then, source, topic }: { then: 'video' | 'page'; sou
       <div className="field"><label htmlFor="ask">{t('start.ask')}</label><textarea id="ask" name="ask" required minLength={20} placeholder={t('start.askPh')} /></div>
       <div className="field"><label htmlFor="why">{t('start.why')}</label><textarea id="why" name="why" required minLength={20} placeholder={t('start.whyPh')} /></div>
       <div className="field"><label htmlFor="source_url">{t('start.source')}</label><input id="source_url" name="source_url" type="url" defaultValue={source} placeholder="https://" /></div>
+      <div className="field"><label htmlFor="official_url">{t('start.official')}</label><input id="official_url" name="official_url" type="url" placeholder="https://" /><span className="hint">{t('start.officialHint')}</span></div>
       <div className="field"><label htmlFor="topic">{t('start.topic')}</label><select id="topic" name="topic" defaultValue={topic && (TOPIC_KEYS as string[]).includes(topic) ? topic : undefined}>{TOPIC_KEYS.map((k) => <option key={k} value={k}>{t(`topic.${k}`)}</option>)}</select></div>
       <div className="field"><label htmlFor="goal">{t('start.goal')}</label><select id="goal" name="goal" defaultValue="10000">{GOALS.map((g) => <option key={g} value={g}>{fmtN(g, lang)}</option>)}</select></div>
       <div className="field"><label htmlFor="organiser_name">{t('start.organiser')}</label><input id="organiser_name" name="organiser_name" required placeholder={t('start.organiserPh')} /></div>

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { CONSENT_VERSION } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
+import { signRpc } from '@/lib/sign';
 
 // A signature started while signed out waits here until the email link signs the person in.
 type Pending = { petitionId: string; email: string; why: string; show: boolean; lang: string; at: number };
@@ -33,7 +34,7 @@ export function PendingSign() {
       if (!data.session || data.session.user.email?.toLowerCase() !== p.email) return;
       try { localStorage.removeItem(KEY); } catch {}
       const c = await sb.rpc('give_signature_consent', { p_text_version: p.lang === 'en' ? CONSENT_VERSION : `${CONSENT_VERSION}-${p.lang}` });
-      const s = c.error ? c : await sb.rpc('sign_petition', { p_petition: p.petitionId, p_why: p.why || null, p_show_reason: p.show && !!p.why });
+      const s = c.error ? c : await signRpc(sb, { petition: p.petitionId, why: p.why || null, show: p.show && !!p.why });
       const already = s.error && /duplicate|already/i.test(s.error.message);
       setMsg(!s.error || already ? 'ok' : 'err');
       router.refresh();

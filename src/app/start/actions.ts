@@ -15,10 +15,12 @@ export async function createPetition(_: StartState, form: FormData): Promise<Sta
   if (!GOALS.includes(goal) || !TOPIC_KEYS.includes(topic as any)) return { error: t('start.errTopic') };
   if (form.get('facts') !== 'on') return { error: t('start.errFacts') };
   const src = g('source_url');
-  if (src && !src.startsWith('https://')) return { error: t('start.errSource') };
+  const off = g('official_url');
+  if ((src && !src.startsWith('https://')) || (off && !off.startsWith('https://'))) return { error: t('start.errSource') };
   const { data, error } = await sb.from('petitions').insert({
     created_by: user.id, organiser_name: g('organiser_name'), title: g('title'), target: g('target'), region: g('region'),
     ask: g('ask'), why: g('why'), source_url: src || null, topic, goal, ends_on: g('ends_on') || null,
+    ...(off ? { official_url: off } : {}),
   }).select('id').single();
   if (error) return { error: error.message.includes('check') ? t('start.errLength') : t('start.errSave') };
   // the database counts the founder as the first signature

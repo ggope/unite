@@ -65,10 +65,15 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
           <FollowButton petitionId={p.id} following={followed.has(p.id)} loggedIn={viewer.loggedIn} />
           <ShareButton path={`/p/${p.id}`} title={p.title} />
           <a className="btn ghost small" href={`/api/card/${p.id}`} target="_blank" rel="noopener">{t('sign.shareCard')}</a>
+          {(p.status === 'live' || p.status === 'closed') && <Link className="btn ghost small" href={`/p/${p.id}/report`}>{t('p.report')}</Link>}
           {!isFounder && p.status === 'live' && <ReportButton petitionId={p.id} loggedIn={viewer.loggedIn} />}
           {(isFounder || signed.has(p.id)) && p.status === 'live' && <Link className="btn ghost small" href={`/post?petition=${p.id}`}>{t('common.postVideo')}</Link>}
         </div>
       </div>
+      {p.official_url && p.status === 'live' && (
+        <section className="panel official"><b>{t('off.title')}</b><p className="muted" style={{ margin: 0 }}>{t('off.text')}</p>
+          <a className="btn small" href={p.official_url} target="_blank" rel="noopener nofollow">{t('off.go')} ↗</a></section>
+      )}
       <section className="stack" style={{ gap: 8 }}><h2>{t('p.asks')}</h2><p style={{ margin: 0 }}>{p.ask}</p><h2>{t('p.whyMatters')}</h2><p style={{ margin: 0 }}>{p.why}</p>
         {p.source_url && <a href={p.source_url} target="_blank" rel="noopener nofollow">{t('p.source')}</a>}</section>
       {(members?.length ?? 0) > 1 && (
