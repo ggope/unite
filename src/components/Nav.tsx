@@ -1,6 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { supabaseBrowser } from '@/lib/supabase/client';
 import { Icon } from './Icon';
 import { useT, LangSwitch } from '@/lib/i18n/client';
 import type { Key } from '@/lib/i18n/dict';
@@ -15,19 +17,28 @@ const ITEMS: { href: string; label: Key; icon: string; create?: boolean }[] = [
 export function Nav() {
   const path = usePathname();
   const { t } = useT();
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    if (path.startsWith('/updates')) { setUnread(0); return; }
+    if (!document.cookie.includes('-auth-token')) return;
+    let gone = false;
+    supabaseBrowser().rpc('unread_updates').then(({ data }: { data: number | null }) => { if (!gone && typeof data === 'number') setUnread(data); });
+    return () => { gone = true; };
+  }, [path]);
+  const dot = (h: string) => h === '/updates' && unread > 0 ? <span className="badge" aria-label={`${unread} ${t('nav.new')}`}>{unread > 9 ? '9+' : unread}</span> : null;
   const active = (h: string) => (h === '/' ? path === '/' : path.startsWith(h) || (h === '/petitions' && (path.startsWith('/p/') || path === '/start')));
   return (
     <>
       <aside className="rail" aria-label={t('nav.main')}>
         <Link className="logo" href="/">UNIER</Link>
         {ITEMS.map((i) => (
-          <Link key={i.href} href={i.href} aria-current={active(i.href) ? 'page' : undefined}><Icon name={i.icon} />{t(i.label)}</Link>
+          <Link key={i.href} href={i.href} aria-current={active(i.href) ? 'page' : undefined}><Icon name={i.icon} />{t(i.label)}{dot(i.href)}</Link>
         ))}
         <div style={{ marginTop: 'auto' }}><LangSwitch compact /></div>
       </aside>
       <nav className="tabbar" aria-label={t('nav.main')}>
         {ITEMS.map((i) => (
-          <Link key={i.href} href={i.href} className={`tab ${i.create ? 'create' : ''}`} aria-current={active(i.href) ? 'page' : undefined}><Icon name={i.icon} />{t(i.label)}</Link>
+          <Link key={i.href} href={i.href} className={`tab ${i.create ? 'create' : ''}`} aria-current={active(i.href) ? 'page' : undefined}><Icon name={i.icon} />{t(i.label)}{dot(i.href)}</Link>
         ))}
       </nav>
     </>

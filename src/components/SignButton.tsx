@@ -6,6 +6,8 @@ import { CONSENT_VERSION, DAILY_LIMIT } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
 import { fmtN, type Key, type T } from '@/lib/i18n/dict';
 import { Icon } from './Icon';
+import { authError } from '@/lib/authError';
+import { savePending } from './PendingSign';
 
 export type Viewer = { loggedIn: boolean; hasConsent: boolean; oneTap: boolean };
 
@@ -28,10 +30,11 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
   const path = usePathname();
   const [signed, setSigned] = useState(initial);
   const [consented, setConsented] = useState(viewer.hasConsent);
-  const [sheet, setSheet] = useState<null | 'form' | 'why'>(null);
+  const [sheet, setSheet] = useState<null | 'form' | 'why' | 'guest'>(null);
   const [undo, setUndo] = useState<number | null>(null);
   const [why, setWhy] = useState(''); const [show, setShow] = useState(true); const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
+  const [email, setEmail] = useState(''); const [sent, setSent] = useState('');
 
   async function sign(reason?: string) {
     setBusy(true); setErr('');
@@ -47,7 +50,7 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
     return true;
   }
   async function start() {
-    if (!viewer.loggedIn) { router.push(`/login?next=${encodeURIComponent(path)}`); return; }
+    if (!viewer.loggedIn) { setSheet('guest'); return; }
     if (signed) { router.push(`/p/${petitionId}`); return; }
     if (consented && viewer.oneTap) {                     // one tap, with 5 seconds to undo
       if (await sign()) { const t = window.setTimeout(() => setUndo(null), 5000); setUndo(t); } else setSheet('form');
@@ -63,6 +66,18 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
   async function saveWhy() {
     await sb.from('signatures').update({ why: why.trim() || null, show_reason: show && !!why.trim() }).eq('petition_id', petitionId);
     setSheet(null); router.refresh();
+  }
+
+  // Signed out: one email link both confirms the person and the signature (finished by PendingSign).
+  async function guestSign() {
+    setBusy(true); setErr('');
+    const clean = email.trim().toLowerCase();
+    savePending({ petitionId, why: why.trim(), show, lang, at: Date.now() });
+    const next = `/p/${petitionId}`;
+    const { error } = await sb.auth.signInWithOtp({ email: clean, options: { shouldCreateUser: true, emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}` } });
+    setBusy(false);
+    if (error) { setErr(authError(t, error, 'sign.errOther')); return; }
+    setSent(clean);
   }
 
   const label = signed ? t('sign.signed') : t('sign.sign');
@@ -83,8 +98,27 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
       )}
       {sheet && (
         <div className="backdrop" onClick={(e) => e.target === e.currentTarget && setSheet(null)}>
+          {sheet === 'guest' ? (
+          <div className="sheet" role="dialog" aria-modal="true" aria-label={t('guest.title')}>
+            <div className="row between sheethead"><div><span className="label">{t('guest.title')}</span><h2>{title}</h2></div>
+              <button className="btn ghost" onClick={() => setSheet(null)} aria-label={t('common.close')}><Icon name="x" /></button></div>
+            {sent ? <p role="status" className="ok">{t('guest.sent', { email: sent })}</p> : (<>
+              <p className="muted" style={{ margin: 0 }}>{t('guest.text')}</p>
+              <form className="stack" style={{ gap: 12 }} onSubmit={(e) => { e.preventDefault(); guestSign(); }}>
+                <div className="field"><label htmlFor={`em-${petitionId}`}>{t('login.email')}</label>
+                  <input id={`em-${petitionId}`} type="email" required autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+                <div className="field"><label htmlFor={`gw-${petitionId}`}>{t('sign.whyLabel')} <span className="muted">{t('sign.optional')}</span></label>
+                  <input id={`gw-${petitionId}`} maxLength={90} value={why} onChange={(e) => setWhy(e.target.value)} placeholder={t('sign.whyPh')} /></div>
+                <label className="check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>{t('consent.text')} <a href="/privacy" target="_blank" rel="noopener">{t('consent.more')}</a></span></label>
+                {err && <p className="error">{err}</p>}
+                <button className="btn primary big block" disabled={busy || !agree || !email.includes('@')}>{busy ? t('sign.signing') : t('guest.send')}</button>
+              </form>
+              <a className="hint" href={`/login?next=${encodeURIComponent(path)}`}>{t('guest.haveAccount')}</a>
+            </>)}
+          </div>
+          ) : (
           <div className="sheet" role="dialog" aria-modal="true" aria-label={sheet === 'why' ? t('sign.addReason') : t('sign.signPetition')}>
-            <div className="row between"><div><span className="label">{sheet === 'why' ? t('sign.youSigned') : t('sign.signPetition')}</span><h2>{title}</h2></div>
+            <div className="row between sheethead"><div><span className="label">{sheet === 'why' ? t('sign.youSigned') : t('sign.signPetition')}</span><h2>{title}</h2></div>
               <button className="btn ghost" onClick={() => setSheet(null)} aria-label={t('common.close')}><Icon name="x" /></button></div>
             <div className="field"><label htmlFor={`why-${petitionId}`}>{t('sign.whyLabel')} <span className="muted">{t('sign.optional')}</span></label>
               <input id={`why-${petitionId}`} maxLength={90} value={why} onChange={(e) => setWhy(e.target.value)} placeholder={t('sign.whyPh')} /></div>
@@ -98,6 +132,7 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
               : <button className="btn primary block" onClick={saveWhy}>{t('common.save')}</button>}
             {sheet === 'form' && !consented && <p className="hint">{t('sign.afterHint')}</p>}
           </div>
+          )}
         </div>
       )}
     </>

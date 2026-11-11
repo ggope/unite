@@ -12,6 +12,7 @@ export default async function Updates() {
   const { data } = ids.length
     ? await sb.from('petition_updates').select('id, kind, title, body, created_at, petition_id, petitions(title)').in('petition_id', ids).order('created_at', { ascending: false }).limit(50)
     : { data: [] as any[] };
+  await sb.from('user_settings').update({ updates_seen_at: new Date().toISOString() }).eq('user_id', user.id);
   return (
     <div className="stack"><h1>{t('upd.title')}</h1><p className="muted" style={{ margin: 0 }}>{t('upd.intro')}</p>
       {data?.length ? data.map((u: any) => (

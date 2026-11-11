@@ -9,7 +9,7 @@ Web app built with Next.js 15 and Supabase (Postgres, email sign-in, file storag
 - **For You feed**: full-screen, autoplaying, looping videos that learn from watch time, replays, cares, shares, follows and signatures (`src/lib/ranking.ts`). Text fades after 3.5 s; tap to show it again.
 - **Signing**: email link sign-in (no password), explicit consent once, then one-tap signing with Undo. Max 10 signatures a day, enforced in the database.
 - **Petitions**: search, topics, full create form, review before going live, united petitions with combined totals, "what happened next" updates.
-- **Videos**: choose or create the petition first; founders post freely, others must sign first (enforced in the database). Founder / Supporter labels. Private storage, moderation queue at `/moderate`.
+- **Videos**: choose or create the petition first; founders post freely, others must sign first (enforced in the database). Founder / Supporter labels. Private storage, moderation queue in the admin page at `/admin`.
 - **Privacy**: nobody can read anyone else's signatures, only totals. Withdraw a signature, withdraw consent (deletes all signatures), delete the account.
 - **Share cards**: `/api/card/<petition id>` returns a 1080×1920 story image.
 
@@ -41,7 +41,7 @@ npm run test:db              # schema + privacy tests on a local Postgres
 
 ## Updates after the first launch
 - **Run `supabase/migrations/0002_updates_invites.sql`** once in the SQL Editor (founder/moderator updates, friend invites).
-- **Starter petitions:** `supabase/starter.sql` (edit the email on the last line first), then approve them at `/moderate`.
+- **Starter petitions:** `supabase/starter.sql` (edit the email on the last line first), then approve them at `/admin` (Review queue).
 - **Legal pages** (`/privacy`, `/terms`, `/imprint`) are drafts in `src/lib/legal.tsx`. Fill in the highlighted placeholders and have a lawyer check them before launch.
 - **Languages:** all text lives in `src/lib/i18n/dict.ts` (English and Hungarian).
-- **News:** run `supabase/migrations/0003_news.sql`, add a `CRON_SECRET` environment variable in Vercel (any long random text), and redeploy. News then imports once a day; moderators can also press "Import news now" on `/moderate`. Sources live in the `news_sources` table. Only headlines, a short teaser and the link are stored; the full article stays on the publisher's site.
+- **News:** run `supabase/migrations/0003_news.sql`, add a `CRON_SECRET` environment variable in Vercel (any long random text), and redeploy. News then imports once a day; moderators can also press "Import news now" on `/admin` (News tab). Sources live in the `news_sources` table. Only headlines, a short teaser and the link are stored; the full article stays on the publisher's site.

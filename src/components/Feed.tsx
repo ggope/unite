@@ -9,6 +9,8 @@ import { fmtN } from '@/lib/i18n/dict';
 import { SignButton, type Viewer } from './SignButton';
 import { Icon } from './Icon';
 import { NewsCard } from './NewsCard';
+import { ReportButton } from './ReportButton';
+import { ShareButton } from './ShareButton';
 import type { NewsStory } from '@/lib/news/load';
 import { TOPICS } from '@/lib/topics';
 
@@ -16,8 +18,8 @@ type Slot = { item: FeedItem; explore: boolean } | { news: NewsStory } | { end: 
 const NEWS_EVERY = 3;   // one headline after every three videos
 const LS = 'unite-weights';
 
-export function Feed({ items, news = [], viewer, signed, followed, serverWeights, chronological, autoplay }: {
-  items: FeedItem[]; news?: NewsStory[]; viewer: Viewer; signed: string[]; followed: string[]; serverWeights: Weights; chronological: boolean; autoplay: boolean;
+export function Feed({ items, news = [], viewer, signed, followed, serverWeights, chronological, autoplay, breakMinutes = 20 }: {
+  items: FeedItem[]; news?: NewsStory[]; viewer: Viewer; signed: string[]; followed: string[]; serverWeights: Weights; chronological: boolean; autoplay: boolean; breakMinutes?: number;
 }) {
   const sb = supabaseBrowser();
   const { lang, t } = useT();
@@ -29,6 +31,29 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
   const seen = useRef<Record<string, number>>({});
   const started = useRef(Date.now());
   const scroller = useRef<HTMLDivElement>(null);
+  const [pauseFor, setPauseFor] = useState<number | null>(null);   // break reminder showing (minutes watched)
+  const [toast, setToast] = useState('');
+  const watched = useRef(0);
+
+  // Break reminder: counts only time the feed is actually on screen.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.hidden || pauseFor !== null) return;
+      watched.current += 15;
+      if (watched.current >= breakMinutes * 60) {
+        setPauseFor(Math.round(watched.current / 60));
+        scroller.current?.querySelectorAll('video').forEach((v) => v.pause());
+      }
+    }, 15000);
+    return () => clearInterval(id);
+  }, [breakMinutes, pauseFor]);
+
+  function notInterested(i: number, topic: Topic) {
+    learn(topic, 'less');
+    setToast(t('feed.lessDone', { topic: t(`topic.${topic}`) })); setTimeout(() => setToast(''), 2500);
+    const next = scroller.current?.querySelector(`.slide[data-i="${i + 1}"]`) as HTMLElement | null;
+    next?.scrollIntoView({ behavior: 'smooth' });
+  }
   const ctx = useMemo(() => ({ followed: new Set(followed), signed: new Set(signed), seen: seen.current }), [followed, signed]);
 
   // anonymous visitors keep what the feed learned in their own browser
@@ -110,6 +135,14 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
 
   return (
     <div className="reel">
+      {pauseFor !== null && (
+        <div className="breakcard" role="dialog" aria-modal="true" aria-label={t('break.title')}>
+          <h2>{t('break.title')}</h2><p>{t('break.text', { n: pauseFor })}</p>
+          <div className="row"><button className="btn primary" onClick={() => { watched.current = 0; setPauseFor(null); scroller.current?.querySelectorAll('video').forEach((v) => { const i = Number(v.closest('.slide')?.getAttribute('data-i')); if (i === active && autoplay) v.play().catch(() => {}); }); }}>{t('break.keep')}</button>
+            <Link className="btn" href="/updates">{t('break.stop')}</Link></div>
+        </div>
+      )}
+      {toast && <div className="reeltoast" role="status">{toast}</div>}
       <div className="scroller" ref={scroller}>
         {slots.map((s, i) => 'news' in s ? (
           <section className="slide" data-i={i} key={'n' + s.news.id}>
@@ -150,7 +183,9 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
                 <SignButton variant="reel" petitionId={s.item.petition_id} title={s.item.petition_title} signed={ctx.signed.has(s.item.petition_id)} viewer={viewer}
                   onChange={(on) => on && learn(s.item.topic, 'sign')} />
                 <button className="rb" onClick={() => learn(s.item.topic, 'care')}><span className="c"><Icon name="heart" /></span>{t('feed.care')}</button>
-                <a className="rb" href={`/api/card/${s.item.petition_id}`} target="_blank" rel="noopener" onClick={() => learn(s.item.topic, 'share')}><span className="c"><Icon name="share" /></span>{t('feed.share')}</a>
+                <button className="rb" onClick={() => notInterested(i, s.item.topic)}><span className="c"><Icon name="eyeoff" /></span>{t('feed.less')}</button>
+                <ReportButton variant="reel" videoId={s.item.id} loggedIn={viewer.loggedIn} />
+                <ShareButton variant="reel" path={`/p/${s.item.petition_id}`} title={s.item.petition_title} onShare={() => learn(s.item.topic, 'share')} />
               </div>
             </div>
           </section>

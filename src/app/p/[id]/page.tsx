@@ -9,6 +9,8 @@ import { fmtN, locale } from '@/lib/i18n/dict';
 import { SignButton } from '@/components/SignButton';
 import { FollowButton } from '@/components/FollowButton';
 import { PostUpdate, RemoveUpdate } from '@/components/PostUpdate';
+import { ReportButton } from '@/components/ReportButton';
+import { ShareButton } from '@/components/ShareButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +51,7 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
     <div className="stack">
       <Link href="/petitions" className="hint">{t('p.back')}</Link>
       {p.status === 'pending' && <p className="note">{t('p.pending')}</p>}
+      {p.status === 'removed' && <p className="note">{t('p.removed')}{p.moderation_note ? ` ${t('mod.reason', { r: p.moderation_note })}` : ''}</p>}
       <span className="hint">{t(`topic.${p.topic as keyof typeof TOPICS}`)} · {t('p.startedBy', { name: p.organiser_name })} · {p.region}</span>
       <h1>{p.title}</h1>
       <p className="muted" style={{ margin: 0 }}>{t('p.to', { target: p.target })}</p>
@@ -60,7 +63,9 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
         <div className="row">
           {p.status === 'live' && <SignButton petitionId={p.id} title={p.title} signed={signed.has(p.id)} viewer={viewer} />}
           <FollowButton petitionId={p.id} following={followed.has(p.id)} loggedIn={viewer.loggedIn} />
+          <ShareButton path={`/p/${p.id}`} title={p.title} />
           <a className="btn ghost small" href={`/api/card/${p.id}`} target="_blank" rel="noopener">{t('sign.shareCard')}</a>
+          {!isFounder && p.status === 'live' && <ReportButton petitionId={p.id} loggedIn={viewer.loggedIn} />}
           {(isFounder || signed.has(p.id)) && p.status === 'live' && <Link className="btn ghost small" href={`/post?petition=${p.id}`}>{t('common.postVideo')}</Link>}
         </div>
       </div>

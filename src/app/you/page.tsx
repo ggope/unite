@@ -8,6 +8,7 @@ import { Friends } from '@/components/Friends';
 import { LegalLinks } from '@/components/LegalLinks';
 import { saveSettings, withdraw, revokeConsent, resetFeed, signOut } from './actions';
 import { DeleteAccount } from './DeleteAccount';
+import { Icon } from '@/components/Icon';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +16,13 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
   const { friend } = await searchParams;
   const [{ sb, user, viewer, settings, weights }, { t }] = await Promise.all([loadViewer(), getT()]);
   if (!user) return <div className="stack"><div className="empty"><h2>{t('you.title')}</h2><p>{t('you.signedOut')}</p><Link className="btn primary" href="/login?next=/you">{t('common.signIn')}</Link></div><InstallApp /><div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div><LegalLinks /></div>;
-  const [{ data: profile }, { data: sigs }, { data: vids }, { data: code }, { data: fr }] = await Promise.all([
-    sb.from('profiles').select('handle, display_name').eq('id', user.id).single(),
+  const [{ data: profile }, { data: sigs }, { data: vids }, { data: code }, { data: fr }, { data: mine }] = await Promise.all([
+    sb.from('profiles').select('handle, display_name, is_moderator').eq('id', user.id).single(),
     sb.from('signatures').select('petition_id, why, created_at, petitions(title)').order('created_at', { ascending: false }),
-    sb.from('videos').select('id, caption, status, created_at').eq('uploader_id', user.id).order('created_at', { ascending: false }),
+    sb.from('videos').select('id, caption, status, moderation_note, created_at').eq('uploader_id', user.id).order('created_at', { ascending: false }),
     sb.rpc('my_invite_code'),
     sb.from('friendships').select('friend_id, profiles!friendships_friend_id_fkey(handle, display_name)').eq('user_id', user.id),
+    sb.from('petitions').select('id, title, status, moderation_note, created_at').eq('created_by', user.id).order('created_at', { ascending: false }),
   ]);
   const friends = (fr ?? []).map((f: any) => ({ id: f.friend_id, handle: f.profiles?.handle ?? null, display_name: f.profiles?.display_name ?? null }));
   const today = (sigs ?? []).filter((s: any) => new Date(s.created_at) >= new Date(new Date().toISOString().slice(0, 10))).length;
@@ -28,7 +30,7 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
   const on = (k: string) => (settings?.[k] ? true : false);
   return (
     <div className="stack">
-      <h1>{t('you.title')}</h1>
+      <div className="row between"><h1>{t('you.title')}</h1>{profile?.is_moderator && <Link className="btn small" href="/admin">Admin</Link>}</div>
       {friend && <p className="note" style={{ margin: 0 }}>{t('invite.done')}</p>}
       <InstallApp />
       <div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div>
@@ -60,11 +62,16 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
             <button className="btn small">{t('you.withdraw')}</button></form>)) : <p className="hint">{t('you.nothing')}</p>}
         {viewer.hasConsent && <form action={revokeConsent}><button className="btn small danger">{t('you.revoke')}</button></form>}
       </div>
+      <div className="panel"><span className="label">{t('you.petitions')}</span>
+        {mine?.length ? mine.map((p: any) => <div key={p.id} className="row between"><Link href={`/p/${p.id}`} style={{ flex: 1, minWidth: 0 }}>{p.title}</Link><span className="hint">{t(`status.${p.status as 'live'}`)}{p.status === 'removed' && p.moderation_note ? ` · ${t('mod.reason', { r: p.moderation_note })}` : ''}</span></div>)
+          : <p className="hint" style={{ margin: 0 }}>{t('you.noPetitions')} <Link href="/start">{t('common.startPetition')}</Link></p>}
+      </div>
       <div className="panel"><span className="label">{t('you.vids')}</span>
-        {vids?.length ? vids.map((v: any) => <div key={v.id} className="row between"><span>{v.caption}</span><span className="hint">{v.status === 'pending' ? t('you.inReview') : v.status === 'approved' ? t('you.live') : t('you.notApproved')}</span></div>) : <p className="hint">{t('you.noVids')} <Link href="/post">{t('you.postOne')}</Link>.</p>}
+        {vids?.length ? vids.map((v: any) => <div key={v.id} className="row between"><span>{v.caption}</span><span className="hint">{v.status === 'pending' ? t('you.inReview') : v.status === 'approved' ? t('you.live') : t('you.notApproved')}{v.status === 'rejected' && v.moderation_note ? ` · ${t('mod.reason', { r: v.moderation_note })}` : ''}</span></div>) : <p className="hint">{t('you.noVids')} <Link href="/post">{t('you.postOne')}</Link>.</p>}
       </div>
       <div className="panel"><span className="label">{t('you.data')}</span>
         <p className="hint" style={{ margin: 0 }}>{t('you.dataText')}</p>
+        <a className="btn small" href="/api/account/export" download><Icon name="download" />{t('you.export')}</a>
         <DeleteAccount />
         <form action={signOut}><button className="btn small">{t('you.signOut')}</button></form>
       </div>

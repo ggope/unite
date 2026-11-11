@@ -1,5 +1,5 @@
 -- UNIER starter petitions. Run once in the Supabase SQL Editor.
--- They arrive as "pending": open /moderate on the site, read each one, and Approve the ones you want live.
+-- They arrive as "pending": open /admin on the site (Review queue), read each one, and Approve the ones you want live.
 -- Edit any wording here before running. Titles 10-90 characters; goal must be 1000, 10000, 50000, 100000, 250000, 500000 or 1000000.
 
 insert into public.petitions (organiser_name, title, target, region, ask, why, topic, goal, status) values

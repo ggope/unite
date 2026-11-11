@@ -30,5 +30,6 @@ export default async function Home() {
     created_at: r.created_at, video_url: url(r.storage_path), cover_url: url(r.cover_path),
   }));
   return <Feed items={items} news={news} viewer={viewer} signed={[...signed]} followed={[...followed]} serverWeights={weights}
-    chronological={!!settings?.chronological_feed} autoplay={settings?.autoplay !== false && !settings?.is_minor} />;
+    chronological={!!settings?.chronological_feed} autoplay={settings?.autoplay !== false && !settings?.is_minor}
+    breakMinutes={settings?.is_minor ? Math.min(10, settings?.break_reminder_minutes ?? 10) : settings?.break_reminder_minutes ?? 20} />;
 }
