@@ -77,8 +77,8 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
         </div>
       )}
       <div className="panel">
-        <button type="button" className="btn big block" onClick={google} disabled={busy}><GoogleLogo /> Continue with Google</button>
-        <div className="or"><span>or</span></div>
+        {process.env.NEXT_PUBLIC_GOOGLE_LOGIN === "on" && <><button type="button" className="btn big block" onClick={google} disabled={busy}><GoogleLogo /> Continue with Google</button>
+        <div className="or"><span>or</span></div></>}
         <form onSubmit={submit} className="stack">
           <div className="field"><label htmlFor="email">Email</label>
             <input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
