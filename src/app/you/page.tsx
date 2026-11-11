@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function You() {
   const { sb, user, viewer, settings, weights } = await loadViewer();
-  if (!user) return <div className="empty"><h2>You</h2><p>No account needed to watch. To sign, confirm your email once.</p><Link className="btn primary" href="/login?next=/you">Sign in with email</Link></div>;
+  if (!user) return <div className="empty"><h2>You</h2><p>No account needed to watch. To sign, confirm your email once.</p><Link className="btn primary" href="/login?next=/you">Sign in</Link></div>;
   const [{ data: profile }, { data: sigs }, { data: vids }] = await Promise.all([
     sb.from('profiles').select('handle, display_name').eq('id', user.id).single(),
     sb.from('signatures').select('petition_id, why, created_at, petitions(title)').order('created_at', { ascending: false }),
