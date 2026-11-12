@@ -76,7 +76,7 @@ export default async function DeliveryReport({ params }: { params: Promise<{ id:
       {organiser && <AnswerLink petitionId={p.id} target={p.target} />}
       {organiser && (delivered?.length
         ? <p className="hint noprint" style={{ margin: 0 }}>{t('dlv.already', { d: day(delivered[0].created_at) })}</p>
-        : p.status === 'live' && <div className="noprint"><MarkDelivered petitionId={p.id} target={p.target} userId={user!.id} /></div>)}
+        : (p.status === 'live' || p.status === 'closed') && <div className="noprint"><MarkDelivered petitionId={p.id} target={p.target} userId={user!.id} /></div>)}
 
       <p className="hint" style={{ margin: 0 }}>{t('rep.generated', { d: day(rep.generated) })} <a href={live}>{live.replace(/^https:\/\//, '')}</a></p>
       <p className="note noprint">{t('rep.forOrganisers')}</p>

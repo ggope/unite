@@ -8,6 +8,8 @@ import { localize } from '@/lib/petitionText';
 import { MyloArt } from '@/components/mylo/MyloArt';
 import { ShareButton } from '@/components/ShareButton';
 import { AnswerLink } from '@/components/AnswerLink';
+import { EndDate } from '@/components/EndDate';
+import { daysLeft, isEnded } from '@/lib/lifecycle';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'UNIER', robots: { index: false, follow: false } };
@@ -21,7 +23,7 @@ export default async function Dashboard({ params }: { params: Promise<{ id: stri
   const [{ sb, user }, { lang, t }] = await Promise.all([currentUser(), getT()]);
   if (!user) redirect(`/login?next=${encodeURIComponent(`/p/${id}/dashboard`)}`);
   const [{ data: raw }, { data, error }] = await Promise.all([
-    sb.from('petitions').select('id, title, target, status, created_at, created_by, lang, tr').eq('id', id).maybeSingle(),
+    sb.from('petitions').select('*').eq('id', id).maybeSingle(),
     sb.rpc('organiser_stats', { p_petition: id }),
   ]);
   if (!raw || (!error && !data)) notFound();   // not theirs, or no such petition
@@ -38,11 +40,13 @@ export default async function Dashboard({ params }: { params: Promise<{ id: stri
   if (error) return <div className="stack">{head}<p className="note">{t('dash.soon')}</p></div>;   // before 0017 has run
 
   const s = data as Stats;
-  const live = p.status === 'live';
+  const ended = isEnded(p); const live = p.status === 'live' && !ended;
+  const left = live ? daysLeft(p.ends_on) : null;
   // One next step, in the order that usually helps most.
   let next: React.ReactNode;
   if (s.won_at) next = <p style={{ margin: 0 }}>{t('dash.won')}</p>;
-  else if (Number(s.signatures) < 25) next = <><p style={{ margin: 0 }}>{t('dash.doShare')}</p><ShareButton path={`/p/${p.id}`} title={p.title} /></>;
+  else if (ended && !s.delivered_at) next = <><p style={{ margin: 0 }}>{t('life.dashClosed', { target: p.target })}</p><Link className="btn primary" href={`/p/${p.id}/report`}>{t('p.report')}</Link></>;
+  else if (Number(s.signatures) < 25 && live) next = <><p style={{ margin: 0 }}>{t('dash.doShare')}</p><ShareButton path={`/p/${p.id}`} title={p.title} /></>;
   else if (!Number(s.videos) && live) next = <><p style={{ margin: 0 }}>{t('dash.doVideo')}</p><Link className="btn primary" href={`/post?petition=${p.id}`}>{t('common.postVideo')}</Link></>;
   else if (!s.delivered_at) next = <><p style={{ margin: 0 }}>{t('dash.doDeliver', { target: p.target })}</p><Link className="btn primary" href={`/p/${p.id}/report`}>{t('p.report')}</Link></>;
   else if (!s.answer_link && !s.answered_at && live) next = <><p style={{ margin: 0 }}>{t('dash.doAnswer', { target: p.target })}</p><AnswerLink petitionId={p.id} target={p.target} /></>;
@@ -57,7 +61,7 @@ export default async function Dashboard({ params }: { params: Promise<{ id: stri
   const days = [...Array(30)].map((_, k) => { const d = new Date(Date.now() - (29 - k) * 864e5).toISOString().slice(0, 10); return { d, n: byDay.get(d) ?? 0 }; });
   const max = Math.max(1, ...days.map((x) => x.n));
   const steps: [string, string | null][] = [
-    ['dash.started', p.created_at], ['dash.delivered', s.delivered_at], ['dash.answered', s.answered_at], ['dash.wonOn', s.won_at],
+    ['dash.started', p.created_at], ...(ended || p.ends_on ? [['life.closedStep', ended ? (p.closed_at ?? p.ends_on) : null] as [string, string | null]] : []), ['dash.delivered', s.delivered_at], ['dash.answered', s.answered_at], ['dash.wonOn', s.won_at],
   ];
   return (
     <div className="stack">
@@ -66,12 +70,15 @@ export default async function Dashboard({ params }: { params: Promise<{ id: stri
         <MyloArt mood={s.won_at ? 'cheering' : 'growing'} size={84} id="dash" label="" />
         <div className="stack" style={{ gap: 8, flex: 1, minWidth: 0 }}><span className="label">{t('dash.next')}</span>{next}</div>
       </section>
+      {left != null && <p className="hint" style={{ margin: 0 }}>{left === 0 ? t('life.lastDay') : left === 1 ? t('life.tomorrow', { d: day(p.ends_on) }) : t('life.daysLeft', { n: left, d: day(p.ends_on) })}</p>}
+      {s.delivered_at && !s.answered_at && !s.won_at && <p className="note" style={{ margin: 0 }}>{t('sil.days', { n: Math.floor((Date.now() - Date.parse(s.delivered_at)) / 864e5), target: p.target })}</p>}
       <div className="tgrid">{tiles.map(([k, v]) => <div className="tile" key={k}><b>{n(v)}</b><span className="hint">{k}</span></div>)}</div>
       <section className="stack" style={{ gap: 8 }}><h2>{t('dash.days')}</h2>
         <div className="spark" role="img" aria-label={days.filter((x) => x.n).map((x) => `${day(x.d)}: ${x.n}`).join(', ') || t('dash.days')}>
           {days.map((x) => <i key={x.d} title={`${day(x.d)}: ${n(x.n)}`} style={{ height: `${Math.max(3, (x.n / max) * 100)}%` }} />)}</div></section>
       <section className="stack" style={{ gap: 8 }}><h2>{t('dash.milestones')}</h2>
         <ol className="milestones">{steps.map(([k, d]) => <li key={k} className={d ? 'done' : ''}>{d ? t(k as 'dash.started', { d: day(d) }) : t(k as 'dash.started', { d: '…' })}</li>)}</ol></section>
+      {(p.status === 'live' || p.status === 'pending') && !ended && <EndDate petitionId={p.id} endsOn={p.ends_on ?? null} createdAt={p.created_at} />}
     </div>
   );
 }

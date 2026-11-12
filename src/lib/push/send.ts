@@ -16,14 +16,18 @@ export async function sendPending(limit = 10) {
   let sent = 0, gone = 0;
   for (const e of (events ?? []) as any[]) {
     const [{ data: p }, { data: targets }] = await Promise.all([
-      sb.from('petitions').select('id, title, target, ask, why, goal, lang, tr').eq('id', e.petition_id).maybeSingle(),
+      sb.from('petitions').select('id, title, target, ask, why, goal, lang, tr, petition_stats(combined)').eq('id', e.petition_id).maybeSingle(),
       sb.rpc('push_targets', { p_event: e.id }),
     ]);
     if (!p || !targets?.length) continue;
     const results = await Promise.allSettled((targets as any[]).map((s) => {
       const lang: Lang = isLang(s.lang) ? s.lang : 'en'; const t = makeT(lang);
       const title = localize(p, lang).title;
-      const body = e.kind === 'goal' ? t('push.goal', { goal: fmtN(p.goal, lang) }) : `${t(`kind.${e.kind}` as Key)}: ${e.title ?? ''}`;
+      const loc = localize(p, lang); const signed = Number((Array.isArray(p.petition_stats) ? p.petition_stats[0] : p.petition_stats as any)?.combined ?? 0);
+      const body = e.kind === 'goal' ? t('push.goal', { goal: fmtN(p.goal, lang) })
+        : e.kind === 'closed' ? t('push.closed', { n: fmtN(signed, lang) })
+        : e.kind === 'silent' ? t('push.silent', { n: e.title ?? '', target: loc.target })
+        : `${t(`kind.${e.kind}` as Key)}: ${e.title ?? ''}`;
       return webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         JSON.stringify({ title, body, url: `/p/${p.id}`, tag: `p-${p.id}` }), { TTL: 60 * 60 * 24 })
         .then(() => { sent++; })
