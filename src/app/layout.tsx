@@ -3,6 +3,7 @@ import { Anton, Inter } from 'next/font/google';
 import { Nav } from '@/components/Nav';
 import { LangProvider } from '@/lib/i18n/client';
 import { PendingSign } from '@/components/PendingSign';
+import { Hydrated } from '@/components/Hydrated';
 import { MyloCorner } from '@/components/mylo/MyloCorner';
 import { getT } from '@/lib/i18n/server';
 import { messagesFor } from '@/lib/i18n/dict';
@@ -30,7 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const { lang, t } = await getT();
   return (
     <html lang={lang} className={`${anton.variable} ${inter.variable}`}>
-      <body><LangProvider lang={lang} messages={messagesFor(lang)}><a className="skip" href="#main">{t('a11y.skip')}</a><div className="app"><Nav /><main id="main" tabIndex={-1}>{children}</main></div><PendingSign /><MyloCorner /></LangProvider></body>
+      <body><LangProvider lang={lang} messages={messagesFor(lang)}><a className="skip" href="#main">{t('a11y.skip')}</a><div className="app"><Nav /><main id="main" tabIndex={-1}>{children}</main></div><PendingSign /><Hydrated /><MyloCorner /></LangProvider></body>
     </html>
   );
 }

@@ -18,7 +18,11 @@ async function as(user) {
   return p;
 }
 const settle = (p) => p.waitForLoadState('networkidle').catch(() => {});
-async function go(p, url) { const r = await p.goto(APP + url); await settle(p); return r; }
+async function go(p, url) {
+  const r = await p.goto(APP + url); await settle(p);
+  await p.waitForFunction(() => document.documentElement.dataset.hydrated === '1', null, { timeout: 15000 }).catch(() => {});   // clicks before React is ready get lost
+  return r;
+}
 const noCrash = async (p) => expect(!(await p.locator('text=/Application error|Something went wrong|This page could not be found/i').count()), `page crashed: ${p.url()}`);
 
 const A = newUser('anna'), B = newUser('bela'), C = newUser('cili');
