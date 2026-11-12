@@ -437,10 +437,19 @@ await check('first visit: Mylo introduces himself once, and the story reads to t
   expect(!(await f.locator('.intro-sheet').count()), 'intro did not close');
   await go(f, '/'); await f.waitForTimeout(800); expect(!(await f.locator('.intro-sheet').count()), 'intro came back');
   await go(f, '/mylo/story'); expect(await f.getByRole('heading', { name: 'Why is Mylo trapped?' }).count(), 'story page has no title');
-  for (let k = 0; k < 5; k++) await f.locator('.story').getByRole('button', { name: 'Next' }).click();
-  expect(await f.getByText(/better place to be stuck in/).count(), 'story did not reach the last page');
+  await f.locator('.bk-closed').click(); await f.waitForSelector('.bk-book');
+  await f.waitForFunction(() => !document.querySelector('.bk-leaf'), null, { timeout: 5000 });   // the cover has swung open
+  expect(await f.getByText(/same world as you/).count(), 'first page missing');
+  for (let k = 0; k < 12 && !(await f.getByText('The end').count()); k++) {
+    await f.locator('.bk-nav').getByRole('button', { name: 'Next' }).click({ timeout: 3000 }).catch(() => {}); await f.waitForTimeout(950);
+  }
+  expect(await f.getByText('The end').count(), 'the book did not reach the end');
   expect(await f.getByRole('link', { name: 'How is Mylo today?' }).count(), 'no way back to Mylo');
-  await go(f, '/mylo'); expect(await f.locator('.story-panel').count(), 'story missing on the Mylo page');
+  await f.locator('.bk-nav').getByRole('button', { name: 'Back' }).click(); await f.waitForTimeout(950);
+  expect(await f.getByText(/better place/).count(), 'turning back failed');
+  await go(f, '/mylo'); await f.locator('.bk-closed').click();
+  await f.waitForSelector('.bk-overlay .bk-book'); await f.getByRole('button', { name: 'Close the book' }).click();
+  expect(!(await f.locator('.bk-overlay').count()), 'book did not close');
   await ctx.close();
 });
 await check('the target answers through the private link, and the petition shows it', async () => {
