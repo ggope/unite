@@ -37,6 +37,7 @@ select pg_temp.same();
 -- the counter itself is private
 select set_config('request.jwt.claim.sub', '', false);
 set role anon;
+do $$ begin perform sum(signatures + last_hour + combined + united_count) from public.petition_stats; end $$;   -- every column readable by guests
 do $$ begin perform 1 from public.petition_counts; raise exception 'counter readable';
 exception when insufficient_privilege then null; end $$;
 reset role;

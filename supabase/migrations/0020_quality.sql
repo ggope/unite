@@ -38,7 +38,9 @@ begin
     into n using p_petition, p_since;
   return n;
 end $$;
-revoke execute on function public.email_signed(uuid, timestamptz) from public, anon, authenticated;
+-- The totals view calls it for whoever reads the totals; it only returns a count that is public anyway.
+revoke execute on function public.email_signed(uuid, timestamptz) from public;
+grant execute on function public.email_signed(uuid, timestamptz) to anon, authenticated;
 
 -- Nobody can sign while the counter is filled, so it starts exactly right.
 do $$ begin
