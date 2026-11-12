@@ -493,3 +493,12 @@ main:focus{outline:none}
   .pp-by,.pp-owner,.pp-num{font-size:14pt}
   .skip{display:none!important}
 }
+/* similar petitions while starting one */
+.similar{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:2px dashed var(--accent);border-radius:var(--r);background:var(--sunk)}
+.similar ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.launch{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.launch li{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;background:var(--surface);border:2px solid var(--edge);border-radius:var(--r)}
+.launch li > span:first-child{flex:none;font-weight:800;width:18px}
+.launch li.ok{border-color:var(--line);color:var(--muted)}
+.launch li.ok > span:first-child{color:#2F8E45}
+.launch code{font-size:12.5px;word-break:break-all}

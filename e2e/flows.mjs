@@ -543,6 +543,27 @@ await check('start page tips react while writing', async () => {
   await a.fill('#target', 'Budapest City Council'); await a.waitForTimeout(200);
   expect(await a.locator('.checklist li.ok').count() === 2, 'named target not ticked');
 });
+await check('starting a petition suggests similar ones to join', async () => {
+  await go(a, '/start');
+  await a.fill('#title', 'Stop bottom trawling in our marine protected areas'); await a.fill('#target', 'Fisheries ministers');
+  await a.waitForSelector('.similar', { timeout: 8000 });
+  expect(await a.locator('.similar a', { hasText: 'End bottom trawling' }).count(), 'the matching petition is not suggested');
+  await a.fill('#title', 'Open every school playground to children at weekends'); await a.waitForTimeout(1500);
+  expect(!(await a.locator('.similar').count()), 'unrelated petitions suggested');
+});
+await check('search engines get a sitemap and robots file', async () => {
+  const sm = await g.request.get(APP + '/sitemap.xml'); const xml = await sm.text();
+  expect(sm.ok() && xml.includes(`/p/${seedId}</loc>`) && xml.includes('/wins</loc>'), 'sitemap missing petitions or pages');
+  const rb = await (await g.request.get(APP + '/robots.txt')).text();
+  expect(/Disallow: \/admin/.test(rb) && /Disallow: \/you/.test(rb) && /Sitemap: .*\/sitemap\.xml/.test(rb), `robots wrong: ${rb}`);
+});
+await check('admin launch checklist shows what is left', async () => {
+  const r = await go(a, '/admin?tab=launch'); expect(r.ok(), `launch ${r.status()}`);
+  expect(await a.getByText(/left before launch/).count(), 'no summary');
+  expect(await a.getByText(/sample petitions are still live/).count(), 'sample petitions not noticed');
+  expect(await a.getByText('Database is up to date').count(), 'migrations wrongly reported missing');
+  expect(await a.getByText(/gaps in the legal pages/).count(), 'legal placeholders not counted');
+});
 await check('open numbers download as CSV without names', async () => {
   for (const f of ['totals', 'petitions', 'targets', 'countries']) {
     const r = await g.request.get(APP + `/open/${f}.csv`); expect(r.status() === 200 && (r.headers()['content-type'] ?? '').includes('text/csv'), `${f}: ${r.status()}`);
@@ -563,6 +584,11 @@ await check('sign out', async () => {
   await go(bb, '/you'); expect(await bb.locator('a[href^="/login"]').count(), 'still signed in');
 });
 
+await check('admin takes the sample petitions down before launch', async () => {
+  await go(a, '/admin?tab=launch'); await a.getByRole('button', { name: 'Take the sample petitions down' }).click(); await settle(a);
+  expect(one(`select count(*) from petitions where organiser_name ilike '%(sample)%' and status <> 'removed'`) === '0', 'samples still live');
+  await go(a, '/admin?tab=launch'); expect(await a.getByText('No sample petitions left').count(), 'checklist not updated');
+});
 
 await b.close();
 if (errors.length) { console.log('\nBrowser/server errors:'); [...new Set(errors)].slice(0, 30).forEach((e) => console.log('  ' + e)); }

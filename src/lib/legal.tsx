@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { Lang } from './i18n/dict';
 
-const Ph = ({ children }: { children: React.ReactNode }) => <span className="ph">{children}</span>;
+export const Ph = ({ children }: { children: React.ReactNode }) => <span className="ph">{children}</span>;
 type Doc = { title: string; updated: string; body: React.ReactNode };
 
 const privacyEn: Doc = { title: 'Privacy policy', updated: 'Last updated: 12 November 2026', body: <>
@@ -214,3 +214,16 @@ export const LEGAL: Record<'privacy' | 'terms' | 'imprint', Partial<Record<Lang,
   terms: { en: termsEn, hu: termsHu },
   imprint: { en: imprintEn, hu: imprintHu },
 };
+
+// How many placeholders are still waiting to be filled in, across every legal page and language.
+export function legalPlaceholders() {
+  const count = (node: React.ReactNode): number => {
+    if (Array.isArray(node)) return node.reduce((a: number, x) => a + count(x), 0);
+    if (node && typeof node === 'object' && 'props' in node) {
+      const el = node as React.ReactElement<{ children?: React.ReactNode }>;
+      return (el.type === Ph ? 1 : 0) + count(el.props.children);
+    }
+    return 0;
+  };
+  return Object.values(LEGAL).flatMap((d) => Object.values(d)).reduce((a, doc) => a + count(doc!.body), 0);
+}

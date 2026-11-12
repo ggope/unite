@@ -5,6 +5,7 @@ import { TOPIC_KEYS, GOALS } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
 import { fmtN } from '@/lib/i18n/langs';
 import { CTAS } from '@/components/LinkBar';
+import { Similar } from './Similar';
 
 type Draft = { title: string; target: string; ask: string; why: string; source: string; ends: string };
 // Words that name nobody who can actually decide.
@@ -43,6 +44,7 @@ export function StartForm({ then, source, topic }: { then: 'video' | 'page'; sou
       <input type="hidden" name="then" value={then} />
       <div className="field"><label htmlFor="title">{t('start.tTitle')}</label><input id="title" name="title" required minLength={10} maxLength={90} placeholder={t('start.tTitlePh')} /><span className="hint">{t('start.tTitleHint')}</span></div>
       <div className="field"><label htmlFor="target">{t('start.target')}</label><input id="target" name="target" required placeholder={t('start.targetPh')} /></div>
+      <Similar title={d.title} target={d.target} />
       <div className="field"><label htmlFor="region">{t('start.region')}</label><input id="region" name="region" required list="regions" placeholder={t('start.regionPh')} />
         <datalist id="regions"><option value={t('start.rWorld')} /><option value={t('start.rEu')} /><option value={t('start.rHu')} /><option value="Budapest" /></datalist></div>
       <div className="field"><label htmlFor="ask">{t('start.ask')}</label><textarea id="ask" name="ask" required minLength={20} placeholder={t('start.askPh')} /></div>

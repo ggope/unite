@@ -162,3 +162,10 @@ export async function setHumanCheck(f: FormData) {
   const { error } = await sb.from('site_settings').update({ require_human_check: on }).eq('id', true);
   await done(error);
 }
+
+// Before launch: takes every sample petition down at once. They stay in the database and can be put back under Petitions.
+export async function removeSamples() {
+  const sb = await mod();
+  await done((await sb.from('petitions').update({ status: 'removed', moderation_note: 'Sample petition, taken down before launch.' })
+    .ilike('organiser_name', '%(sample)%').neq('status', 'removed')).error);
+}

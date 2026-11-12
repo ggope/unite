@@ -2,10 +2,11 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN, LANGS, type Lang } from '@/lib/i18n/dict';
-import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource } from './actions';
+import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, removeSamples } from './actions';
+import { legalPlaceholders } from '@/lib/legal';
 
 export const dynamic = 'force-dynamic';
-const TABS = [['overview', 'Overview'], ['queue', 'Review queue'], ['reports', 'Reports'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People']] as const;
+const TABS = [['overview', 'Overview'], ['launch', 'Launch checklist'], ['queue', 'Review queue'], ['reports', 'Reports'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People']] as const;
 type Tab = (typeof TABS)[number][0];
 const when = (d: string) => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const n = (x: number) => fmtN(x, 'en');
@@ -33,6 +34,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       </nav>
       {err && <p className="error" role="alert">That did not work: {err}</p>}
       {tab === 'overview' && <Overview st={st} sb={sb} />}
+      {tab === 'launch' && <Launch sb={sb} />}
       {tab === 'queue' && <Queue sb={sb} />}
       {tab === 'reports' && <Reports sb={sb} />}
       {tab === 'petitions' && <Petitions sb={sb} q={q} open={open} />}
@@ -78,6 +80,52 @@ async function Queue({ sb }: { sb: any }) {
     {pets?.length ? pets.map((p: any) => <div className="panel" key={p.id}><b>{p.title}</b><span className="hint">{p.organiser_name} → {p.target} · {p.region} · {p.topic} · goal {n(p.goal)} · {when(p.created_at)}</span><p style={{ margin: 0 }}>{p.ask}</p><p className="hint" style={{ margin: 0 }}>{p.why}</p>{p.source_url && <a href={p.source_url} target="_blank" rel="noopener nofollow">Source</a>}{p.link_url && <span className="hint">Button link ({p.link_cta}): <a href={p.link_url} target="_blank" rel="noopener nofollow">{p.link_url}</a> · check it is safe and belongs to the organiser</span>}<Decide kind="petition" id={p.id} /></div>) : <p className="hint">Nothing waiting.</p>}
     <h2>Videos ({vids?.length ?? 0})</h2>
     {vids?.length ? vids.map((v: any, i: number) => <div className="panel" key={v.id}><b>{v.caption}</b><span className="hint">For: {v.petitions?.title} · {v.audience === 'friends' ? 'friends only · ' : ''}{when(v.created_at)}</span>{v.blur_faces && <p className="error" style={{ margin: 0 }}>The uploader says other people can be recognised. Approve only if they clearly agreed to be filmed or cannot be identified.</p>}{urls[i]?.signedUrl && <video src={urls[i].signedUrl} controls muted playsInline style={{ width: '100%', maxHeight: 420, background: '#000', borderRadius: 10 }} />}<Decide kind="video" id={v.id} /></div>) : <p className="hint">Nothing waiting.</p>}
+  </>);
+}
+
+// Everything that still needs doing before real people use UNIER, checked live.
+// A database update counts as missing only when the thing it adds does not exist.
+const MIGRATIONS: [string, string, string][] = [
+  ['0002', 'invites', 'user_id'], ['0003', 'news_items', 'id'], ['0004', 'reports', 'resolved_at'], ['0005', 'petitions', 'official_url'],
+  ['0006', 'profiles', 'bio'], ['0007', 'petitions', 'link_url'], ['0012', 'petitions', 'tr'], ['0014', 'notices', 'id'],
+  ['0015', 'share_codes', 'code'], ['0016', 'answer_links', 'petition_id'], ['0017', 'signatures', 'reason_key'],
+];
+const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins' };
+const missing = (e: any) => !!e && /does not exist|PGRST20[45]|42703|42P01|schema cache/i.test(`${e.code} ${e.message}`);
+
+async function Launch({ sb }: { sb: any }) {
+  const probes = await Promise.all(MIGRATIONS.map(async ([v, table, col]) => [v, !missing((await sb.from(table).select(col).limit(1)).error)] as const));
+  const todo = probes.filter(([, ok]) => !ok).map(([v]) => v);
+  const [{ count: samples }, { data: mods }] = await Promise.all([
+    sb.from('petitions').select('id', { count: 'exact', head: true }).ilike('organiser_name', '%(sample)%').neq('status', 'removed'),
+    sb.rpc('admin_find_people', { p_query: '' }),
+  ]);
+  const site = process.env.NEXT_PUBLIC_SITE_URL ?? '';
+  const ph = legalPlaceholders();
+  const env = (...k: string[]) => k.every((x) => !!process.env[x]);
+  const items: { ok: boolean; what: string; how: React.ReactNode }[] = [
+    { ok: !todo.length, what: todo.length ? `Database updates to run: ${todo.join(', ')}` : 'Database is up to date',
+      how: <>In Supabase, open SQL editor and run, in order: {todo.map((v) => <code key={v}>{FILES[v]}.sql </code>)}. The files are in the project&apos;s sql folder.</> },
+    { ok: !samples, what: samples ? `${samples} sample petitions are still live` : 'No sample petitions left',
+      how: samples ? <form action={removeSamples}><button className="btn small danger">Take the sample petitions down</button></form> : null },
+    { ok: ph === 0, what: ph ? `${ph} gaps in the legal pages (name, address, email…)` : 'Legal pages are filled in',
+      how: <>Send me the operator&apos;s name, address and contact email, and have a lawyer read <Link href="/privacy">Privacy</Link>, <Link href="/terms">Terms</Link> and <Link href="/imprint">Imprint</Link>.</> },
+    { ok: !!site && !/vercel\.app|localhost/.test(site), what: site && !/vercel\.app|localhost/.test(site) ? `Own web address: ${site}` : 'Own web address',
+      how: <>Buy a domain, add it in Vercel → Settings → Domains, then set <code>NEXT_PUBLIC_SITE_URL</code> to it.</> },
+    { ok: env('NEXT_PUBLIC_VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY'), what: 'Phone notification keys',
+      how: <>Add <code>NEXT_PUBLIC_VAPID_PUBLIC_KEY</code> and <code>VAPID_PRIVATE_KEY</code> in Vercel → Settings → Environment Variables (they are in the project&apos;s setup folder).</> },
+    { ok: env('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'), what: 'Bot check keys (Cloudflare Turnstile)',
+      how: <>Make a free Turnstile widget at Cloudflare, add both keys in Vercel, then switch the check on under People.</> },
+    { ok: env('CRON_SECRET'), what: 'Daily jobs secret', how: <>Set <code>CRON_SECRET</code> in Vercel so the daily news import and clean-up run.</> },
+    { ok: env('SUPABASE_SERVICE_ROLE_KEY'), what: 'Server key for Supabase', how: <>Set <code>SUPABASE_SERVICE_ROLE_KEY</code> in Vercel (Supabase → Project settings → API).</> },
+    { ok: (mods?.length ?? 0) >= 2, what: `${mods?.length ?? 0} moderator${mods?.length === 1 ? '' : 's'}`, how: <>Two or more, so reports are answered when one of you is away. Add one under <Link href="/admin?tab=people">People</Link>.</> },
+  ];
+  const left = items.filter((x) => !x.ok).length;
+  return (<>
+    <p style={{ margin: 0 }}><b>{left ? `${left} of ${items.length} left before launch` : 'Ready for launch ✓'}</b></p>
+    <ul className="launch">{items.map((x) => (
+      <li key={x.what} className={x.ok ? 'ok' : ''}><span aria-hidden="true">{x.ok ? '✓' : '○'}</span>
+        <span className="stack" style={{ gap: 4 }}><b>{x.what}</b>{!x.ok && x.how && <span className="hint">{x.how}</span>}</span></li>))}</ul>
   </>);
 }
 
