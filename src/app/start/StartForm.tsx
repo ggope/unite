@@ -3,7 +3,7 @@ import { useActionState } from 'react';
 import { createPetition, type StartState } from './actions';
 import { TOPIC_KEYS, GOALS } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
-import { fmtN } from '@/lib/i18n/dict';
+import { fmtN } from '@/lib/i18n/langs';
 import { CTAS } from '@/components/LinkBar';
 
 export function StartForm({ then, source, topic }: { then: 'video' | 'page'; source?: string; topic?: string }) {

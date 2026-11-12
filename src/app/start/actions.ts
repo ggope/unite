@@ -17,13 +17,17 @@ export async function createPetition(_: StartState, form: FormData): Promise<Sta
   const src = g('source_url');
   const off = g('official_url'), link = g('link_url'), cta = g('link_cta');
   if ([src, off, link].some((u) => u && !u.startsWith('https://'))) return { error: t('start.errSource') };
-  const { data, error } = await sb.from('petitions').insert({
+  const row = {
     created_by: user.id, organiser_name: g('organiser_name'), title: g('title'), target: g('target'), region: g('region'),
     ask: g('ask'), why: g('why'), source_url: src || null, topic, goal, ends_on: g('ends_on') || null, lang,
     ...(off ? { official_url: off } : {}),
     ...(link ? { link_url: link, link_cta: ['learn', 'visit', 'donate', 'join', 'event'].includes(cta) ? cta : 'learn' } : {}),
-  }).select('id').single();
+  };
+  let { data, error } = await sb.from('petitions').insert(row).select('id').single();
+  // until 0015_reach.sql runs, the database only knows English and Hungarian
+  if (error?.message.includes('petitions_lang_check')) ({ data, error } = await sb.from('petitions').insert({ ...row, lang: 'en' }).select('id').single());
   if (error) return { error: error.message.includes('slow_down') ? t('err.slow') : error.message.includes('check') ? t('start.errLength') : t('start.errSave') };
   // the database counts the founder as the first signature
+  if (!data) return { error: t('start.errSave') };
   redirect(form.get('then') === 'video' ? `/post?petition=${data.id}` : `/p/${data.id}`);
 }

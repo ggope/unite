@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
-import { makeT, fmtN, type Key, type Lang } from '@/lib/i18n/dict';
+import { makeT, fmtN, isLang, type Key, type Lang } from '@/lib/i18n/dict';
 import { localize } from '@/lib/petitionText';
 
 // Phone notifications are on when the two VAPID keys are set (see README).
@@ -21,7 +21,7 @@ export async function sendPending(limit = 10) {
     ]);
     if (!p || !targets?.length) continue;
     const results = await Promise.allSettled((targets as any[]).map((s) => {
-      const lang = (s.lang === 'hu' ? 'hu' : 'en') as Lang; const t = makeT(lang);
+      const lang: Lang = isLang(s.lang) ? s.lang : 'en'; const t = makeT(lang);
       const title = localize(p, lang).title;
       const body = e.kind === 'goal' ? t('push.goal', { goal: fmtN(p.goal, lang) }) : `${t(`kind.${e.kind}` as Key)}: ${e.title ?? ''}`;
       return webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },

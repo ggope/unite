@@ -15,6 +15,9 @@ const privacyEn: Doc = { title: 'Privacy policy', updated: 'Last updated: 12 Nov
     <li><b>Your signatures and reasons:</b> a signature shows a political opinion, which the law treats as sensitive. We only record signatures with your explicit consent (Art. 9(2)(a)), and we keep a record of when you gave or withdrew it, to be able to prove it. Signatures are private: nobody else can see them unless you switch that on, and petition targets and organisers only receive totals. With each signature we keep the approximate country of your internet connection, only to show totals per country in the petition’s delivery report; countries with fewer than 10 signers are grouped together. A reason is shown only if you choose. You can withdraw any signature, or your consent, at any time under You. Withdrawing consent deletes all your signatures.</li>
     <li><b>Official petitions elsewhere:</b> some petitions link to an official petition on another site (for example the European Citizens’ Initiative). Signing there is separate: that site collects your data under its own policy.</li>
     <li><b>Follows, settings and friends:</b> to show you updates and run the features you use (Art. 6(1)(b)). Friends see your signatures only if you switch that on. Friend requests nobody answers are deleted after 90 days. Your invite link holds a random code; making a new one stops the old link working.</li>
+    <li><b>Share links:</b> when you share a petition while signed in, the link carries a random code. If someone signs through it, their signature records that it came through your link (Art. 6(1)(f), our legitimate interest in showing people the effect of sharing). You only ever see totals from 3 signatures up, never who signed. The code is deleted with your account; the export of your data says whether a share link brought you.</li>
+    <li><b>Phone notifications:</b> only if you switch them on (Art. 6(1)(a)). We store your device’s notification address and your language, and send news about petitions you follow. Switch them off under You, or in your phone’s settings; addresses that stop working are deleted automatically.</li>
+    <li><b>Bot check:</b> when it is switched on, Cloudflare Turnstile checks that a person, not a program, is signing up or signing (Art. 6(1)(f), protecting petitions from fake signatures). Cloudflare sees technical data about your browser and connection for this check only. We store only the date you last passed it, for 30 days.</li>
     <li><b>Profile and messages:</b> your handle, name, short bio and chosen topics are public (if you tell us you are under 18: friends only). Messages can only be sent between friends; only the two of you can read them, unless one of you reports a message, which shares that one message with our moderators. Blocking someone hides you from each other immediately. Messages are deleted with your account (Art. 6(1)(b)).</li>
     <li><b>Reports you send:</b> what you reported and the reason you gave. Only our moderators see a report; the person you reported is not told who reported them. We need this to deal with illegal or harmful content (Art. 6(1)(c) and (f), and the EU Digital Services Act). Reports are deleted automatically 12 months after we close them.</li>
     <li><b>Videos and petitions you post:</b> public once approved, under the name you choose (Art. 6(1)(b)). If we decline or remove something, you see our reason under You.</li>
@@ -34,6 +37,8 @@ const privacyEn: Doc = { title: 'Privacy policy', updated: 'Last updated: 12 Nov
   <ul>
     <li>Supabase: database, login and video storage, in the EU (Frankfurt).</li>
     <li>Vercel: website hosting, servers in Frankfurt. Vercel is a US company and is bound by the EU Standard Contractual Clauses and the EU-US Data Privacy Framework.</li>
+    <li>Cloudflare: the bot check (Turnstile), only when switched on. Cloudflare is a US company bound by the EU Standard Contractual Clauses and the EU-US Data Privacy Framework.</li>
+    <li>Phone notifications go through your phone’s own push service (Apple, Google or Mozilla), encrypted so they cannot read the content.</li>
     <li><Ph>email provider</Ph>: sending login and update emails.</li>
     <li>Google: only if you choose Google sign-in.</li>
   </ul>
@@ -65,6 +70,9 @@ const privacyHu: Doc = { title: 'Adatvédelmi tájékoztató', updated: 'Utolsó
     <li><b>Aláírásaid és indokaid:</b> az aláírás politikai véleményt fejez ki, amit a jog különleges adatként kezel. Csak a kifejezett hozzájárulásoddal rögzítjük (9. cikk (2) a)), és nyilvántartjuk, mikor adtad meg vagy vontad vissza, hogy ezt igazolni tudjuk. Az aláírások privátak: más nem látja őket, hacsak be nem kapcsolod, a petíciók címzettjei és szervezői csak összesített számokat kapnak. Minden aláírás mellé eltároljuk az internetkapcsolatod hozzávetőleges országát, kizárólag az átadási jelentés országonkénti összesítéséhez; a 10 aláírónál kisebb országokat összevonjuk. Az indokod csak akkor jelenik meg, ha te így döntesz. Bármelyik aláírást vagy a hozzájárulásodat bármikor visszavonhatod a Profil oldalon. A hozzájárulás visszavonása minden aláírásodat törli.</li>
     <li><b>Hivatalos petíciók máshol:</b> egyes petíciók egy másik oldalon futó hivatalos petícióra mutatnak (például az európai polgári kezdeményezésre). Az ottani aláírás külön dolog: azt az oldal a saját szabályai szerint kezeli.</li>
     <li><b>Követések, beállítások, ismerősök:</b> hogy megkapd a frissítéseket, és működjenek a használt funkciók (6. cikk (1) b)). Az ismerőseid csak akkor látják az aláírásaidat, ha ezt bekapcsolod. A megválaszolatlan ismerősnek jelöléseket 90 nap után töröljük. A meghívó linked egy véletlen kódot tartalmaz; ha újat kérsz, a régi link megszűnik.</li>
+    <li><b>Megosztási linkek:</b> ha bejelentkezve osztasz meg egy petíciót, a link egy véletlen kódot tartalmaz. Ha valaki ezen keresztül ír alá, az aláírásánál rögzítjük, hogy a te linkeden jött (GDPR 6. cikk (1) f), jogos érdekünk megmutatni a megosztás hatását). Csak összesítést látsz, 3 aláírástól kezdve, azt soha, hogy ki írt alá. A kód a fiókoddal együtt törlődik; az adataid exportja jelzi, hogy megosztási link hozott-e.</li>
+    <li><b>Telefonos értesítések:</b> csak ha bekapcsolod (6. cikk (1) a)). Eltároljuk az eszközöd értesítési címét és a nyelvedet, és híreket küldünk a követett petíciókról. A Te menüben vagy a telefonod beállításaiban kapcsolhatod ki; a már nem működő címeket automatikusan töröljük.</li>
+    <li><b>Robotellenőrzés:</b> ha be van kapcsolva, a Cloudflare Turnstile ellenőrzi, hogy ember és nem program regisztrál vagy ír alá (6. cikk (1) f), a petíciók védelme a hamis aláírásoktól). A Cloudflare ehhez a böngésződ és a kapcsolatod technikai adatait látja, csak erre az ellenőrzésre. Mi csak azt tároljuk, mikor mentél át legutóbb, 30 napig.</li>
     <li><b>Profil és üzenetek:</b> a felhasználóneved, neved, rövid bemutatkozásod és a választott témáid nyilvánosak (ha jelezted, hogy 18 év alatti vagy: csak az ismerősöknek). Üzenetet csak ismerősök küldhetnek egymásnak; csak ti ketten olvashatjátok, kivéve ha valamelyikőtök bejelent egy üzenetet: ekkor az az egy üzenet a moderátorokhoz kerül. A letiltás azonnal elrejt titeket egymás elől. Az üzenetek a fiókoddal együtt törlődnek (6. cikk (1) b)).</li>
     <li><b>Bejelentéseid:</b> amit bejelentettél, és az indok, amit megadtál. A bejelentést csak a moderátoraink látják; a bejelentett személy nem tudja meg, ki jelentette be. Erre a jogellenes vagy ártalmas tartalmak kezeléséhez van szükség (6. cikk (1) c) és f), valamint az EU digitális szolgáltatásokról szóló rendelete). A bejelentéseket lezárásuk után 12 hónappal automatikusan töröljük.</li>
     <li><b>Feltöltött videók és petíciók:</b> jóváhagyás után nyilvánosak, az általad választott néven (6. cikk (1) b)). Ha valamit elutasítunk vagy eltávolítunk, az indokot a Profil oldalon látod.</li>
@@ -84,6 +92,8 @@ const privacyHu: Doc = { title: 'Adatvédelmi tájékoztató', updated: 'Utolsó
   <ul>
     <li>Supabase: adatbázis, bejelentkezés és videótárolás az EU-ban (Frankfurt).</li>
     <li>Vercel: a weboldal tárhelye, frankfurti szerverekkel. A Vercel amerikai cég, az EU általános szerződési feltételei és az EU–USA adatvédelmi keretrendszer kötik.</li>
+    <li>Cloudflare: a robotellenőrzés (Turnstile), csak ha be van kapcsolva. A Cloudflare amerikai cég, az EU általános szerződési feltételei és az EU–USA adatvédelmi keretrendszer kötik.</li>
+    <li>A telefonos értesítések a telefonod saját értesítési szolgáltatásán (Apple, Google vagy Mozilla) mennek át, titkosítva, így a tartalmukat nem láthatják.</li>
     <li><Ph>e-mail-szolgáltató</Ph>: belépési és értesítő e-mailek küldése.</li>
     <li>Google: csak ha Google-fiókkal lépsz be.</li>
   </ul>
@@ -199,7 +209,7 @@ const imprintHu: Doc = { title: 'Impresszum', updated: '', body: <>
   </ul>
 </> };
 
-export const LEGAL: Record<'privacy' | 'terms' | 'imprint', Record<Lang, Doc>> = {
+export const LEGAL: Record<'privacy' | 'terms' | 'imprint', Partial<Record<Lang, Doc>> & { en: Doc }> = {
   privacy: { en: privacyEn, hu: privacyHu },
   terms: { en: termsEn, hu: termsHu },
   imprint: { en: imprintEn, hu: imprintHu },

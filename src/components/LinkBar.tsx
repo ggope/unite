@@ -1,6 +1,6 @@
 'use client';
 import { useT } from '@/lib/i18n/client';
-import type { Key } from '@/lib/i18n/dict';
+import type { Key } from '@/lib/i18n/langs';
 
 export const CTAS = ['learn', 'visit', 'donate', 'join', 'event'] as const;
 export type Cta = (typeof CTAS)[number];

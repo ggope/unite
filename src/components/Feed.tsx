@@ -5,7 +5,7 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import { applySignal, pickNext, type FeedItem, type Signal, type Weights } from '@/lib/ranking';
 import { type Topic } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
-import { fmtN } from '@/lib/i18n/dict';
+import { fmtN } from '@/lib/i18n/langs';
 import { SignButton, type Viewer } from './SignButton';
 import { Icon } from './Icon';
 import { NewsCard } from './NewsCard';

@@ -2,5 +2,5 @@ import Link from 'next/link';
 import { getT } from '@/lib/i18n/server';
 export async function LegalLinks() {
   const { t } = await getT();
-  return <nav className="legal" aria-label={t('legal.privacy')}><Link href="/privacy">{t('legal.privacy')}</Link><Link href="/terms">{t('legal.terms')}</Link><Link href="/imprint">{t('legal.imprint')}</Link><Link href="/donate">{t('don.link')}</Link></nav>;
+  return <nav className="legal" aria-label={t('legal.privacy')}><Link href="/privacy">{t('legal.privacy')}</Link><Link href="/terms">{t('legal.terms')}</Link><Link href="/imprint">{t('legal.imprint')}</Link><Link href="/donate">{t('don.link')}</Link><Link href="/transparency">{t('tr.title')}</Link><Link href="/targets">{t('board.title')}</Link></nav>;
 }

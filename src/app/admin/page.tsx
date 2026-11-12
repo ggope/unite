@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
-import { fmtN } from '@/lib/i18n/dict';
-import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource } from './actions';
+import { fmtN, LANGS, type Lang } from '@/lib/i18n/dict';
+import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource } from './actions';
 
 export const dynamic = 'force-dynamic';
 const TABS = [['overview', 'Overview'], ['queue', 'Review queue'], ['reports', 'Reports'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People']] as const;
@@ -10,7 +10,7 @@ type Tab = (typeof TABS)[number][0];
 const when = (d: string) => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const n = (x: number) => fmtN(x, 'en');
 
-export default async function Admin({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string; err?: string }> }) {
+export default async function Admin({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string; err?: string; tr?: string }> }) {
   const { sb, user } = await currentUser();
   if (!user) redirect('/login?next=/admin');
   const { data: me } = await sb.from('profiles').select('is_moderator').eq('id', user.id).single();
@@ -19,7 +19,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       <p>You are signed in as <b>{user.email}</b>, but this account is not a moderator yet. Make it one in the Supabase SQL editor, then reload this page.</p>
       <Link className="btn" href="/">← Back to UNIER</Link></div>
   );
-  const { tab: raw = 'overview', q = '', err } = await searchParams;
+  const { tab: raw = 'overview', q = '', err, tr: open = '' } = await searchParams;
   const tab = (TABS.some(([k]) => k === raw) ? raw : 'overview') as Tab;
   const { data: stats } = await sb.rpc('admin_stats');
   const st = (stats ?? {}) as Record<string, number>;
@@ -35,7 +35,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       {tab === 'overview' && <Overview st={st} sb={sb} />}
       {tab === 'queue' && <Queue sb={sb} />}
       {tab === 'reports' && <Reports sb={sb} />}
-      {tab === 'petitions' && <Petitions sb={sb} q={q} />}
+      {tab === 'petitions' && <Petitions sb={sb} q={q} open={open} />}
       {tab === 'news' && <News sb={sb} />}
       {tab === 'people' && <People sb={sb} q={q} me={user.id} />}
     </div>
@@ -101,29 +101,42 @@ async function Reports({ sb }: { sb: any }) {
   </>);
 }
 
-// The petition in the other language. The original stays as written; readers see the version for their language.
-function Translation({ p }: { p: any }) {
-  const other = p.lang === 'hu' ? 'en' : 'hu';
-  const tr = (p.tr ?? {})[other] ?? {};
-  const done = ['title', 'target', 'ask', 'why'].filter((k) => tr[k]).length;
+// The petition in other languages. The original stays as written; readers see the version for their language.
+function Translation({ p, open, q }: { p: any; open: boolean; q: string }) {
+  const orig = (p.lang ?? 'en') as Lang;
+  const others = (Object.keys(LANGS) as Lang[]).filter((l) => l !== orig);
+  const count = (l: Lang) => ['title', 'target', 'ask', 'why'].filter((k) => (p.tr ?? {})[l]?.[k]).length;
+  const href = (tr: string) => `/admin?tab=petitions${q ? `&q=${encodeURIComponent(q)}` : ''}${tr ? `&tr=${tr}` : ''}`;
+  const status = others.map((l) => `${l.toUpperCase()} ${count(l) === 4 ? '✓' : count(l) ? `${count(l)}/4` : '–'}`).join(' · ');
+  // The forms only render for the petition being translated, so the page stays light.
+  if (!open) return <div className="row between"><span className="hint">Written in {LANGS[orig]} · {status}</span><a className="btn small" href={href(p.id)}>Translations</a></div>;
   return (
-    <details>
-      <summary className="hint">Translation · written in {p.lang === 'hu' ? 'Hungarian' : 'English'} · {other === 'hu' ? 'Hungarian' : 'English'} version {done === 4 ? 'complete' : done ? `${done} of 4 fields` : 'missing'}</summary>
-      <form action={setTranslation} className="stack" style={{ marginTop: 8 }}>
+    <section className="stack" style={{ gap: 8 }} id={`tr-${p.id}`}>
+      <div className="row between"><b>Translations</b><a className="btn ghost small" href={href('')}>Done</a></div>
+      <form action={setOriginalLang} className="row">
         <input type="hidden" name="id" value={p.id} />
-        <label className="row">Written in <select name="lang" defaultValue={p.lang ?? 'en'}><option value="en">English</option><option value="hu">Hungarian</option></select>
-          <span className="hint">(the translation below is for the other language)</span></label>
-        <input name="title" maxLength={90} defaultValue={tr.title ?? ''} placeholder={`Title (${other})`} aria-label={`Title (${other})`} />
-        <input name="target" maxLength={120} defaultValue={tr.target ?? ''} placeholder={`Target (${other})`} aria-label={`Target (${other})`} />
-        <textarea name="ask" maxLength={2000} rows={3} defaultValue={tr.ask ?? ''} placeholder={`What we ask (${other})`} aria-label={`What we ask (${other})`} />
-        <textarea name="why" maxLength={5000} rows={4} defaultValue={tr.why ?? ''} placeholder={`Why it matters (${other})`} aria-label={`Why it matters (${other})`} />
-        <button className="btn small">Save translation</button>
+        <label className="row">Written in <select name="lang" defaultValue={orig}>{(Object.keys(LANGS) as Lang[]).map((l) => <option key={l} value={l}>{LANGS[l]}</option>)}</select></label>
+        <button className="btn small">Save</button>
       </form>
-    </details>
+      {others.map((l) => {
+        const tr = (p.tr ?? {})[l] ?? {};
+        return (
+          <form key={l} action={setTranslation} className="stack" lang={l}>
+            <b className="hint">{LANGS[l]} {count(l) === 4 ? '· complete' : count(l) ? `· ${count(l)} of 4 fields` : '· missing'}</b>
+            <input type="hidden" name="id" value={p.id} /><input type="hidden" name="to" value={l} />
+            <input name="title" maxLength={90} defaultValue={tr.title ?? ''} placeholder={`Title (${l})`} aria-label={`Title (${LANGS[l]})`} />
+            <input name="target" maxLength={120} defaultValue={tr.target ?? ''} placeholder={`Target (${l})`} aria-label={`Target (${LANGS[l]})`} />
+            <textarea name="ask" maxLength={2000} rows={3} defaultValue={tr.ask ?? ''} placeholder={`What we ask (${l})`} aria-label={`What we ask (${LANGS[l]})`} />
+            <textarea name="why" maxLength={5000} rows={4} defaultValue={tr.why ?? ''} placeholder={`Why it matters (${l})`} aria-label={`Why it matters (${LANGS[l]})`} />
+            <button className="btn small">Save {LANGS[l]}</button>
+          </form>
+        );
+      })}
+    </section>
   );
 }
 
-async function Petitions({ sb, q }: { sb: any; q: string }) {
+async function Petitions({ sb, q, open }: { sb: any; q: string; open: string }) {
   let query = sb.from('petitions').select('*, petition_stats(combined)').order('created_at', { ascending: false }).limit(60);
   if (q) query = query.ilike('title', `%${q}%`);
   const [{ data: ps }, { data: all }] = await Promise.all([query, sb.from('petitions').select('id, title').eq('status', 'live').order('title').limit(500)]);
@@ -151,7 +164,7 @@ async function Petitions({ sb, q }: { sb: any; q: string }) {
           <input name="url" type="url" defaultValue={p.link_url ?? ''} placeholder="Organiser's website (https://…)" style={{ flex: 1, minWidth: 0 }} />
           <select name="cta" defaultValue={p.link_cta ?? 'learn'}>{['learn', 'visit', 'donate', 'join', 'event'].map((c) => <option key={c} value={c}>{c}</option>)}</select>
           <button className="btn small">Save</button></form>
-        <Translation p={p} />
+        <Translation p={p} open={open === p.id} q={q} />
         {p.cluster_id && <form action={separate}><input type="hidden" name="id" value={p.id} /><button className="btn ghost small">Separate from its group</button></form>}
       </div>))}
   </>);

@@ -11,7 +11,8 @@ export async function GET() {
     q(sb.from('profiles').select('*').eq('id', user.id).maybeSingle()),
     q(sb.from('user_settings').select('*').eq('user_id', user.id).maybeSingle()),
     q(sb.from('consents').select('kind, text_version, granted_at, revoked_at')),
-    q(sb.from('signatures').select('petition_id, why, show_reason, country, created_at, petitions(title)')),
+    // the sharer's id stays private: the export only says whether a share link brought you
+    q(sb.from('signatures').select('*, petitions(title)')).then((rows) => rows?.map(({ user_id, ref_by, ...r }: any) => ({ ...r, came_through_a_share: !!ref_by }))),
     q(sb.from('follows').select('petition_id, created_at, petitions(title)')),
     q(sb.from('friendships').select('friend_id, created_at, profiles!friendships_friend_id_fkey(handle, display_name)').eq('user_id', user.id)),
     q(sb.from('petitions').select('*').eq('created_by', user.id)),

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n/client';
-import { locale } from '@/lib/i18n/dict';
+import { locale } from '@/lib/i18n/langs';
 
 export type Msg = { id: number; sender_id: string; body: string; created_at: string };
 

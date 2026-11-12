@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@/lib/i18n/client';
-import { fmtN, type Key } from '@/lib/i18n/dict';
+import { fmtN, type Key } from '@/lib/i18n/langs';
 import type { Mood } from './art';
 
 // The drawings load only when Mylo actually appears.

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useT } from '@/lib/i18n/client';
-import { fmtN, type Key } from '@/lib/i18n/dict';
+import { fmtN, type Key } from '@/lib/i18n/langs';
 import { TOPICS, type Topic } from '@/lib/topics';
 import { MyloArt } from './mylo/MyloArt';
 import type { Mood } from './mylo/art';

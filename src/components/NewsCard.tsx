@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { TOPICS } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
-import { fmtN } from '@/lib/i18n/dict';
+import { fmtN } from '@/lib/i18n/langs';
 import { ago, type NewsStory } from '@/lib/news/load';
 import { SignButton, type Viewer } from './SignButton';
 

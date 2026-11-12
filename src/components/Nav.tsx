@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { Icon } from './Icon';
 import { useT, LangSwitch } from '@/lib/i18n/client';
-import type { Key } from '@/lib/i18n/dict';
+import type { Key } from '@/lib/i18n/langs';
 
 const ITEMS: { href: string; label: Key; icon: string; create?: boolean }[] = [
   { href: '/', label: 'nav.feed', icon: 'feed' },

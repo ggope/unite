@@ -11,12 +11,13 @@ import { DeleteAccount } from './DeleteAccount';
 import { SaveForm } from './SaveForm';
 import { Icon } from '@/components/Icon';
 import { PushToggle } from '@/components/PushToggle';
+import { localize } from '@/lib/petitionText';
 
 export const dynamic = 'force-dynamic';
 
 export default async function You({ searchParams }: { searchParams: Promise<{ friend?: string }> }) {
   const { friend } = await searchParams;
-  const [{ sb, user, viewer, settings, weights }, { t }] = await Promise.all([loadViewer(), getT()]);
+  const [{ sb, user, viewer, settings, weights }, { lang, t }] = await Promise.all([loadViewer(), getT()]);
   if (!user) return <div className="stack"><div className="empty"><h1>{t('you.title')}</h1><p>{t('you.signedOut')}</p><Link className="btn primary" href="/login?next=/you">{t('common.signIn')}</Link></div><InstallApp /><div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div><LegalLinks /></div>;
   const [{ data: profile }, { data: sigs }, { data: vids }, { data: code }, { data: fr }, { data: mine }] = await Promise.all([
     sb.from('profiles').select('*').eq('id', user.id).single(),
@@ -26,6 +27,7 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
     sb.from('friendships').select('friend_id, profiles!friendships_friend_id_fkey(handle, display_name)').eq('user_id', user.id),
     sb.from('petitions').select('id, title, status, moderation_note, created_at').eq('created_by', user.id).order('created_at', { ascending: false }),
   ]);
+  const { data: impact } = await sb.rpc('my_impact');
   const { data: notices } = await sb.from('notices').select('id, kind, body').order('created_at', { ascending: false });
   const { data: reqs } = await sb.from('friend_requests').select('from_id, profiles!friend_requests_from_id_fkey(handle, display_name)').eq('to_id', user.id);
   const requests = (reqs ?? []).map((r: any) => ({ id: r.from_id, handle: r.profiles?.handle ?? null, display_name: r.profiles?.display_name ?? null }));
@@ -47,6 +49,12 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
       ))}
       <InstallApp />
       <div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div>
+      <div className="panel"><span className="label">{t('impact.title')}</span>
+        {impact?.total ? <><b className="impact-n">{t('impact.total', { n: impact.total })}</b>
+          {(impact.petitions ?? []).map((p: any) => <span key={p.id} className="row between"><Link href={`/p/${p.id}`}>{localize(p, lang).title}</Link><b className="num">{p.n}</b></span>)}</>
+          : <span className="hint">{impact?.any ? t('impact.few') : t('impact.none')}</span>}
+        <span className="hint">{t('impact.privacy')}</span>
+      </div>
       <PushToggle />
       <SaveForm action={saveSettings}>
         <span className="label">{t('you.profile')}</span><span className="hint">{user.email}</span>

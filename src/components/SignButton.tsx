@@ -6,7 +6,7 @@ import { CONSENT_VERSION, DAILY_LIMIT } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
 import { signRpc } from '@/lib/sign';
 import { myloCheer } from './mylo/MyloCorner';
-import { fmtN, type Key, type T } from '@/lib/i18n/dict';
+import { fmtN, type Key, type T } from '@/lib/i18n/langs';
 import { Icon } from './Icon';
 import { authError } from '@/lib/authError';
 import { savePending } from './PendingSign';

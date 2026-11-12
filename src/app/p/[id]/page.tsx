@@ -13,6 +13,7 @@ import { ReportButton } from '@/components/ReportButton';
 import { ShareButton } from '@/components/ShareButton';
 import { LinkBar } from '@/components/LinkBar';
 import { localize } from '@/lib/petitionText';
+import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +52,7 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
   const canUpdate = !!user && p.status === 'live' && (isFounder || !!me?.is_moderator);
   const stat = (m: any) => (Array.isArray(m.petition_stats) ? m.petition_stats[0] : m.petition_stats)?.signatures ?? 0;
 
+  const h = await headers(); const origin = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('x-forwarded-host') ?? h.get('host')}`;
   return (
     <div className="stack">
       <Link href="/petitions" className="hint">{t('p.back')}</Link>
@@ -75,6 +77,11 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
         </div>
       </div>
       {p.link_url && <LinkBar url={p.link_url} cta={p.link_cta} />}
+      {(p.status === 'live' || p.status === 'closed') && (
+        <details className="panel embed"><summary>{t('embed.title')}</summary>
+          <p className="hint" style={{ margin: 0 }}>{t('embed.hint')}</p>
+          <textarea readOnly rows={3} aria-label={t('embed.title')} value={`<iframe src="${origin}/embed/${p.id}?lang=${lang}" width="100%" height="250" style="border:0;max-width:480px" title="${p.title.replace(/"/g, '&quot;')} · UNIER" loading="lazy"></iframe>`} />
+        </details>)}
       {p.official_url && p.status === 'live' && (
         <section className="panel official"><b>{t('off.title')}</b><p className="muted" style={{ margin: 0 }}>{t('off.text')}</p>
           <a className="btn small" href={p.official_url} target="_blank" rel="noopener nofollow">{t('off.go')} ↗</a></section>

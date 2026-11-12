@@ -1,15 +1,17 @@
 'use client';
 import { createContext, useContext, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { makeT, LANGS, type Lang } from './dict';
+import { makeTFrom, LANGS, type Lang, type Key } from './langs';
 
-const Ctx = createContext<Lang>('en');
-export function LangProvider({ lang, children }: { lang: Lang; children: React.ReactNode }) {
-  return <Ctx.Provider value={lang}>{children}</Ctx.Provider>;
+// The server hands over only the reader's language.
+const Ctx = createContext<{ lang: Lang; messages: Record<Key, string> }>({ lang: 'en', messages: {} as Record<Key, string> });
+export function LangProvider({ lang, messages, children }: { lang: Lang; messages: Record<Key, string>; children: React.ReactNode }) {
+  const v = useMemo(() => ({ lang, messages }), [lang, messages]);
+  return <Ctx.Provider value={v}>{children}</Ctx.Provider>;
 }
 export function useT() {
-  const lang = useContext(Ctx);
-  return useMemo(() => ({ lang, t: makeT(lang) }), [lang]);
+  const { lang, messages } = useContext(Ctx);
+  return useMemo(() => ({ lang, t: makeTFrom(messages) }), [lang, messages]);
 }
 
 export function LangSwitch({ compact = false }: { compact?: boolean }) {

@@ -114,14 +114,17 @@ await check('admin pins it as a big goal', async () => {
 
 console.log('Signing');
 const bb = await as(B);
-await check('sign with consent', async () => {
-  await go(bb, `/p/${pid}`);
+await check('sign with consent, arriving through a share link', async () => {
+  sql(`insert into share_codes (user_id, code) values ('${A.id}', 'a1b2c3d4e5f6') on conflict (user_id) do update set code = 'a1b2c3d4e5f6'`);
+  await go(bb, `/p/${pid}?r=a1b2c3d4e5f6`);
+  expect((await bb.context().cookies()).some((c) => c.name === 'ref' && c.value === 'a1b2c3d4e5f6'), 'share code not remembered');
   await bb.getByRole('button', { name: /^Sign/ }).first().click();
   await bb.locator('.sheet input[id^=why-]').fill('My kids play there');
   await bb.locator('.sheet input[type=checkbox]').last().check();
   await bb.locator('.sheet').getByRole('button', { name: /^Sign/ }).click();
   await bb.waitForSelector('.mylo-corner', { timeout: 5000 });
   expect(one(`select count(*) from signatures where user_id = '${B.id}' and petition_id = '${pid}'`) === '1', 'no signature');
+  expect(one(`select ref_by from signatures where user_id = '${B.id}' and petition_id = '${pid}'`) === A.id, 'sharer not credited');
 });
 await check('signing follows automatically; unfollow and follow again', async () => {
   const n = () => one(`select count(*) from follows where user_id = '${B.id}' and petition_id = '${pid}'`);
@@ -229,10 +232,11 @@ await check('petitions without a video show as poster cards in the feed', async 
 await check('a moderator adds a Hungarian version and Hungarian readers see it', async () => {
   await go(a, '/admin?tab=petitions&q=fountains');
   const panel = a.locator('.panel', { hasText: 'fountains' }).first();
-  await panel.locator('summary', { hasText: 'Translation' }).click();
-  await panel.locator('input[name=title]').fill('Ivókutat minden parkba, most');
-  await panel.locator('textarea[name=ask]').fill('Szereljenek fel ivókutat minden nyilvános parkban még idén nyáron.');
-  await panel.getByRole('button', { name: 'Save translation' }).click(); await a.waitForTimeout(1200);
+  await panel.getByRole('link', { name: 'Translations' }).click(); await settle(a);
+  const form = a.locator('form[lang=hu]');
+  await form.locator('input[name=title]').fill('Ivókutat minden parkba, most');
+  await form.locator('textarea[name=ask]').fill('Szereljenek fel ivókutat minden nyilvános parkban még idén nyáron.');
+  await form.getByRole('button', { name: 'Save Magyar' }).click(); await a.waitForTimeout(1200);
   expect(one(`select tr->'hu'->>'title' from petitions where id = '${pid}'`) === 'Ivókutat minden parkba, most', 'translation not saved');
   const hu = await b.newContext({ locale: 'hu-HU' }); await hu.addCookies([{ name: 'lang', value: 'hu', url: APP }]);
   const hp = await hu.newPage(); await hp.goto(APP + `/p/${pid}`);
@@ -240,6 +244,18 @@ await check('a moderator adds a Hungarian version and Hungarian readers see it',
   await hp.goto(APP + '/petitions'); expect(await hp.locator('text=Ivókutat minden parkba').count(), 'petition list not translated');
   await hu.close();
   await go(g, `/p/${pid}`); expect(!(await g.locator('h1', { hasText: 'Ivókutat' }).count()), 'English reader sees the translation');
+});
+
+await check('German: the interface, a German translation, and English legal text with a note', async () => {
+  sql(`update petitions set tr = tr || '{"de": {"title": "Trinkbrunnen in jeden Park, jetzt"}}'::jsonb where id = '${pid}'`);
+  const de = await b.newContext({ locale: 'de-DE' }); const dp = await de.newPage();
+  await dp.goto(APP + `/p/${pid}`);
+  expect(await dp.locator('h1', { hasText: 'Trinkbrunnen in jeden Park' }).count(), 'German translation not shown');
+  expect(await dp.getByText('Diese Petition unterschreiben').count() + await dp.getByText('Petitionen').count(), 'interface not German');
+  await dp.goto(APP + '/privacy'); expect(await dp.getByText(/rechtlich verbindlich/i).count(), 'no English-only note');
+  await dp.goto(APP + '/you'); await dp.getByRole('button', { name: 'Français' }).click(); await dp.waitForTimeout(800);
+  expect(await dp.getByRole('heading', { name: 'Toi' }).count(), 'switching to French failed');
+  await de.close();
 });
 
 console.log('Feed, people and admin tools');
@@ -351,6 +367,36 @@ await check('admin: hide a news story and switch a source off', async () => {
 await check('share card and preview images render', async () => {
   for (const u of [`/api/card/${pid}`, `/p/${pid}/opengraph-image`, '/opengraph-image']) { const r = await g.request.get(APP + u); expect(r.status() === 200, `${u} ${r.status()}`); }
 });
+console.log('Openness');
+await check('share button adds your code; You shows your impact', async () => {
+  await a.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: APP });
+  await go(a, `/p/${pid}`); await a.waitForTimeout(600);
+  await a.getByRole('button', { name: /share link|copy link|^share/i }).first().click(); await a.waitForTimeout(300);
+  const copied = await a.evaluate(() => navigator.clipboard.readText());
+  expect(copied.endsWith(`/p/${pid}?r=a1b2c3d4e5f6`), 'link without code: ' + copied);
+  await go(a, '/you'); expect(await a.getByText(/Fewer than 3 people/).count(), 'impact not shown');
+});
+await check('transparency page shows live numbers', async () => {
+  const r = await go(g, '/transparency'); expect(r.ok(), 'transparency failed'); await noCrash(g);
+  expect(await g.getByRole('heading', { name: /how the feed decides/i }).count(), 'feed rules missing');
+  expect(await g.locator('.tstat').count() >= 8, 'numbers missing');
+});
+await check('who listens: delivered and silent targets', async () => {
+  sql(`insert into petition_updates (petition_id, kind, title, created_by, created_at) values ('${pid}', 'delivered', 'Handed to the council', '${A.id}', now() - interval '12 days')`);
+  const r = await go(g, '/targets'); expect(r.ok(), 'board failed'); await noCrash(g);
+  const target = one(`select target from petitions where id = '${pid}'`);
+  const card = g.locator('.target', { hasText: target }).first();
+  expect(await card.count(), 'target missing');
+  expect(/Silent for 1[12] days|Answered/i.test(await card.innerText()), 'status wrong: ' + (await card.innerText()));
+});
+await check('embed box for other websites', async () => {
+  const r = await g.request.get(APP + `/embed/${pid}?lang=hu`); const html = await r.text();
+  expect(r.ok() && html.includes('aláírás') && html.includes(`/p/${pid}`), 'embed wrong');
+  expect((await g.request.get(APP + '/embed/00000000-0000-0000-0000-000000000000')).status() === 404, 'missing petition not 404');
+  await go(g, `/p/${pid}`); await g.locator('details.embed summary').click();
+  expect((await g.locator('details.embed textarea').inputValue()).includes(`/embed/${pid}`), 'no embed code');
+});
+
 console.log('Your data');
 await check('withdraw a signature from You', async () => {
   await go(bb, '/you');

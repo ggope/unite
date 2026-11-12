@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
+import { isLang } from '@/lib/i18n/dict';
 
 async function mod() {
   const { sb, user } = await currentUser();
@@ -64,14 +65,22 @@ export async function setLink(f: FormData) {
   await done((await sb.from('petitions').update({ link_url: url || null, link_cta: ['learn', 'visit', 'donate', 'join', 'event'].includes(cta) ? cta : 'learn' }).eq('id', s(f, 'id'))).error);
 }
 
-// The petition's text in the other language (0012_translations.sql). Empty fields fall back to the original.
+// A petition's text in another language (0012, 0015). Empty fields fall back to the original.
 export async function setTranslation(f: FormData) {
   const sb = await mod();
-  const lang = s(f, 'lang') === 'hu' ? 'hu' : 'en', other = lang === 'hu' ? 'en' : 'hu';
+  const to = s(f, 'to'); if (!isLang(to)) return done({ message: 'Unknown language.' });
   const lim = { title: 90, target: 120, ask: 2000, why: 5000 } as const;
   const t: Record<string, string> = {};
   for (const [k, n] of Object.entries(lim)) { const v = s(f, k).slice(0, n); if (v) t[k] = v; }
-  await done((await sb.from('petitions').update({ lang, tr: Object.keys(t).length ? { [other]: t } : {} }).eq('id', s(f, 'id'))).error);
+  const { data: p } = await sb.from('petitions').select('tr').eq('id', s(f, 'id')).single();
+  const tr = { ...((p?.tr as Record<string, unknown>) ?? {}) };
+  if (Object.keys(t).length) tr[to] = t; else delete tr[to];
+  await done((await sb.from('petitions').update({ tr }).eq('id', s(f, 'id'))).error);
+}
+export async function setOriginalLang(f: FormData) {
+  const sb = await mod();
+  const lang = s(f, 'lang'); if (!isLang(lang)) return done({ message: 'Unknown language.' });
+  await done((await sb.from('petitions').update({ lang }).eq('id', s(f, 'id'))).error);
 }
 
 // Big community goals: pinned petitions lead the list on the Mylo page.
