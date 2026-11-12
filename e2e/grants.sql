@@ -1,6 +1,3 @@
--- Supabase's default privileges: the API roles may touch every table, and row level security decides.
-grant usage on schema public to anon, authenticated, service_role;
-grant all on all tables in schema public to anon, authenticated, service_role;
-grant all on all sequences in schema public to anon, authenticated, service_role;
+-- Table access comes from supabase/migrations/0010_grants.sql, so the tests check that file too.
 grant usage on schema auth to authenticated, service_role;
 grant select on auth.users to service_role;
