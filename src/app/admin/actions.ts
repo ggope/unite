@@ -56,6 +56,12 @@ export async function setLink(f: FormData) {
   await done((await sb.from('petitions').update({ link_url: url || null, link_cta: ['learn', 'visit', 'donate', 'join', 'event'].includes(cta) ? cta : 'learn' }).eq('id', s(f, 'id'))).error);
 }
 
+// Big community goals: pinned petitions lead the list on the Mylo page.
+export async function setFeatured(f: FormData) {
+  const sb = await mod();
+  await done((await sb.rpc('set_featured', { p_petition: s(f, 'id'), p_on: !!s(f, 'on') })).error);
+}
+
 // Unite: both petitions join one group; each keeps its own count, and the total is shown on both.
 export async function unite(f: FormData) {
   const sb = await mod();

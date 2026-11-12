@@ -10,6 +10,7 @@ import { SignButton, type Viewer } from './SignButton';
 import { Icon } from './Icon';
 import { NewsCard } from './NewsCard';
 import { ReportButton } from './ReportButton';
+import { MyloArt } from './mylo/MyloArt';
 import { LinkBar } from './LinkBar';
 import { ShareButton } from './ShareButton';
 import type { NewsStory } from '@/lib/news/load';
@@ -20,14 +21,15 @@ const NEWS_EVERY = 3;   // one headline after every three videos
 const AD_FIRST = 7, AD_EVERY = 15;   // the empty ad slot: after 7 videos, then every 15
 const LS = 'unite-weights';
 
-export function Feed({ items, news = [], viewer, signed, followed, serverWeights, chronological, autoplay, breakMinutes = 20 }: {
-  items: FeedItem[]; news?: NewsStory[]; viewer: Viewer; signed: string[]; followed: string[]; serverWeights: Weights; chronological: boolean; autoplay: boolean; breakMinutes?: number;
+export function Feed({ items, news = [], viewer, signed, followed, serverWeights, chronological, autoplay, breakMinutes = 20, firstId }: {
+  firstId?: string; items: FeedItem[]; news?: NewsStory[]; viewer: Viewer; signed: string[]; followed: string[]; serverWeights: Weights; chronological: boolean; autoplay: boolean; breakMinutes?: number;
 }) {
   const sb = supabaseBrowser();
   const { lang, t } = useT();
   const fmt = (n: number) => fmtN(n, lang);
   const [weights, setWeights] = useState<Weights>(serverWeights);
-  const [slots, setSlots] = useState<Slot[]>([]);
+  // The opener is chosen on the server, so its video is in the first HTML and starts before the app has even loaded.
+  const [slots, setSlots] = useState<Slot[]>(() => { const f = items.find((i) => i.id === firstId); return f ? [{ item: f, explore: false }] : []; });
   const [active, setActive] = useState(0);
   const [quiet, setQuiet] = useState<Record<number, boolean>>({});
   const seen = useRef<Record<string, number>>({});
@@ -141,7 +143,8 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
     <div className="reel">
       {pauseFor !== null && (
         <div className="breakcard" role="dialog" aria-modal="true" aria-label={t('break.title')}>
-          <h2>{t('break.title')}</h2><p>{t('break.text', { n: pauseFor })}</p>
+          <MyloArt mood="sleepy" size={150} id="break" label={t('mylo.label', { mood: t('mylo.mood.sleepy') })} />
+          <h2>{t('break.title')}</h2><p className="say">{t('mylo.say.sleepy')}</p><p>{t('break.text', { n: pauseFor })}</p>
           <div className="row"><button className="btn primary" onClick={() => { watched.current = 0; setPauseFor(null); scroller.current?.querySelectorAll('video').forEach((v) => { const i = Number(v.closest('.slide')?.getAttribute('data-i')); if (i === active && autoplay) v.play().catch(() => {}); }); }}>{t('break.keep')}</button>
             <Link className="btn" href="/updates">{t('break.stop')}</Link></div>
         </div>
@@ -179,7 +182,7 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
           <section className={`slide ${quiet[i] ? 'quiet' : ''}`} data-i={i} key={s.item.id}>
             <div className="frame" onClick={(e) => { if (!(e.target as HTMLElement).closest('a,button')) setQuiet((q) => ({ ...q, [i]: !q[i] })); }}>
               {s.item.video_url && (
-                <video src={s.item.video_url} poster={s.item.cover_url ?? undefined} muted playsInline preload={i <= active + 1 ? 'auto' : 'metadata'}
+                <video src={s.item.video_url} poster={s.item.cover_url ?? undefined} muted playsInline autoPlay={autoplay && i === 0} preload={i <= active + 1 ? 'auto' : 'metadata'}
                   onLoadedMetadata={(e) => { e.currentTarget.currentTime = s.item.trim_start; }}
                   onTimeUpdate={(e) => { const v = e.currentTarget; if (v.currentTime >= s.item.trim_end - 0.05) { v.currentTime = s.item.trim_start; if (i === active) learn(s.item.topic, 'replay'); } }}
                   onEnded={(e) => { e.currentTarget.currentTime = s.item.trim_start; e.currentTarget.play().catch(() => {}); }} />

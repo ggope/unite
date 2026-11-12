@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN } from '@/lib/i18n/dict';
-import { review, petitionStatus, setOfficial, setLink, unite, separate, resolveReport, setModerator, importNews, newsAction, toggleSource } from './actions';
+import { review, petitionStatus, setOfficial, setLink, setFeatured, unite, separate, resolveReport, setModerator, importNews, newsAction, toggleSource } from './actions';
 
 export const dynamic = 'force-dynamic';
 const TABS = [['overview', 'Overview'], ['queue', 'Review queue'], ['reports', 'Reports'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People']] as const;
@@ -116,6 +116,9 @@ async function Petitions({ sb, q }: { sb: any; q: string }) {
           {p.status !== 'live' && <button className="btn small" name="status" value="live">Make live</button>}
           {p.status === 'live' && <button className="btn small" name="status" value="closed">Close</button>}
           {p.status !== 'removed' && <button className="btn small danger" name="status" value="removed">Remove</button>}</form>
+        {p.status === 'live' && <form action={setFeatured} className="row"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="on" value={p.featured ? '' : '1'} />
+          <span className="hint" style={{ flex: 1 }}>{p.featured ? '★ Big community goal (shown on the Mylo page)' : 'Not a big community goal'}</span>
+          <button className="btn small">{p.featured ? 'Unpin goal' : 'Pin as big goal'}</button></form>}
         {p.status === 'live' && <form action={unite} className="row"><input type="hidden" name="id" value={p.id} />
           <input name="with" list="live-petitions" required placeholder="Unite with… (type a title or paste a link)" style={{ flex: 1, minWidth: 0 }} />
           <button className="btn small">Unite</button></form>}

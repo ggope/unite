@@ -5,6 +5,7 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import { CONSENT_VERSION, DAILY_LIMIT } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
 import { signRpc } from '@/lib/sign';
+import { myloCheer } from './mylo/MyloCorner';
 import { fmtN, type Key, type T } from '@/lib/i18n/dict';
 import { Icon } from './Icon';
 import { authError } from '@/lib/authError';
@@ -47,7 +48,7 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
     const { data, error } = await signRpc(sb, { petition: petitionId, why: reason || null, show });
     setBusy(false);
     if (error) { setErr(errorText(t, error.message)); return false; }
-    setSigned(true); onChange?.(true, data as number); router.refresh();
+    setSigned(true); onChange?.(true, data as number); myloCheer(typeof data === 'number' ? data : undefined); router.refresh();
     return true;
   }
   async function start() {

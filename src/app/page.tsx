@@ -1,6 +1,6 @@
 import { loadViewer } from '@/lib/viewer';
 import { Feed } from '@/components/Feed';
-import type { FeedItem } from '@/lib/ranking';
+import { score, type FeedItem } from '@/lib/ranking';
 import { Welcome } from '@/components/Welcome';
 import { loadNews } from '@/lib/news/load';
 import { getLang } from '@/lib/i18n/server';
@@ -30,7 +30,10 @@ export default async function Home() {
     created_at: r.created_at, video_url: url(r.storage_path), cover_url: url(r.cover_path),
     link_url: r.link_url ?? null, link_cta: r.link_cta ?? null,
   }));
-  return <Feed items={items} news={news} viewer={viewer} signed={[...signed]} followed={[...followed]} serverWeights={weights}
+  // The first video is picked here so it ships in the first HTML and starts playing right away.
+  const ctx = { followed, signed, seen: {} };
+  const first = settings?.chronological_feed ? items[0] : [...items].sort((a, b) => score(b, weights, ctx) - score(a, weights, ctx))[0];
+  return <Feed firstId={first?.id} items={items} news={news} viewer={viewer} signed={[...signed]} followed={[...followed]} serverWeights={weights}
     chronological={!!settings?.chronological_feed} autoplay={settings?.autoplay !== false && !settings?.is_minor}
     breakMinutes={settings?.is_minor ? Math.min(10, settings?.break_reminder_minutes ?? 10) : settings?.break_reminder_minutes ?? 20} />;
 }

@@ -4,6 +4,7 @@ import { TOPICS, TOPIC_KEYS } from '@/lib/topics';
 import { getT } from '@/lib/i18n/server';
 import { fmtN } from '@/lib/i18n/dict';
 import { SignButton } from '@/components/SignButton';
+import { MyloArt } from '@/components/mylo/MyloArt';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,7 @@ export default async function Petitions({ searchParams }: { searchParams: Promis
   return (
     <div className="stack">
       <div className="row between"><h1>{t('pet.title')}</h1><Link className="btn primary" href="/start">{t('common.startPetition')}</Link></div>
+      <Link className="mylolink" href="/mylo"><MyloArt mood="fired" size={44} id="pet" label="" /><span>{t('mylo.goals')}<br /><span className="hint" style={{ color: '#4A453E', fontWeight: 600 }}>{t('mylo.goalsText')}</span></span>→</Link>
       <form className="field" action="/petitions"><input name="q" type="search" defaultValue={q} placeholder={t('pet.search')} aria-label={t('pet.search')} /><input type="hidden" name="topic" value={topic} /></form>
       <div className="chips">
         <Link className="chip" aria-pressed={!topic} href={href({ topic: '' })}>{t('pet.all')}</Link>

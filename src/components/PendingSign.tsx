@@ -5,6 +5,7 @@ import { supabaseBrowser } from '@/lib/supabase/client';
 import { CONSENT_VERSION } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
 import { signRpc } from '@/lib/sign';
+import { myloCheer } from './mylo/MyloCorner';
 
 // A signature started while signed out waits here until the email link signs the person in.
 type Pending = { petitionId: string; email: string; why: string; show: boolean; lang: string; at: number };
@@ -37,6 +38,7 @@ export function PendingSign() {
       const s = c.error ? c : await signRpc(sb, { petition: p.petitionId, why: p.why || null, show: p.show && !!p.why });
       const already = s.error && /duplicate|already/i.test(s.error.message);
       setMsg(!s.error || already ? 'ok' : 'err');
+      if (!s.error) myloCheer(typeof s.data === 'number' ? s.data : undefined);
       router.refresh();
       setTimeout(() => setMsg(''), 6000);
     })();

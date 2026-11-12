@@ -3,6 +3,7 @@ import { Anton, Inter } from 'next/font/google';
 import { Nav } from '@/components/Nav';
 import { LangProvider } from '@/lib/i18n/client';
 import { PendingSign } from '@/components/PendingSign';
+import { MyloCorner } from '@/components/mylo/MyloCorner';
 import { getT } from '@/lib/i18n/server';
 import { siteUrl } from '@/lib/topics';
 import './globals.css';
@@ -28,7 +29,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const { lang } = await getT();
   return (
     <html lang={lang} className={`${anton.variable} ${inter.variable}`}>
-      <body><LangProvider lang={lang}><div className="app"><Nav /><main>{children}</main></div><PendingSign /></LangProvider></body>
+      <body><LangProvider lang={lang}><div className="app"><Nav /><main>{children}</main></div><PendingSign /><MyloCorner /></LangProvider></body>
     </html>
   );
 }
