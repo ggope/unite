@@ -13,6 +13,7 @@ import { savePending } from './PendingSign';
 import { PushToggle } from './PushToggle';
 import { Turnstile, TURNSTILE_KEY } from './Turnstile';
 import { verifyHuman } from '@/lib/human/actions';
+import { requestEmailSign } from '@/app/s/actions';
 
 export type Viewer = { loggedIn: boolean; hasConsent: boolean; oneTap: boolean };
 
@@ -22,6 +23,10 @@ const ERRORS: Record<string, Key> = {
   consent_required: 'sign.errConsent',
   petition_not_open: 'sign.errClosed',
   not_signed_in: 'sign.errSignIn',
+};
+const GUEST_ERRORS: Record<string, Key> = {
+  already: 'guest.already', wait: 'guest.wait', daily_limit_reached: 'sign.errDaily', busy: 'guest.busy',
+  bad_email: 'guest.badEmail', petition_not_open: 'sign.errClosed', human: 'human.err',
 };
 const errorText = (t: T, m: string) => t(Object.entries(ERRORS).find(([k]) => m.includes(k))?.[1] ?? 'sign.errOther', { n: DAILY_LIMIT });
 
@@ -41,7 +46,7 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
   const [undo, setUndo] = useState<number | null>(null);
   const [why, setWhy] = useState(''); const [show, setShow] = useState(true); const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
-  const [email, setEmail] = useState(''); const [sent, setSent] = useState('');
+  const [email, setEmail] = useState(''); const [sent, setSent] = useState(''); const [sameDevice, setSameDevice] = useState(false);
 
   async function sign(reason?: string) {
     setBusy(true); setErr('');
@@ -90,16 +95,25 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
   }
   function afterSign() { setToast(true); window.setTimeout(() => setToast(false), 7000); }
 
-  // Signed out: one email link both confirms the person and the signature (finished by PendingSign).
+  // Signed out: only an email. With UNIER's own mail sender set up, the link confirms the signature without
+  // making an account (any device). Otherwise one Supabase sign-in link confirms the person and the signature
+  // (finished by PendingSign on this device).
   async function guestSign() {
     setBusy(true); setErr('');
     const clean = email.trim().toLowerCase();
-    savePending({ petitionId, email: clean, why: why.trim(), show, lang, at: Date.now() });
+    const r = await requestEmailSign({ petitionId, email: clean, lang, captcha }).catch(() => ({ status: 'fallback' as const }));
+    if (r.status !== 'fallback') {
+      setBusy(false); setCaptcha(null); setTsKey((k) => k + 1);
+      if (r.status === 'sent') setSent(clean);
+      else setErr(t(GUEST_ERRORS[r.status] ?? 'sign.errOther', { n: DAILY_LIMIT }));
+      return;
+    }
+    savePending({ petitionId, email: clean, why: '', show: false, lang, at: Date.now() });
     const next = `/p/${petitionId}`;
     const { error } = await sb.auth.signInWithOtp({ email: clean, options: { shouldCreateUser: true, captchaToken: captcha ?? undefined, emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}` } });
     setBusy(false); setCaptcha(null); setTsKey((k) => k + 1);
     if (error) { setErr(authError(t, error, 'sign.errOther')); return; }
-    setSent(clean);
+    setSent(clean); setSameDevice(true);
   }
 
   const label = signed ? t('sign.signed') : t('sign.sign');
@@ -128,13 +142,11 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
           <div className="sheet" role="dialog" aria-modal="true" aria-label={t('guest.title')}>
             <div className="row between sheethead"><div><span className="label">{t('guest.title')}</span><h2>{title}</h2></div>
               <button className="btn ghost" onClick={() => setSheet(null)} aria-label={t('common.close')}><Icon name="x" /></button></div>
-            {sent ? <p role="status" className="ok">{t('guest.sent', { email: sent })}</p> : (<>
+            {sent ? <p role="status" className="ok">{t(sameDevice ? 'guest.sent' : 'guest.sentAny', { email: sent })}</p> : (<>
               <p className="muted" style={{ margin: 0 }}>{t('guest.text')}</p>
               <form className="stack" style={{ gap: 12 }} onSubmit={(e) => { e.preventDefault(); guestSign(); }}>
                 <div className="field"><label htmlFor={`em-${petitionId}`}>{t('login.email')}</label>
                   <input id={`em-${petitionId}`} type="email" required autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-                <div className="field"><label htmlFor={`gw-${petitionId}`}>{t('sign.whyLabel')} <span className="muted">{t('sign.optional')}</span></label>
-                  <input id={`gw-${petitionId}`} maxLength={90} value={why} onChange={(e) => setWhy(e.target.value)} placeholder={t('sign.whyPh')} /></div>
                 <label className="check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>{t('consent.text')} <a href="/privacy" target="_blank" rel="noopener">{t('consent.more')}</a></span></label>
                 <Turnstile key={tsKey} lang={lang} onToken={setCaptcha} />
                 {err && <p className="error">{err}</p>}

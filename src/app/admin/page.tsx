@@ -2,11 +2,11 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN, LANGS, type Lang } from '@/lib/i18n/dict';
-import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, removeSamples, decideAppeal, runLifecycle } from './actions';
+import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, removeSamples, decideAppeal, runLifecycle, resolveError, testAlert } from './actions';
 import { legalPlaceholders } from '@/lib/legal';
 
 export const dynamic = 'force-dynamic';
-const TABS = [['overview', 'Overview'], ['launch', 'Launch checklist'], ['queue', 'Review queue'], ['reports', 'Reports'], ['appeals', 'Appeals'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People']] as const;
+const TABS = [['overview', 'Overview'], ['launch', 'Launch checklist'], ['queue', 'Review queue'], ['reports', 'Reports'], ['appeals', 'Appeals'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People'], ['errors', 'Errors']] as const;
 type Tab = (typeof TABS)[number][0];
 const when = (d: string) => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const n = (x: number) => fmtN(x, 'en');
@@ -42,6 +42,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       {tab === 'petitions' && <Petitions sb={sb} q={q} open={open} />}
       {tab === 'news' && <News sb={sb} />}
       {tab === 'people' && <People sb={sb} q={q} me={user.id} />}
+      {tab === 'errors' && <Errors sb={sb} />}
     </div>
   );
 }
@@ -91,9 +92,9 @@ const MIGRATIONS: [string, string, string][] = [
   ['0002', 'invites', 'user_id'], ['0003', 'news_items', 'id'], ['0004', 'reports', 'resolved_at'], ['0005', 'petitions', 'official_url'],
   ['0006', 'profiles', 'bio'], ['0007', 'petitions', 'link_url'], ['0012', 'petitions', 'tr'], ['0014', 'notices', 'id'],
   ['0015', 'share_codes', 'code'], ['0016', 'answer_links', 'petition_id'], ['0017', 'signatures', 'reason_key'],
-  ['0018', 'appeals', 'id'],
+  ['0018', 'appeals', 'id'], ['0021', 'error_events', 'fingerprint'],
 ];
-const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle' };
+const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0021': '0021_email_sign' };
 const missing = (e: any) => !!e && /does not exist|PGRST20[45]|42703|42P01|schema cache/i.test(`${e.code} ${e.message}`);
 
 async function Launch({ sb }: { sb: any }) {
@@ -120,6 +121,9 @@ async function Launch({ sb }: { sb: any }) {
     { ok: env('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'), what: 'Bot check keys (Cloudflare Turnstile)',
       how: <>Make a free Turnstile widget at Cloudflare, add both keys in Vercel, then switch the check on under People.</> },
     { ok: env('CRON_SECRET'), what: 'Daily jobs secret', how: <>Set <code>CRON_SECRET</code> in Vercel so the daily news import and clean-up run.</> },
+    { ok: env('SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'), what: 'Email sender (signing with only an email, error alerts)',
+      how: <>For now, a Gmail address with an app password: set <code>SMTP_HOST</code>=smtp.gmail.com, <code>SMTP_PORT</code>=465, <code>SMTP_USER</code> and <code>SMTP_PASS</code> in Vercel. Put the same in Supabase → Authentication → Emails → SMTP, so login emails stop hitting the hourly limit. Once you have a domain, switch both to Resend or Brevo.</> },
+    { ok: env('ALERT_EMAIL'), what: 'Error alerts by email', how: <>Set <code>ALERT_EMAIL</code> in Vercel to the address that should hear when something breaks. See <Link href="/admin?tab=errors">Errors</Link>.</> },
     { ok: env('SUPABASE_SERVICE_ROLE_KEY'), what: 'Server key for Supabase', how: <>Set <code>SUPABASE_SERVICE_ROLE_KEY</code> in Vercel (Supabase → Project settings → API).</> },
     { ok: (mods?.length ?? 0) >= 2, what: `${mods?.length ?? 0} moderator${mods?.length === 1 ? '' : 's'}`, how: <>Two or more, so reports are answered when one of you is away. Add one under <Link href="/admin?tab=people">People</Link>.</> },
   ];
@@ -318,5 +322,31 @@ async function People({ sb, q, me }: { sb: any; q: string; me: string }) {
         <span style={{ flex: 1, minWidth: 0 }}><b>{p.display_name || (p.handle ? '@' + p.handle : p.email)}</b><span className="hint" style={{ display: 'block' }}>{p.email} · joined {when(p.created_at)}{p.is_moderator ? ' · moderator' : ''}</span></span>
         {p.id !== me && <button className={`btn small ${p.is_moderator ? 'danger' : ''}`}>{p.is_moderator ? 'Remove moderator' : 'Make moderator'}</button>}
       </form>))}
+  </>);
+}
+
+async function Errors({ sb }: { sb: any }) {
+  const { data, error } = await sb.from('error_events').select('fingerprint, source, message, path, detail, count, first_seen, last_seen, resolved_at').order('last_seen', { ascending: false }).limit(60);
+  if (missing(error)) return <p className="hint">Run <code>0021_email_sign.sql</code> to start keeping a log of errors.</p>;
+  const open = (data ?? []).filter((e: any) => !e.resolved_at);
+  const fixed = (data ?? []).filter((e: any) => e.resolved_at);
+  const ready = !!process.env.ALERT_EMAIL && !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  const Row = ({ e }: { e: any }) => (
+    <div className="panel">
+      <span className="hint">{e.source} · {e.count}× · last {when(e.last_seen)} · first {when(e.first_seen)}</span>
+      <b style={{ overflowWrap: 'anywhere' }}>{e.message}</b>
+      {e.path && <code>{e.path}</code>}
+      {e.detail && <details><summary className="hint">Details</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 12 }}>{e.detail}</pre></details>}
+      {!e.resolved_at && <form action={resolveError}><input type="hidden" name="fp" value={e.fingerprint} /><button className="btn small">Mark as fixed</button></form>}
+    </div>
+  );
+  return (<>
+    <p className="hint" style={{ margin: 0 }}>
+      {ready ? <>Alerts go to <b>{process.env.ALERT_EMAIL}</b>: once per kind of error, then at most every 6 hours while it continues.</> : <>Alerts are off. Set <code>ALERT_EMAIL</code> and the email sender in Vercel (see Launch checklist).</>}
+      {' '}To hear when the whole site is down, add a free monitor (for example UptimeRobot) for <code>/api/health</code>.
+    </p>
+    {ready && <form action={testAlert}><button className="btn small">Send a test alert</button></form>}
+    {open.length ? open.map((e: any) => <Row key={e.fingerprint} e={e} />) : <p className="hint">No open errors.</p>}
+    {fixed.length > 0 && <details><summary className="hint">Marked as fixed ({fixed.length})</summary>{fixed.map((e: any) => <Row key={e.fingerprint} e={e} />)}</details>}
   </>);
 }
