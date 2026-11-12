@@ -1,4 +1,4 @@
--- 0018: quality check (security, speed). Safe to run more than once.
+-- 0020: quality check (security, speed). Safe to run more than once.
 --  1. Petition totals no longer count every signature on the site each time a page asks for one number.
 --     A small counter per petition is kept up to date as people sign or withdraw. Same numbers, same columns.
 --  2. Missing indexes for the pages added lately (updates, wins, followers, videos, "popular in your country").

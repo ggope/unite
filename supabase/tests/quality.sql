@@ -1,5 +1,5 @@
 \set ON_ERROR_STOP on
--- 0018: quality check (totals from the counter, updates follow petition visibility)
+-- 0020: quality check (totals from the counter, updates follow petition visibility)
 reset role;
 
 -- 1. the counter gives exactly the totals the old view counted, including united groups
