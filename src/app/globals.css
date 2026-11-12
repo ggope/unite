@@ -538,3 +538,16 @@ main:focus{outline:none}
 .ws-sign{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 18px}
 .ws-sign span{height:34px;border-bottom:2px solid #999}
 @media print{.ws{justify-content:flex-start!important}.ws-draw{min-height:0}.ws-q{font-size:16pt}}
+/* Petition life cycle (0018): closed note, days without an answer, end date, appeals */
+.life-closed{border-left:8px solid var(--ink)}
+.life-closed .btn{align-self:flex-start}
+.silence{border:3px solid var(--warn);background:var(--warn-soft)}
+.silence-n{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.silence-n .bignum{color:var(--warn)}
+.silence-n b{font-size:17px;line-height:1.25;flex:1;min-width:12ch}
+.end-date input[type=date]{min-width:0}
+.target{scroll-margin-top:16px}
+.target:target{outline:3px solid var(--accent);outline-offset:3px}
+.appeal-what{border-left:8px solid var(--warn)}
+.appeal-reversed{color:var(--ok);font-weight:700}
+.appeal-upheld{font-weight:700}

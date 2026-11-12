@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { makeT, fmtN, pickLang, type Lang } from '@/lib/i18n/dict';
 import { localize } from '@/lib/petitionText';
 import { logoSvg } from '@/lib/logo';
+import { isEnded, silence } from '@/lib/lifecycle';
 
 // A small sign box other websites can put in an iframe. Signing itself happens on UNIER.
 export const revalidate = 120;
@@ -14,15 +15,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const t = makeT(lang);
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
   const ok = /^[0-9a-f-]{36}$/.test(id);
-  const [{ data: raw }, { data: st }] = ok ? await Promise.all([
-    sb.from('petitions').select('id, title, target, ask, why, goal, status, lang, tr').eq('id', id).in('status', ['live', 'closed']).maybeSingle(),
+  const [{ data: raw }, { data: st }, { data: ups }] = ok ? await Promise.all([
+    sb.from('petitions').select('*').eq('id', id).in('status', ['live', 'closed']).maybeSingle(),
     sb.from('petition_stats').select('combined').eq('id', id).maybeSingle(),
-  ]) : [{ data: null }, { data: null }];
+    sb.from('petition_updates').select('kind, created_at').eq('petition_id', id),
+  ]) : [{ data: null }, { data: null }, { data: null }];
   const base = u.origin;
   if (!raw) return new Response(`<!doctype html><meta charset="utf-8"><p style="font-family:system-ui">${esc(t('embed.missing'))}</p>`, { status: 404, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   const p = localize(raw, lang);
   const n = Number(st?.combined ?? 0), pct = Math.min(100, (n / p.goal) * 100);
   const href = `${base}/p/${p.id}?utm_source=embed`;
+  const silent = silence(ups as any).silentDays;
   const html = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(p.title)} · UNIER</title>
 <style>
 :root{--bg:#F2EEE6;--ink:#111;--muted:#555;--accent:#FF5A1F;--edge:#111}
@@ -41,7 +44,8 @@ a.go:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 <h1>${esc(p.title)}</h1><span class="to">${esc(t('poster.to', { target: p.target }))}</span>
 <div><span class="n">${fmtN(n, lang)}</span> <span class="goal">${esc(t('poster.signed', { goal: fmtN(p.goal, lang) }))}</span></div>
 <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct.toFixed(1)}%"></i></div>
-${raw.status === 'live' ? `<a class="go" href="${href}" target="_blank" rel="noopener">${esc(t('sign.signThis'))} ↗</a>` : `<span class="goal">${esc(t('sign.errClosed'))}</span>`}
+${silent != null ? `<span class="goal"><b>${esc(t('sil.days', { n: silent, target: p.target }))}</b></span>` : ''}
+${!isEnded(raw) ? `<a class="go" href="${href}" target="_blank" rel="noopener">${esc(t('sign.signThis'))} ↗</a>` : `<span class="goal">${esc(t('sign.errClosed'))}</span>`}
 </div></body></html>`;
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' } });
 }

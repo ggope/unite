@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> { const { t } = awai
 // The rules and the numbers, in public. Everything here is counted live from the database.
 export default async function Transparency() {
   const [sb, { lang, t }] = await Promise.all([supabaseServer(), getT()]);
-  const { data: s } = await sb.rpc('transparency_stats');
+  const [{ data: s }, { data: ap }] = await Promise.all([sb.rpc('transparency_stats'), sb.rpc('appeal_stats')]);   // appeals need 0018
   const n = (k: string) => fmtN(Number(s?.[k] ?? 0), lang);
   const tile = (k: string, label: Key) => <div className="tstat" key={k}><b className="num">{n(k)}</b><span>{t(label)}</span></div>;
   return (
@@ -26,7 +26,10 @@ export default async function Transparency() {
         <div className="tgrid">{tile('reports_30d', 'tr.reports')}{tile('reports_resolved_30d', 'tr.resolved')}{tile('reports_open', 'tr.open')}{tile('moderators', 'tr.mods')}</div>
         {s?.median_hours_to_resolve != null && <p className="hint" style={{ margin: 0 }}>{t('tr.median', { h: String(s.median_hours_to_resolve) })}</p>}
         <div className="tgrid">{tile('videos_approved', 'tr.vApproved')}{tile('videos_rejected', 'tr.vRejected')}{tile('videos_pending', 'tr.vPending')}{tile('petitions_removed', 'tr.pRemoved')}</div>
-        <p className="hint" style={{ margin: 0 }}>{t('tr.reasons')}</p></section>
+        <p className="hint" style={{ margin: 0 }}>{t('tr.reasons')}</p>
+        {ap && <><div className="tgrid">{([['filed_12m', 'tr.aFiled'], ['reversed_12m', 'tr.aReversed'], ['upheld_12m', 'tr.aUpheld'], ['open', 'tr.aOpen']] as const).map(([k, label]) =>
+          <div className="tstat" key={k}><b className="num">{fmtN(Number(ap[k] ?? 0), lang)}</b><span>{t(label)}</span></div>)}</div>
+          <p className="hint" style={{ margin: 0 }}>{t('tr.appeals')}{ap.median_days != null ? ` ${t('tr.aMedian', { d: String(ap.median_days) })}` : ''}</p></>}</section>
 
       <section className="panel tsec"><h2>{t('tr.feed')}</h2>
         <ul>{(['tr.f1', 'tr.f2', 'tr.f3', 'tr.f4', 'tr.f5'] as Key[]).map((k) => <li key={k}>{t(k)}</li>)}</ul>

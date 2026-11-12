@@ -607,6 +607,62 @@ await check('admin takes the sample petitions down before launch', async () => {
   await go(a, '/admin?tab=launch'); expect(await a.getByText('No sample petitions left').count(), 'checklist not updated');
 });
 
+
+console.log('Petition life cycle (0018)');
+{
+  const D = newUser('dora'); handle(D, 'dora_e2e');
+  const mk = (title, status = 'live') => one(`insert into petitions (created_by, organiser_name, title, target, region, ask, why, topic, goal, status)
+    values ('${D.id}', 'Dora', '${title}', 'Minister of Testing', 'Hungary', 'Please do the tested thing by next spring for everyone.', 'Because tests keep everyone safe and calm.', 'digital', 1000, '${status}') returning id`);
+  const ended = mk('Ended petition for the life cycle test'), quiet = mk('Delivered petition waiting for an answer'), gone = mk('Removed petition that gets appealed');
+  sql(`alter table petitions disable trigger petition_lifecycle; update petitions set ends_on = (now() at time zone 'Europe/Budapest')::date - 1 where id = '${ended}'; alter table petitions enable trigger petition_lifecycle;`);
+  sql(`insert into petition_updates (petition_id, kind, title, created_by, created_at) values ('${quiet}', 'delivered', 'Delivered to the minister', '${D.id}', now() - interval '12 days')`);
+  sql(`update petitions set status = 'removed', moderation_note = 'Looks like a duplicate' where id = '${gone}'`);
+  const d = await as(D);
+
+  await check('after its end date a petition shows as closed and cannot be signed', async () => {
+    await go(g, `/p/${ended}`); await noCrash(g);
+    expect(await g.getByText(/Signing closed on/).count(), 'no closed note');
+    expect(!(await g.getByRole('button', { name: /^Sign/ }).count()), 'sign button still shown');
+  });
+  await check('the nightly job closes it and reminds the organiser to deliver', async () => {
+    const r = await g.request.get(APP + '/api/lifecycle'); expect(r.status() === 401, `cron open to anyone: ${r.status()}`);
+    await go(a, '/admin?tab=petitions'); await a.getByRole('button', { name: 'Close ended petitions now' }).click(); await settle(a);
+    expect(one(`select status from petitions where id = '${ended}'`) === 'closed', 'not closed');
+    await go(d, '/you'); expect(await d.getByText(/Signing has closed on/).count(), 'no reminder under You');
+    expect(await d.locator(`a[href="/p/${ended}/report"]`).count(), 'no link to the report');
+    await go(d, `/p/${ended}/report`); expect(await d.getByRole('button', { name: /delivered/i }).count(), 'cannot mark a closed petition delivered');
+  });
+  await check('cron endpoint runs with the secret', async () => {
+    const r = await g.request.get(APP + '/api/lifecycle', { headers: { authorization: 'Bearer e2e' } }); const j = await r.json();
+    expect(r.ok() && j.lifecycle, JSON.stringify(j));
+  });
+  await check('days without an answer show on the petition, the board and the embed', async () => {
+    await go(g, `/p/${quiet}`); expect(await g.getByText(/days without an answer from Minister of Testing/).count(), 'no counter');
+    expect((await g.locator('.silence .bignum').innerText()).trim() === '12', 'wrong number of days');
+    const href = await g.locator('.silence a').getAttribute('href'); expect(href === '/targets#t-minister-of-testing', `board link ${href}`);   // the board itself is cached for 5 minutes
+    const e = await (await g.request.get(APP + `/embed/${quiet}`)).text(); expect(e.includes('Days without an answer'), 'embed has no counter');
+  });
+  await check('the organiser sets an end date on the dashboard', async () => {
+    await go(d, `/p/${quiet}/dashboard`);
+    const day = one(`select to_char((now() at time zone 'Europe/Budapest')::date + 20, 'YYYY-MM-DD')`);
+    await d.locator('#end-date').fill(day); await d.getByRole('button', { name: 'Save date' }).click(); await d.getByText('Saved.').waitFor({ timeout: 5000 });
+    expect(one(`select ends_on from petitions where id = '${quiet}'`) === day, 'end date not saved');
+  });
+  await check('an author appeals a removal and a moderator reverses it', async () => {
+    await go(d, '/you'); await d.locator(`a[href="/appeal?kind=petition&id=${gone}"]`).click(); await settle(d);
+    expect(await d.getByText('Looks like a duplicate').count(), 'decision not shown');
+    await d.locator('#appeal-body').fill('It is not a duplicate: it asks a different ministry.'); await d.getByRole('button', { name: 'Send appeal' }).click();
+    await d.waitForURL(/appealed=1/, { timeout: 8000 }); await d.getByText(/Your appeal was sent/).waitFor({ timeout: 8000 });
+    expect(await d.getByText('Waiting for a second look').count(), 'appeal not listed');
+    await go(a, '/admin?tab=appeals'); expect(await a.getByText(/asks a different ministry/).count(), 'appeal not in admin');
+    const f = a.locator('.panel', { hasText: 'asks a different ministry' });
+    await f.locator('input[name=note]').fill('Agreed, it asks a different ministry.'); await f.getByRole('button', { name: 'Reverse and restore' }).click(); await settle(a);
+    expect(one(`select status from petitions where id = '${gone}'`) === 'live', 'petition not restored');
+    await go(d, '/you'); expect(await d.getByText(/reversed the decision/).count(), 'author not told');
+    await go(g, '/transparency'); expect(await g.getByText('decisions reversed').count(), 'no appeal numbers on transparency');
+  });
+}
+
 await b.close();
 if (errors.length) { console.log('\nBrowser/server errors:'); [...new Set(errors)].slice(0, 30).forEach((e) => console.log('  ' + e)); }
 console.log(failed() ? `\n${failed()} check(s) failed` : '\nAll end-to-end checks passed');

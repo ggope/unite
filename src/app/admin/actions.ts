@@ -184,3 +184,19 @@ export async function removeSamples() {
   await done((await sb.from('petitions').update({ status: 'removed', moderation_note: 'Sample petition, taken down before launch.' })
     .ilike('organiser_name', '%(sample)%').neq('status', 'removed')).error);
 }
+
+// Appeals (0018): a second look at a decision. Either way the author is told the reason.
+export async function decideAppeal(reverse: boolean, f: FormData) {
+  const sb = await mod();
+  if (!s(f, 'note')) return done(NEED_REASON);
+  const { error } = await sb.rpc('decide_appeal', { p_id: Number(s(f, 'id')), p_reverse: reverse, p_note: s(f, 'note') });
+  await done(error && { message: error.message.includes('not_open') ? 'Someone already decided this appeal.' : error.message });
+}
+
+// The nightly job (closing ended petitions, delivery reminders, silence notifications), started by hand.
+export async function runLifecycle() {
+  const sb = await mod();
+  const { error } = await sb.rpc('run_lifecycle_now');
+  if (!error) { const { sendPending } = await import('@/lib/push/send'); await sendPending(50).catch(() => {}); }
+  await done(error);
+}
