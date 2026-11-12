@@ -44,7 +44,7 @@ export function PostFlow({ userId, petitions, initial, viewer }: { userId: strin
     const cv = await cover(); if (cv) await sb.storage.from('videos').upload(coverPath, cv, { contentType: 'image/jpeg' });
     const ins = await sb.from('videos').insert({ id, petition_id: pet.id, uploader_id: userId, storage_path: path, cover_path: cv ? coverPath : null,
       caption: caption.trim(), trim_start: ts, trim_end: te, blur_faces: blur, audience: aud });
-    if (ins.error) { setStage(''); setErr(ins.error.message.includes('row-level') ? t('post.errSign') : t('post.errSave')); return; }
+    if (ins.error) { setStage(''); setErr(ins.error.message.includes('slow_down') ? t('err.slow') : ins.error.message.includes('row-level') ? t('post.errSign') : t('post.errSave')); return; }
     setPct(100); setStage('done');
   }
 

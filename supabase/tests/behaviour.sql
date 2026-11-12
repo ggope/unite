@@ -1,7 +1,5 @@
 \set ON_ERROR_STOP on
 grant usage on schema public, auth to authenticated;
-grant all on all tables in schema public to authenticated;
-grant all on all sequences in schema public to authenticated;
 grant select on auth.users to authenticated;
 insert into auth.users values ('11111111-1111-1111-1111-111111111111','a@x.io', now()), ('22222222-2222-2222-2222-222222222222','b@x.io', now()), ('33333333-3333-3333-3333-333333333333','c@x.io', null);
 set role authenticated;

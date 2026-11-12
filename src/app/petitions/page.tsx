@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { localize } from '@/lib/petitionText';
 import { loadViewer } from '@/lib/viewer';
 import { TOPICS, TOPIC_KEYS } from '@/lib/topics';
 import { getT } from '@/lib/i18n/server';
@@ -12,13 +13,13 @@ export default async function Petitions({ searchParams }: { searchParams: Promis
   const { q = '', topic = '', sort = 'recent' } = await searchParams;
   const [{ sb, viewer, signed }, { lang, t }] = await Promise.all([loadViewer(), getT()]);
   const fmt = (n: number) => fmtN(n, lang);
-  let query = sb.from('petitions').select('id, title, target, topic, goal, cluster_id, created_at, petition_stats(signatures, combined, united_count)').eq('status', 'live').limit(50);
+  let query = sb.from('petitions').select('id, title, target, topic, goal, cluster_id, created_at, lang, tr, petition_stats(signatures, combined, united_count)').eq('status', 'live').limit(50);
   if (q.trim()) query = query.textSearch('search', q.trim().split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter(Boolean).join(' & '), { config: 'simple' });
   if (topic && topic in TOPICS) query = query.eq('topic', topic);
   const { data } = await query.order('created_at', { ascending: false });
   // one row per united group
   const seen = new Set<string>();
-  let rows = (data ?? []).filter((p: any) => !p.cluster_id || (!seen.has(p.cluster_id) && seen.add(p.cluster_id)));
+  let rows = (data ?? []).map((p: any) => localize(p, lang)).filter((p: any) => !p.cluster_id || (!seen.has(p.cluster_id) && seen.add(p.cluster_id)));
   const stat = (p: any) => (Array.isArray(p.petition_stats) ? p.petition_stats[0] : p.petition_stats) ?? { combined: 0, united_count: 1 };
   if (sort === 'signed') rows = rows.sort((a: any, b: any) => stat(b).combined - stat(a).combined);
   const href = (o: Record<string, string>) => '/petitions?' + new URLSearchParams({ q, topic, sort, ...o }).toString();

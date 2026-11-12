@@ -64,6 +64,16 @@ export async function setLink(f: FormData) {
   await done((await sb.from('petitions').update({ link_url: url || null, link_cta: ['learn', 'visit', 'donate', 'join', 'event'].includes(cta) ? cta : 'learn' }).eq('id', s(f, 'id'))).error);
 }
 
+// The petition's text in the other language (0012_translations.sql). Empty fields fall back to the original.
+export async function setTranslation(f: FormData) {
+  const sb = await mod();
+  const lang = s(f, 'lang') === 'hu' ? 'hu' : 'en', other = lang === 'hu' ? 'en' : 'hu';
+  const lim = { title: 90, target: 120, ask: 2000, why: 5000 } as const;
+  const t: Record<string, string> = {};
+  for (const [k, n] of Object.entries(lim)) { const v = s(f, k).slice(0, n); if (v) t[k] = v; }
+  await done((await sb.from('petitions').update({ lang, tr: Object.keys(t).length ? { [other]: t } : {} }).eq('id', s(f, 'id'))).error);
+}
+
 // Big community goals: pinned petitions lead the list on the Mylo page.
 export async function setFeatured(f: FormData) {
   const sb = await mod();

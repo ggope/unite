@@ -9,7 +9,7 @@ export type StartState = { error?: string };
 export async function createPetition(_: StartState, form: FormData): Promise<StartState> {
   const { sb, user } = await currentUser();
   if (!user) redirect('/login?next=/start');
-  const { t } = await getT();
+  const { lang, t } = await getT();
   const g = (k: string) => String(form.get(k) ?? '').trim();
   const goal = Number(g('goal')); const topic = g('topic');
   if (!GOALS.includes(goal) || !TOPIC_KEYS.includes(topic as any)) return { error: t('start.errTopic') };
@@ -19,11 +19,11 @@ export async function createPetition(_: StartState, form: FormData): Promise<Sta
   if ([src, off, link].some((u) => u && !u.startsWith('https://'))) return { error: t('start.errSource') };
   const { data, error } = await sb.from('petitions').insert({
     created_by: user.id, organiser_name: g('organiser_name'), title: g('title'), target: g('target'), region: g('region'),
-    ask: g('ask'), why: g('why'), source_url: src || null, topic, goal, ends_on: g('ends_on') || null,
+    ask: g('ask'), why: g('why'), source_url: src || null, topic, goal, ends_on: g('ends_on') || null, lang,
     ...(off ? { official_url: off } : {}),
     ...(link ? { link_url: link, link_cta: ['learn', 'visit', 'donate', 'join', 'event'].includes(cta) ? cta : 'learn' } : {}),
   }).select('id').single();
-  if (error) return { error: error.message.includes('check') ? t('start.errLength') : t('start.errSave') };
+  if (error) return { error: error.message.includes('slow_down') ? t('err.slow') : error.message.includes('check') ? t('start.errLength') : t('start.errSave') };
   // the database counts the founder as the first signature
   redirect(form.get('then') === 'video' ? `/post?petition=${data.id}` : `/p/${data.id}`);
 }

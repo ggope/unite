@@ -13,6 +13,7 @@ import { ReportButton } from './ReportButton';
 import { MyloArt } from './mylo/MyloArt';
 import { LinkBar } from './LinkBar';
 import { ShareButton } from './ShareButton';
+import { PosterCard } from './PosterCard';
 import type { NewsStory } from '@/lib/news/load';
 import { TOPICS } from '@/lib/topics';
 
@@ -181,6 +182,10 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
         ) : (
           <section className={`slide ${quiet[i] ? 'quiet' : ''}`} data-i={i} key={s.item.id}>
             <div className="frame" onClick={(e) => { if (!(e.target as HTMLElement).closest('a,button')) setQuiet((q) => ({ ...q, [i]: !q[i] })); }}>
+              {s.item.kind === 'card' && (
+                <PosterCard id={s.item.petition_id} topic={s.item.topic} title={s.item.petition_title} target={s.item.target ?? ''} ask={s.item.caption}
+                  combined={s.item.combined} goal={s.item.goal} lastHour={s.item.last_hour} active={i === active} />
+              )}
               {s.item.video_url && (
                 <video src={s.item.video_url} poster={s.item.cover_url ?? undefined} muted playsInline autoPlay={autoplay && i === 0} preload={i <= active + 1 ? 'auto' : 'metadata'}
                   onLoadedMetadata={(e) => { e.currentTarget.currentTime = s.item.trim_start; }}
@@ -190,11 +195,11 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
               <div className="shade" />
               <div className="txt">
                 {s.item.uploader_handle && <span className="byline"><a href={`/u/${s.item.uploader_handle}`} style={{ color: 'inherit' }}>@{s.item.uploader_handle}</a> <span className={`role ${s.item.role}`}>({t(`role.${s.item.role}`)})</span></span>}
-                <div className="more"><div>
+                {s.item.kind !== 'card' && <><div className="more"><div>
                   <span className="whytag">{s.explore ? t('feed.newForYou', { topic: t(`topic.${s.item.topic}`) }) : (weights[s.item.topic] ?? 0) > 1 ? t('feed.oftenWatch', { topic: t(`topic.${s.item.topic}`) }) : t('feed.popular')}</span>
                   <h2>{s.item.caption}</h2>
                 </div></div>
-                <div className="peek">{s.item.caption}</div>
+                <div className="peek">{s.item.caption}</div></>}
                 <Link className="pcard" href={`/p/${s.item.petition_id}`}>
                   <strong>{s.item.petition_title}</strong>
                   <span className="bar"><i style={{ width: `${Math.min(100, (s.item.combined / s.item.goal) * 100)}%` }} /></span>
@@ -207,7 +212,7 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
                   onChange={(on) => on && learn(s.item.topic, 'sign')} />
                 <button className="rb" onClick={() => learn(s.item.topic, 'care')}><span className="c"><Icon name="heart" /></span>{t('feed.care')}</button>
                 <button className="rb" onClick={() => notInterested(i, s.item.topic)}><span className="c"><Icon name="eyeoff" /></span>{t('feed.less')}</button>
-                <ReportButton variant="reel" videoId={s.item.id} loggedIn={viewer.loggedIn} />
+                <ReportButton variant="reel" {...(s.item.kind === 'card' ? { petitionId: s.item.petition_id } : { videoId: s.item.id })} loggedIn={viewer.loggedIn} />
                 <ShareButton variant="reel" path={`/p/${s.item.petition_id}`} title={s.item.petition_title} onShare={() => learn(s.item.topic, 'share')} />
               </div>
             </div>

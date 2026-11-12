@@ -12,6 +12,7 @@ import { PostUpdate, RemoveUpdate } from '@/components/PostUpdate';
 import { ReportButton } from '@/components/ReportButton';
 import { ShareButton } from '@/components/ShareButton';
 import { LinkBar } from '@/components/LinkBar';
+import { localize } from '@/lib/petitionText';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,11 +20,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const sb = await supabaseServer();
   const [{ data: p }, { data: st }, { lang, t }] = await Promise.all([
-    sb.from('petitions').select('title, ask, target').eq('id', id).maybeSingle(),
+    sb.from('petitions').select('title, ask, target, lang, tr').eq('id', id).maybeSingle(),
     sb.from('petition_stats').select('combined').eq('id', id).maybeSingle(),
     getT(),
   ]);
   if (!p) return {};
+  Object.assign(p, localize(p, lang));
   const description = `${fmtN(Number(st?.combined ?? 0), lang)} ${t('p.signatures')} · ${p.ask}`.slice(0, 200);
   return { title: `${p.title} · UNIER`, description, openGraph: { title: p.title, description, type: 'article', siteName: 'UNIER' }, twitter: { card: 'summary_large_image', title: p.title, description } };
 }
@@ -32,8 +34,9 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const [{ sb, user, viewer, signed, followed }, { lang, t }] = await Promise.all([loadViewer(), getT()]);
   const fmt = (n: number) => fmtN(n, lang);
-  const { data: p } = await sb.from('petitions').select('*').eq('id', id).maybeSingle();
-  if (!p) notFound();
+  const { data: raw } = await sb.from('petitions').select('*').eq('id', id).maybeSingle();
+  if (!raw) notFound();
+  const p = localize(raw, lang);
   const [{ data: st }, { data: members }, { data: updates }, { data: videos }, friends, { data: me }, { data: news }] = await Promise.all([
     sb.from('petition_stats').select('*').eq('id', id).maybeSingle(),
     p.cluster_id ? sb.from('petitions').select('id, title, organiser_name, origin, petition_stats(signatures)').eq('cluster_id', p.cluster_id) : Promise.resolve({ data: [] as any[] }),

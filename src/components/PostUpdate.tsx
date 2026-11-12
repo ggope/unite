@@ -17,7 +17,7 @@ export function PostUpdate({ petitionId, userId }: { petitionId: string; userId:
     e.preventDefault(); setBusy(true); setErr('');
     const { error } = await supabaseBrowser().from('petition_updates').insert({ petition_id: petitionId, kind, title: title.trim(), body: body.trim() || null, created_by: userId });
     setBusy(false);
-    if (error) { setErr(t('upd.err')); return; }
+    if (error) { setErr(error.message.includes('slow_down') ? t('err.slow') : t('upd.err')); return; }
     setTitle(''); setBody(''); setOpen(false); router.refresh();
   }
   if (!open) return <button className="btn primary" onClick={() => setOpen(true)}>{t('upd.post')}</button>;

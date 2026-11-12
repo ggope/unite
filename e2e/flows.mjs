@@ -216,6 +216,32 @@ await check('news import runs with the cron secret', async () => {
   expect(clean && !clean.status.startsWith('error'), `daily privacy clean-up did not run: ${JSON.stringify(clean)}`);
 });
 
+console.log('Posters and translations');
+await check('petitions without a video show as poster cards in the feed', async () => {
+  const hidden = one(`with h as (update videos set audience = 'friends' where status = 'approved' and audience = 'everyone' returning id) select coalesce(string_agg(id::text, ','), '') from h`);
+  try {
+    await go(g, '/'); await g.waitForSelector('.poster', { timeout: 15000 });
+    expect(await g.locator('.poster .poster-title').first().textContent(), 'poster has no title');
+    expect(await g.locator('.poster .poster-to').count(), 'poster has no target');
+    expect(await g.locator('.slide').first().getByRole('button', { name: /^Sign/ }).count(), 'cannot sign from a poster');
+  } finally { if (hidden) sql(`update videos set audience = 'everyone' where id in (${hidden.split(',').map((x) => `'${x}'`).join(',')})`); }
+});
+await check('a moderator adds a Hungarian version and Hungarian readers see it', async () => {
+  await go(a, '/admin?tab=petitions&q=fountains');
+  const panel = a.locator('.panel', { hasText: 'fountains' }).first();
+  await panel.locator('summary', { hasText: 'Translation' }).click();
+  await panel.locator('input[name=title]').fill('Ivókutat minden parkba, most');
+  await panel.locator('textarea[name=ask]').fill('Szereljenek fel ivókutat minden nyilvános parkban még idén nyáron.');
+  await panel.getByRole('button', { name: 'Save translation' }).click(); await a.waitForTimeout(1200);
+  expect(one(`select tr->'hu'->>'title' from petitions where id = '${pid}'`) === 'Ivókutat minden parkba, most', 'translation not saved');
+  const hu = await b.newContext({ locale: 'hu-HU' }); await hu.addCookies([{ name: 'lang', value: 'hu', url: APP }]);
+  const hp = await hu.newPage(); await hp.goto(APP + `/p/${pid}`);
+  expect(await hp.locator('h1', { hasText: 'Ivókutat minden parkba' }).count(), 'Hungarian reader does not see the translation');
+  await hp.goto(APP + '/petitions'); expect(await hp.locator('text=Ivókutat minden parkba').count(), 'petition list not translated');
+  await hu.close();
+  await go(g, `/p/${pid}`); expect(!(await g.locator('h1', { hasText: 'Ivókutat' }).count()), 'English reader sees the translation');
+});
+
 console.log('Feed, people and admin tools');
 await check('feed: care and not interested teach the feed', async () => {
   await go(bb, '/'); await bb.waitForSelector('video');

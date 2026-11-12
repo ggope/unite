@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN } from '@/lib/i18n/dict';
-import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, unite, separate, resolveReport, setModerator, importNews, newsAction, toggleSource } from './actions';
+import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, unite, separate, resolveReport, setModerator, importNews, newsAction, toggleSource } from './actions';
 
 export const dynamic = 'force-dynamic';
 const TABS = [['overview', 'Overview'], ['queue', 'Review queue'], ['reports', 'Reports'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People']] as const;
@@ -101,6 +101,28 @@ async function Reports({ sb }: { sb: any }) {
   </>);
 }
 
+// The petition in the other language. The original stays as written; readers see the version for their language.
+function Translation({ p }: { p: any }) {
+  const other = p.lang === 'hu' ? 'en' : 'hu';
+  const tr = (p.tr ?? {})[other] ?? {};
+  const done = ['title', 'target', 'ask', 'why'].filter((k) => tr[k]).length;
+  return (
+    <details>
+      <summary className="hint">Translation · written in {p.lang === 'hu' ? 'Hungarian' : 'English'} · {other === 'hu' ? 'Hungarian' : 'English'} version {done === 4 ? 'complete' : done ? `${done} of 4 fields` : 'missing'}</summary>
+      <form action={setTranslation} className="stack" style={{ marginTop: 8 }}>
+        <input type="hidden" name="id" value={p.id} />
+        <label className="row">Written in <select name="lang" defaultValue={p.lang ?? 'en'}><option value="en">English</option><option value="hu">Hungarian</option></select>
+          <span className="hint">(the translation below is for the other language)</span></label>
+        <input name="title" maxLength={90} defaultValue={tr.title ?? ''} placeholder={`Title (${other})`} aria-label={`Title (${other})`} />
+        <input name="target" maxLength={120} defaultValue={tr.target ?? ''} placeholder={`Target (${other})`} aria-label={`Target (${other})`} />
+        <textarea name="ask" maxLength={2000} rows={3} defaultValue={tr.ask ?? ''} placeholder={`What we ask (${other})`} aria-label={`What we ask (${other})`} />
+        <textarea name="why" maxLength={5000} rows={4} defaultValue={tr.why ?? ''} placeholder={`Why it matters (${other})`} aria-label={`Why it matters (${other})`} />
+        <button className="btn small">Save translation</button>
+      </form>
+    </details>
+  );
+}
+
 async function Petitions({ sb, q }: { sb: any; q: string }) {
   let query = sb.from('petitions').select('*, petition_stats(combined)').order('created_at', { ascending: false }).limit(60);
   if (q) query = query.ilike('title', `%${q}%`);
@@ -129,6 +151,7 @@ async function Petitions({ sb, q }: { sb: any; q: string }) {
           <input name="url" type="url" defaultValue={p.link_url ?? ''} placeholder="Organiser's website (https://…)" style={{ flex: 1, minWidth: 0 }} />
           <select name="cta" defaultValue={p.link_cta ?? 'learn'}>{['learn', 'visit', 'donate', 'join', 'event'].map((c) => <option key={c} value={c}>{c}</option>)}</select>
           <button className="btn small">Save</button></form>
+        <Translation p={p} />
         {p.cluster_id && <form action={separate}><input type="hidden" name="id" value={p.id} /><button className="btn ghost small">Separate from its group</button></form>}
       </div>))}
   </>);

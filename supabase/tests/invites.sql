@@ -1,6 +1,5 @@
 \set ON_ERROR_STOP on
 -- runs after behaviour.sql (users A, B, C exist)
-grant all on all tables in schema public to authenticated;
 set role authenticated;
 -- A makes an invite code; B cannot read it from the table
 select set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111', false);
