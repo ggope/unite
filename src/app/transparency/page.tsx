@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { supabaseServer } from '@/lib/supabase/server';
+import { publicRpc } from '@/lib/supabase/public';
 import { getT } from '@/lib/i18n/server';
 import { fmtN, type Key } from '@/lib/i18n/dict';
 import { LegalLinks } from '@/components/LegalLinks';
@@ -10,8 +10,8 @@ export async function generateMetadata(): Promise<Metadata> { const { t } = awai
 
 // The rules and the numbers, in public. Everything here is counted live from the database.
 export default async function Transparency() {
-  const [sb, { lang, t }] = await Promise.all([supabaseServer(), getT()]);
-  const { data: s } = await sb.rpc('transparency_stats');
+  const { lang, t } = await getT();   // first: it reads the language cookie, so the build never caches build-time numbers
+  const s = await publicRpc('transparency_stats', 600) as Record<string, any> | null;
   const n = (k: string) => fmtN(Number(s?.[k] ?? 0), lang);
   const tile = (k: string, label: Key) => <div className="tstat" key={k}><b className="num">{n(k)}</b><span>{t(label)}</span></div>;
   return (

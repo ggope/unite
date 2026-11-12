@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n/client';
 import { Icon } from './Icon';
+import { useSheet } from '@/lib/useSheet';
 
 const REASONS = ['false', 'hate', 'violence', 'privacy', 'spam', 'other'] as const;
 
@@ -13,6 +14,7 @@ export function ReportButton({ videoId, petitionId, profileId, reasonKey, update
   const { t } = useT(); const router = useRouter(); const path = usePathname();
   const [open, setOpen] = useState(false); const [why, setWhy] = useState<(typeof REASONS)[number] | ''>(''); const [txt, setTxt] = useState('');
   const [state, setState] = useState<'' | 'busy' | 'done' | 'err'>('');
+  const sheet = useSheet(open, () => setOpen(false));
   const what = videoId ? t('report.video') : reasonKey ? t('report.reason') : updateId ? t('report.answer') : profileId ? t('report.profile') : t('report.petition');
   function start() { if (!loggedIn) { router.push(`/login?next=${encodeURIComponent(path)}`); return; } setOpen(true); setState(''); }
   async function send() {
@@ -31,7 +33,7 @@ export function ReportButton({ videoId, petitionId, profileId, reasonKey, update
         : <button className="btn ghost small" onClick={start}><Icon name="flag" />{t('report.btn')}</button>}
       {open && (
         <div className="backdrop" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
-          <div className="sheet" role="dialog" aria-modal="true" aria-label={t('report.title', { what })}>
+          <div className="sheet" ref={sheet} role="dialog" aria-modal="true" aria-label={t('report.title', { what })}>
             <div className="row between"><h2>{t('report.title', { what })}</h2><button className="btn ghost" onClick={() => setOpen(false)} aria-label={t('common.close')}><Icon name="x" /></button></div>
             {state === 'done' ? <><p style={{ margin: 0 }}>{t('report.thanks')}</p><button className="btn primary" onClick={() => setOpen(false)}>{t('common.close')}</button></> : <>
               <span className="label">{t('report.why')}</span>

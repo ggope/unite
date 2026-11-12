@@ -36,12 +36,12 @@ h1{font-size:19px;line-height:1.15;margin:0;text-transform:uppercase;font-weight
 .bar{height:10px;border:2px solid var(--edge);background:transparent}.bar i{display:block;height:100%;background:var(--accent)}
 a.go{align-self:flex-start;background:var(--accent);color:#111;font-weight:900;text-decoration:none;text-transform:uppercase;padding:10px 16px;border:2px solid var(--edge);box-shadow:3px 3px 0 var(--edge)}
 a.go:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
-</style></head><body><div class="box">
+</style></head><body><main class="box">
 <a class="brand" href="${base}" target="_blank" rel="noopener">${logoSvg({ round: true, paper: false, id: 'em' })}UNIER</a>
 <h1>${esc(p.title)}</h1><span class="to">${esc(t('poster.to', { target: p.target }))}</span>
 <div><span class="n">${fmtN(n, lang)}</span> <span class="goal">${esc(t('poster.signed', { goal: fmtN(p.goal, lang) }))}</span></div>
-<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct.toFixed(1)}%"></i></div>
+<div class="bar" role="progressbar" aria-label="${esc(t('poster.signed', { goal: fmtN(p.goal, lang) }))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct.toFixed(1)}%"></i></div>
 ${raw.status === 'live' ? `<a class="go" href="${href}" target="_blank" rel="noopener">${esc(t('sign.signThis'))} ↗</a>` : `<span class="goal">${esc(t('sign.errClosed'))}</span>`}
-</div></body></html>`;
+</main></body></html>`;
   return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' } });
 }

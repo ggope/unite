@@ -18,7 +18,7 @@ async function done(error?: { message: string } | null) {
   const u = new URL((await headers()).get('referer') ?? '/admin', 'http://x');
   if (!error && !u.searchParams.has('err')) return;
   if (error) u.searchParams.set('err', error.message.slice(0, 120)); else u.searchParams.delete('err');
-  redirect(u.pathname + u.search);
+  redirect((u.pathname.startsWith('/admin') ? u.pathname : '/admin') + u.search);   // never off-site, whatever the Referer says
 }
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
 // Accepts a petition id or a pasted link to one.

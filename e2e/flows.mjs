@@ -36,7 +36,7 @@ const g = await as(null);
 for (const url of ['/', '/petitions', '/mylo', '/donate', '/login', '/start', '/post', '/updates', '/you', '/privacy', '/terms', '/imprint']) {
   await check(`guest opens ${url}`, async () => { const r = await go(g, url); expect(r.status() < 400, `status ${r.status()}`); await noCrash(g); });
 }
-const seedId = one(`select id from petitions where status = 'live' order by created_at limit 1`);
+const seedId = one(`select id from petitions where status = 'live' order by title like 'End bottom trawling%' desc, created_at limit 1`);   // seed rows share one created_at
 await check('petition list, welcome page and news show petitions with totals', async () => {
   await go(g, '/petitions'); expect(await g.locator('text=End bottom trawling').count(), 'petition list is empty');
 });
@@ -573,6 +573,22 @@ await check('open numbers download as CSV without names', async () => {
   const p = await (await g.request.get(APP + '/open/petitions.csv')).text(); expect(p.includes('End bottom trawling'), 'petitions missing');
   expect((await g.request.get(APP + '/open/nope.csv')).status() === 404, 'unknown file served');
   await go(g, '/transparency'); expect(await g.locator('a[href="/open/petitions.csv"]').count(), 'no download link');
+});
+
+await check('quality: no framing except the embed, cached open data, keyboard report sheet', async () => {
+  const home = await g.request.get(APP + '/'); const h = home.headers();
+  expect(h['x-frame-options'] === 'DENY' && /frame-ancestors 'none'/.test(h['content-security-policy'] ?? ''), 'pages can be framed by other sites');
+  const em = await g.request.get(APP + `/embed/${seedId}`); const eh = em.headers();
+  expect(em.ok() && !eh['x-frame-options'] && !/frame-ancestors/.test(eh['content-security-policy'] ?? ''), 'embed cannot be framed');
+  const html = await em.text(); expect(/<main/.test(html) && /role="progressbar" aria-label=/.test(html), 'embed landmarks or progress label missing');
+  expect(/s-maxage=\d+/.test((await g.request.get(APP + '/open/petitions.csv')).headers()['cache-control'] ?? ''), 'open data not cached at the edge');
+  // totals still match a full count after all the signing above
+  expect(one(`select count(*) from petition_stats s join petitions p using (id) where s.signatures <> p.imported_count + (select count(*) from signatures x where x.petition_id = p.id)`) === '0', 'signature counter drifted');
+  await go(bb, `/p/${seedId}`);
+  await bb.getByRole('button', { name: /^report$/i }).first().click();
+  expect(await bb.evaluate(() => !!document.activeElement?.closest('[role=dialog]')), 'focus did not move into the report sheet');
+  await bb.keyboard.press('Escape'); await bb.waitForTimeout(200);
+  expect(!(await bb.locator('[role=dialog]').count()), 'Escape did not close the report sheet');
 });
 
 await check('revoke consent, then signing asks again', async () => {
