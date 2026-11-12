@@ -41,7 +41,7 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
   const { data: raw } = await sb.from('petitions').select('*').eq('id', id).maybeSingle();
   if (!raw) notFound();
   const p = localize(raw, lang);
-  const easy = easyOf(raw, lang);   // the easy-read version for kids (0018)
+  const easy = easyOf(raw, lang);   // the easy-read version for kids (0019)
   const [{ data: st }, { data: members }, { data: updates }, { data: videos }, friends, { data: me }, { data: news }] = await Promise.all([
     sb.from('petition_stats').select('*').eq('id', id).maybeSingle(),
     p.cluster_id ? sb.from('petitions').select('id, title, organiser_name, origin, petition_stats(signatures)').eq('cluster_id', p.cluster_id) : Promise.resolve({ data: [] as any[] }),

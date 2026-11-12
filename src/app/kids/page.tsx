@@ -28,7 +28,7 @@ export default async function Kids() {
   const [{ lang, t }, { data: today }, { data: rows }] = await Promise.all([
     getT(),
     sb.rpc('mylo_today'),
-    // Kid-friendly petitions: live ones with easy-read text (empty until 0018 has run).
+    // Kid-friendly petitions: live ones with easy-read text (empty until 0019 has run).
     sb.from('petitions').select('id, topic, goal, easy, petition_stats(combined)').eq('status', 'live').neq('easy', '{}').order('created_at', { ascending: false }).limit(40),
   ]);
   const feel = FEEL[asMylo(today).mood] ?? 'calm';

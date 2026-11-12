@@ -1,5 +1,5 @@
 \set ON_ERROR_STOP on
--- 0018: easy-read text is public, only moderators write it, and the shape is checked
+-- 0019: easy-read text is public, only moderators write it, and the shape is checked
 reset role;
 update public.profiles set is_moderator = false where id = '33333333-3333-3333-3333-333333333333';
 update public.profiles set is_moderator = true  where id = '11111111-1111-1111-1111-111111111111';

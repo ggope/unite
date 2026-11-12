@@ -80,7 +80,7 @@ export async function setTranslation(f: FormData) {
   if (Object.keys(t).length) tr[to] = t; else delete tr[to];
   await done((await sb.from('petitions').update({ tr }).eq('id', s(f, 'id'))).error);
 }
-// The easy-read version for kids (0018), all languages in one form. Saving it empty takes the petition out of the kids corner.
+// The easy-read version for kids (0019), all languages in one form. Saving it empty takes the petition out of the kids corner.
 export async function setEasy(f: FormData) {
   const sb = await mod();
   const easy: Record<string, { title: string; text: string }> = {};

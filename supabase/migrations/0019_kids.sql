@@ -1,4 +1,4 @@
--- 0018: the kids side. A petition can have an easy-read version in plain words, one per language:
+-- 0019: the kids side. A petition can have an easy-read version in plain words, one per language:
 --   easy = {"en": {"title": "…", "text": "…"}, "hu": {…}, …}
 -- A live petition with any easy-read text is kid-friendly and shows in the kids corner (/kids).
 -- Moderators write it in Admin → Petitions. Kids never sign; the kids corner sends them to a grown-up.

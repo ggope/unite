@@ -1,6 +1,6 @@
 import type { Lang } from './i18n/langs';
 
-// A petition's easy-read version (0018): a kid-sized title and a few plain sentences, one per language.
+// A petition's easy-read version (0019): a kid-sized title and a few plain sentences, one per language.
 export type Easy = { title: string; text: string };
 
 function pick(v: unknown): Easy | null {
