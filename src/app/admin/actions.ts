@@ -27,10 +27,14 @@ const pid = (v: string) => v.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 // so "Approve" was read as "Reject").
 export async function noop() {}
 
+// The EU Digital Services Act asks for a clear reason whenever we remove or decline someone's content.
+const NEED_REASON = { message: 'Write the reason first. The author sees it, and the law requires one.' };
+
 export async function review(decision: 'approve' | 'reject', f: FormData) {
   const sb = await mod();
   const table = s(f, 'kind') === 'petition' ? 'petitions' : 'videos';
   const approve = decision === 'approve';
+  if (!approve && !s(f, 'note')) return done(NEED_REASON);
   const status = table === 'petitions' ? (approve ? 'live' : 'removed') : (approve ? 'approved' : 'rejected');
   const { error } = await sb.from(table).update({ status, moderation_note: approve ? null : s(f, 'note') || null }).eq('id', s(f, 'id'));
   await done(error);
@@ -39,6 +43,7 @@ export async function review(decision: 'approve' | 'reject', f: FormData) {
 export async function petitionStatus(status: 'live' | 'closed' | 'removed', f: FormData) {
   const sb = await mod();
   if (!['live', 'closed', 'removed'].includes(status)) return;
+  if (status === 'removed' && !s(f, 'note')) return done(NEED_REASON);
   const { error } = await sb.from('petitions').update({ status, moderation_note: status === 'removed' ? s(f, 'note') || null : null }).eq('id', s(f, 'id'));
   await done(error);
 }
@@ -91,6 +96,7 @@ export async function resolveReport(action: 'dismiss' | 'remove', f: FormData) {
   const video = s(f, 'video_id'), petition = s(f, 'petition_id'), person = s(f, 'profile_id');
   const resolved = { status: 'resolved', resolved_at: new Date().toISOString() };
   if (action === 'remove') {
+    if ((video || petition) && !note) return done(NEED_REASON);
     const { error } = video
       ? await sb.from('videos').update({ status: 'rejected', moderation_note: note }).eq('id', video)
       : petition ? await sb.from('petitions').update({ status: 'removed', moderation_note: note }).eq('id', petition)

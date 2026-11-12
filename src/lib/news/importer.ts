@@ -43,5 +43,8 @@ export async function runImport() {
 
   // keep the table small: drop old stories nobody attached a petition to
   await sb.from('news_items').delete().lt('published_at', new Date(Date.now() - 30 * 864e5).toISOString()).is('petition_id', null);
+  // the daily privacy clean-up rides on the same schedule (0011_privacy.sql)
+  const clean = await sb.rpc('run_retention');
+  report.push({ source: 'privacy clean-up', status: clean.error ? `error: ${clean.error.message}` : JSON.stringify(clean.data), added: 0 });
   return report;
 }

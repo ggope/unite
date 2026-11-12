@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n/client';
@@ -99,6 +100,7 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
           {mode !== 'link' && <button className="linkbtn" onClick={() => { setMode('link'); setErr(''); }}>{t('login.useLink')}</button>}
           {(mode === 'link' || mode === 'forgot') && <button className="linkbtn" onClick={() => { setMode('signin'); setErr(''); }}>{t('login.usePassword')}</button>}
         </div>
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>{t('login.agree')} <Link href="/terms">{t('login.termsLink')}</Link>. {t('login.dataHow')} <Link href="/privacy">{t('login.privacyLink')}</Link>.</p>
       </div>
     </div>
   );

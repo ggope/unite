@@ -212,6 +212,8 @@ await check('admin resolves the report', async () => {
 await check('news import runs with the cron secret', async () => {
   const r = await g.request.get(APP + '/api/news/import', { headers: { authorization: 'Bearer e2e' } });
   expect(r.status() < 500, `status ${r.status()} ${await r.text()}`);
+  const clean = (await r.json()).report?.find((x) => x.source === 'privacy clean-up');
+  expect(clean && !clean.status.startsWith('error'), `daily privacy clean-up did not run: ${JSON.stringify(clean)}`);
 });
 
 console.log('Feed, people and admin tools');
@@ -261,6 +263,14 @@ await check('admin: official link, organiser link, unite and separate', async ()
   await go(a, '/admin?tab=petitions&q=fountains'); await a.getByRole('button', { name: /separate/i }).first().click(); await a.waitForTimeout(1200);
   expect(one(`select cluster_id from petitions where id = '${pid}'`) === null || one(`select cluster_id from petitions where id = '${pid}'`) === '', 'not separated');
 });
+await check('admin: declining without a reason is refused', async () => {
+  const v3 = one(`insert into videos (petition_id, uploader_id, storage_path, caption, trim_start, trim_end) values ('${pid}', '${B.id}', '${B.id}/y.webm', 'Clip without a reason', 0, 5) returning id`);
+  await go(a, '/admin?tab=queue');
+  await a.locator('.panel', { hasText: 'Clip without a reason' }).first().getByRole('button', { name: 'Reject' }).click(); await a.waitForTimeout(1200);
+  expect(one(`select status from videos where id = '${v3}'`) === 'pending', 'declined without a reason');
+  expect(await a.locator('text=Write the reason first').count(), 'no message asking for a reason');
+  sql(`delete from videos where id = '${v3}'`);
+});
 await check('admin: reject a video with a reason the author sees', async () => {
   const v2 = one(`insert into videos (petition_id, uploader_id, storage_path, caption, trim_start, trim_end) values ('${pid}', '${B.id}', '${B.id}/x.webm', 'Second clip for review', 0, 5) returning id`);
   await go(a, '/admin?tab=queue');
@@ -296,7 +306,17 @@ await check('withdraw a signature from You', async () => {
   await bb.locator('form', { has: bb.locator(`input[value="${pid}"]`) }).getByRole('button').first().click(); await settle(bb);
   expect(one(`select count(*) from signatures where user_id = '${B.id}' and petition_id = '${pid}'`) === '0', 'not withdrawn');
 });
-await check('export my data', async () => { const r = await bb.request.get(APP + '/api/account/export'); expect(r.status() === 200, `status ${r.status()}`); });
+await check('export my data, complete', async () => {
+  const r = await bb.request.get(APP + '/api/account/export'); expect(r.status() === 200, `status ${r.status()}`);
+  const d = await r.json();
+  for (const k of ['profile', 'settings', 'consents', 'signatures', 'messages', 'reports_sent', 'invite', 'feed_learning']) expect(k in d, `export misses ${k}`);
+  expect(Array.isArray(d.reports_sent) && d.reports_sent.length > 0, 'my reports are not in the export');
+});
+await check('legal pages and the sign-in note', async () => {
+  for (const u of ['/privacy', '/terms', '/imprint']) { await go(g, u); expect(await g.locator('h1').count(), `${u} has no title`); }
+  await go(g, '/privacy'); expect(await g.locator('text=mylo-greeted').count(), 'cookie list missing');
+  await go(g, '/login'); expect(await g.locator('a[href="/terms"]').count() && await g.locator('a[href="/privacy"]').count(), 'login has no terms/privacy links');
+});
 await check('delete account', async () => {
   const E = newUser('emil'); const e = await as(E);
   const r = await e.request.post(APP + '/api/account/delete'); expect(r.status() < 400, `status ${r.status()} ${await r.text()}`);

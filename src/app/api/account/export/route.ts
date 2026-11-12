@@ -11,7 +11,7 @@ export async function GET() {
     q(sb.from('profiles').select('*').eq('id', user.id).maybeSingle()),
     q(sb.from('user_settings').select('*').eq('user_id', user.id).maybeSingle()),
     q(sb.from('consents').select('kind, text_version, granted_at, revoked_at')),
-    q(sb.from('signatures').select('petition_id, why, show_reason, created_at, petitions(title)')),
+    q(sb.from('signatures').select('petition_id, why, show_reason, country, created_at, petitions(title)')),
     q(sb.from('follows').select('petition_id, created_at, petitions(title)')),
     q(sb.from('friendships').select('friend_id, created_at, profiles!friendships_friend_id_fkey(handle, display_name)').eq('user_id', user.id)),
     q(sb.from('petitions').select('*').eq('created_by', user.id)),
@@ -20,12 +20,14 @@ export async function GET() {
     q(sb.from('topic_weights').select('topic, weight')),
   ]);
   // People features (0006_social.sql): your messages, requests and blocks.
-  const [messages, friend_requests, blocks] = await Promise.all([
+  const [messages, friend_requests, blocks, reports_sent, invite] = await Promise.all([
     q(sb.from('messages').select('id, sender_id, recipient_id, body, created_at, read_at').order('id')),
     q(sb.from('friend_requests').select('from_id, to_id, created_at')),
     q(sb.from('blocks').select('blocked_id, created_at')),
+    q(sb.from('reports').select('video_id, petition_id, profile_id, reason, status, created_at, resolved_at').eq('reporter_id', user.id)),
+    q(sb.from('invites').select('code, created_at').eq('user_id', user.id).maybeSingle()),
   ]);
-  const body = { exported_at: new Date().toISOString(), account: { id: user.id, email: user.email }, profile, settings, consents, signatures, follows, friends, petitions, videos, updates_posted: updates, feed_learning: weights, messages, friend_requests, blocks,
+  const body = { exported_at: new Date().toISOString(), account: { id: user.id, email: user.email }, profile, settings, consents, signatures, follows, friends, petitions, videos, updates_posted: updates, feed_learning: weights, messages, friend_requests, blocks, reports_sent, invite,
     note: 'Video files are stored privately; they are deleted with your account. Write to us if you want copies of the files.' };
   return new NextResponse(JSON.stringify(body, null, 2), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': `attachment; filename="unier-my-data-${new Date().toISOString().slice(0, 10)}.json"`, 'Cache-Control': 'no-store' } });
 }
