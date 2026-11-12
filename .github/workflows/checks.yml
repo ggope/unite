@@ -33,7 +33,7 @@ jobs:
       - name: Database rules
         run: sudo -u postgres bash supabase/tests/run.sh
       - name: Click through the whole site
-        run: sudo -E env "PATH=$PATH" bash e2e/run.sh
+        run: sudo -E env "PATH=$PATH" "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright" bash e2e/run.sh
       - name: Logs if something failed
         if: failure()
-        run: for f in /tmp/e2e-*.log; do echo "::group::$f"; tail -80 "$f"; echo "::endgroup::"; done
+        run: for f in /tmp/e2e-*.log; do [ -f "$f" ] || continue; echo "::group::$f"; tail -80 "$f"; echo "::endgroup::"; done
