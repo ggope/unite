@@ -126,7 +126,7 @@ main{min-width:0;width:100%;max-width:680px;margin:0 auto;padding:16px max(16px,
 .byline .role.founder{color:#9A3412} .byline .role.supporter{color:#4A453E}
 .endcard{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:0 28px;height:100%}
 .endcard h2{font-size:40px}
-@media (prefers-reduced-motion: reduce){*{transition:opacity .3s!important;animation:none!important}.btn:hover{transform:none}}
+@media (prefers-reduced-motion: reduce){*:not(.mylo-art *){transition:opacity .3s!important;animation:none!important}.btn:hover{transform:none}.mylo-art :is([style*='m-jump'],[style*='m-jitter'],[style*='m-flash'],[style*='m-flicker']){animation:none!important}}
 /* login */
 .seg{display:flex;background:var(--surface);border:2px solid var(--edge);border-radius:var(--r);padding:4px;gap:4px}
 .seg button{flex:1;border:0;background:transparent;border-radius:2px;padding:9px 12px;font-weight:800;color:var(--muted);cursor:pointer}
