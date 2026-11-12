@@ -45,7 +45,7 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
     if (mode === 'signin') {
       const { error } = await sb.auth.signInWithPassword({ email, password, options: { captchaToken } });
       setBusy(false);
-      if (!error) { router.replace(next); router.refresh(); return; }
+      if (!error) { await sb.rpc('claim_email_signatures').then(() => {}, () => {}); router.replace(next); router.refresh(); return; }
       if (/confirm/i.test(error.message)) setErr(t('login.errConfirm'));
       else setErr(t('login.errWrong'));
     } else if (mode === 'signup') {

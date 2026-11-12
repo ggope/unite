@@ -52,6 +52,34 @@ await check('guest sign asks for email and sends a code', async () => {
   await g.getByRole('button', { name: /email|link|code/i }).last().click();
   await g.waitForSelector('.sheet .ok', { timeout: 5000 });
 });
+const mailsTo = async (to) => (await (await fetch(`http://localhost:54321/__mail?to=${encodeURIComponent(to)}`)).json());
+await check('signing with only an email: link, confirm, counted once, withdraw', async () => {
+  const total = () => Number(one(`select signatures from petition_stats where id = '${seedId}'`));
+  const before = total();
+  const mails = await mailsTo('guest@e2e.test'); expect(mails.length === 1, `expected one email, got ${mails.length}`);
+  const link = mails[0].text.match(/http\S+\/s\/[\w-]+/)?.[0]; expect(link, 'no link in the email');
+  expect(one(`select count(*) from email_signatures e where e::text ilike '%guest@%'`) === '0', 'email address stored');
+  await go(g, new URL(link).pathname); expect(total() === before, 'counted before pressing Confirm');
+  await g.getByRole('button', { name: /confirm/i }).click(); await settle(g);
+  await g.waitForSelector('.esign .ok', { timeout: 5000 }); expect(total() === before + 1, 'not counted after Confirm');
+  await go(g, new URL(link).pathname); await g.getByRole('button', { name: /confirm/i }).count().then((n) => expect(n === 0, 'confirm shown twice'));
+  // signing again with the same email says it already counts
+  await go(g, `/p/${seedId}`); await g.getByRole('button', { name: /^Sign/ }).first().click();
+  await g.locator('.sheet input[type=email]').fill('Guest@e2e.test'); await g.locator('.sheet input[type=checkbox]').check();
+  await g.getByRole('button', { name: /email|link|code/i }).last().click(); await g.waitForSelector('.sheet .error', { timeout: 5000 });
+  await go(g, new URL(link).pathname + '?w=1'); await g.getByRole('button', { name: /withdraw/i }).click(); await settle(g);
+  expect(total() === before, 'withdraw did not remove it');
+});
+await check('a crashed page and a failing server call are logged and the owner is emailed once', async () => {
+  const r = await g.request.post(APP + '/api/errors', { headers: { origin: APP, 'content-type': 'application/json' }, data: { message: 'E2E test crash for a@b.io', path: '/p/x?token=secret' } });
+  expect(r.status() === 204, `status ${r.status()}`);
+  await g.request.post(APP + '/api/errors', { headers: { origin: APP, 'content-type': 'application/json' }, data: { message: 'E2E test crash for a@b.io', path: '/p/x' } });
+  expect((await g.request.post(APP + '/api/errors', { headers: { origin: 'https://evil.example', 'content-type': 'application/json' }, data: { message: 'x' } })).status() === 403, 'other sites can log');
+  const row = sql(`select count, message, path from error_events where source = 'browser' and message like 'E2E test crash%'`)[0];
+  expect(row && row[0] === '2', `not counted: ${row}`); expect(!row[1].includes('a@b.io') && !row[2].includes('secret'), 'personal data in the log');
+  const alerts = (await mailsTo('owner@e2e.test')).filter((m) => m.subject.includes('E2E test crash')); expect(alerts.length === 1, `alerts: ${alerts.length}`);
+  expect((await g.request.get(APP + '/api/health')).status() === 200, 'health check failed');
+});
 await check('Mylo API answers', async () => { const r = await g.request.get(APP + '/api/mylo'); const j = await r.json(); expect(j.mood, JSON.stringify(j)); });
 
 console.log('Profile and settings');
@@ -584,6 +612,14 @@ await check('sign out', async () => {
   await go(bb, '/you'); expect(await bb.locator('a[href^="/login"]').count(), 'still signed in');
 });
 
+await check('admin sees errors, marks one fixed and sends a test alert', async () => {
+  await go(a, '/admin?tab=errors'); await noCrash(a); expect(await a.getByText(/E2E test crash/).count(), 'error not listed');
+  await a.getByRole('button', { name: 'Mark as fixed' }).first().click(); await settle(a);
+  expect(one(`select count(*) from error_events where resolved_at is not null`) !== '0', 'not marked fixed');
+  await go(a, '/admin?tab=errors'); await a.getByRole('button', { name: 'Send a test alert' }).click(); await settle(a);
+  let got = false; for (let i = 0; i < 20 && !got; i++) { got = (await mailsTo('owner@e2e.test')).some((m) => m.subject === 'UNIER test alert'); if (!got) await a.waitForTimeout(250); }
+  expect(got, 'no test alert');
+});
 await check('admin takes the sample petitions down before launch', async () => {
   await go(a, '/admin?tab=launch'); await a.getByRole('button', { name: 'Take the sample petitions down' }).click(); await settle(a);
   expect(one(`select count(*) from petitions where organiser_name ilike '%(sample)%' and status <> 'removed'`) === '0', 'samples still live');

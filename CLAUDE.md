@@ -67,7 +67,7 @@ Add an e2e check in `e2e/flows.mjs` for each new feature. Sign-in in e2e uses `l
 
 ## Still to do by Gug (before launch)
 
-Run SQL 0014 to 0018; add VAPID keys and Cloudflare Turnstile keys in Vercel; buy a domain and set `NEXT_PUBLIC_SITE_URL`; fill the legal placeholders; take down the sample petitions (one button in Admin → Launch checklist).
+Run SQL 0014 to 0018 and 0021 (email signing); set the email sender (`SMTP_*`) and `ALERT_EMAIL` in Vercel; add VAPID keys and Cloudflare Turnstile keys in Vercel; buy a domain and set `NEXT_PUBLIC_SITE_URL`; fill the legal placeholders; take down the sample petitions (one button in Admin → Launch checklist).
 
 ## Working in parallel
 
