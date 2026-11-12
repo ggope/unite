@@ -39,6 +39,10 @@ npm run dev
 npm run test:db              # schema + privacy tests on a local Postgres
 ```
 
+## End-to-end tests
+
+`bash e2e/run.sh` clicks through the whole site in a real browser, as a guest, a signed-in person and a moderator: saving settings, starting, approving and signing petitions, videos, friends, messages, blocking, reports, every admin tab, data export and account deletion. It needs a local Postgres (like the database tests). It downloads PostgREST once, runs a small stand-in for Supabase auth and storage, and builds the app. `SKIP_BUILD=1` reuses the last build.
+
 ## Updates after the first launch
 - **Run `supabase/migrations/0002_updates_invites.sql`** once in the SQL Editor (founder/moderator updates, friend invites).
 - **Starter petitions:** `supabase/starter.sql` (edit the email on the last line first), then approve them at `/admin` (Review queue).
@@ -48,4 +52,5 @@ npm run test:db              # schema + privacy tests on a local Postgres
 - **People:** run `supabase/migrations/0006_social.sql`. Profiles at `/u/handle`, friend requests, blocking, and messages between friends at `/messages`.
 - **Organiser links:** run `supabase/migrations/0007_links.sql`. Petitions can carry a website button ("Learn more", "Donate", …) shown under the petition and its videos.
 - **Mylo:** run `supabase/migrations/0008_mylo.sql`. Mylo, the baby orange, gets a daily mood from public totals (signatures today vs. a usual day, wins, petitions near their goal, how grim the big news stories are). He greets visitors once a day in the corner, cheers after every signature, and has his own page at `/mylo` with the reasons and the big community goals. Moderators pin big goals in Admin → Petitions.
+- **Fixes:** run `supabase/migrations/0009_fixes.sql`. It creates any missing profile rows (this is why names would not save for some accounts), lets petition lists show signature counts again, and lets people reset what their feed learned. Account deletion needs `SUPABASE_SERVICE_ROLE_KEY` set in Vercel.
 - **News:** run `supabase/migrations/0003_news.sql`, add a `CRON_SECRET` environment variable in Vercel (any long random text), and redeploy. News then imports once a day; moderators can also press "Import news now" on `/admin` (News tab). Sources live in the `news_sources` table. Only headlines, a short teaser and the link are stored; the full article stays on the publisher's site.

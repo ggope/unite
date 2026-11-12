@@ -23,18 +23,21 @@ const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
 // Accepts a petition id or a pasted link to one.
 const pid = (v: string) => v.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? '';
 
-export async function review(f: FormData) {
+// Each button binds its own choice (button name/value pairs did not reach server actions,
+// so "Approve" was read as "Reject").
+export async function noop() {}
+
+export async function review(decision: 'approve' | 'reject', f: FormData) {
   const sb = await mod();
   const table = s(f, 'kind') === 'petition' ? 'petitions' : 'videos';
-  const approve = s(f, 'decision') === 'approve';
+  const approve = decision === 'approve';
   const status = table === 'petitions' ? (approve ? 'live' : 'removed') : (approve ? 'approved' : 'rejected');
   const { error } = await sb.from(table).update({ status, moderation_note: approve ? null : s(f, 'note') || null }).eq('id', s(f, 'id'));
   await done(error);
 }
 
-export async function petitionStatus(f: FormData) {
+export async function petitionStatus(status: 'live' | 'closed' | 'removed', f: FormData) {
   const sb = await mod();
-  const status = s(f, 'status');
   if (!['live', 'closed', 'removed'].includes(status)) return;
   const { error } = await sb.from('petitions').update({ status, moderation_note: status === 'removed' ? s(f, 'note') || null : null }).eq('id', s(f, 'id'));
   await done(error);
@@ -82,9 +85,9 @@ export async function separate(f: FormData) {
   await done(error);
 }
 
-export async function resolveReport(f: FormData) {
+export async function resolveReport(action: 'dismiss' | 'remove', f: FormData) {
   const sb = await mod();
-  const action = s(f, 'action'), note = s(f, 'note') || null;
+  const note = s(f, 'note') || null;
   const video = s(f, 'video_id'), petition = s(f, 'petition_id'), person = s(f, 'profile_id');
   const resolved = { status: 'resolved', resolved_at: new Date().toISOString() };
   if (action === 'remove') {
@@ -112,9 +115,9 @@ export async function importNews() {
   await runImport();
   await done();
 }
-export async function newsAction(f: FormData) {
+export async function newsAction(op: 'attach' | 'hide', f: FormData) {
   const sb = await mod();
-  const patch = s(f, 'do') === 'hide' ? { status: 'hidden' } : { petition_id: pid(s(f, 'petition_id')) || null };
+  const patch = op === 'hide' ? { status: 'hidden' } : { petition_id: pid(s(f, 'petition_id')) || null };
   await done((await sb.from('news_items').update(patch).eq('id', s(f, 'id'))).error);
 }
 export async function toggleSource(f: FormData) {

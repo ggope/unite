@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN } from '@/lib/i18n/dict';
-import { review, petitionStatus, setOfficial, setLink, setFeatured, unite, separate, resolveReport, setModerator, importNews, newsAction, toggleSource } from './actions';
+import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, unite, separate, resolveReport, setModerator, importNews, newsAction, toggleSource } from './actions';
 
 export const dynamic = 'force-dynamic';
 const TABS = [['overview', 'Overview'], ['queue', 'Review queue'], ['reports', 'Reports'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People']] as const;
@@ -62,9 +62,9 @@ async function Overview({ st, sb }: { st: Record<string, number>; sb: any }) {
 }
 
 const Decide = ({ kind, id }: { kind: string; id: string }) => (
-  <form action={review} className="row"><input type="hidden" name="kind" value={kind} /><input type="hidden" name="id" value={id} />
+  <form action={noop} className="row"><input type="hidden" name="kind" value={kind} /><input type="hidden" name="id" value={id} />
     <input name="note" placeholder="Reason if not approved (the author sees this)" style={{ flex: 1, minWidth: 0 }} />
-    <button className="btn small primary" name="decision" value="approve">Approve</button><button className="btn small danger" name="decision" value="reject">Reject</button></form>
+    <button className="btn small primary" formAction={review.bind(null, 'approve')}>Approve</button><button className="btn small danger" formAction={review.bind(null, 'reject')}>Reject</button></form>
 );
 
 async function Queue({ sb }: { sb: any }) {
@@ -94,9 +94,9 @@ async function Reports({ sb }: { sb: any }) {
           : <Link href={`/u/${r.person?.handle ?? r.profile_id}`}>{r.person?.display_name || (r.person?.handle ? '@' + r.person.handle : 'Profile')}</Link>}</b>
         {r.profile_id && r.person?.bio && <span className="hint">Bio: “{r.person.bio}”</span>}
         <p style={{ margin: 0 }}>“{r.reason}”</p>
-        <form action={resolveReport} className="row"><input type="hidden" name="report_id" value={r.id} /><input type="hidden" name="video_id" value={r.video_id ?? ''} /><input type="hidden" name="petition_id" value={r.petition_id ?? ''} /><input type="hidden" name="profile_id" value={r.profile_id ?? ''} />
+        <form action={noop} className="row"><input type="hidden" name="report_id" value={r.id} /><input type="hidden" name="video_id" value={r.video_id ?? ''} /><input type="hidden" name="petition_id" value={r.petition_id ?? ''} /><input type="hidden" name="profile_id" value={r.profile_id ?? ''} />
           <input name="note" placeholder="Reason shown to the author if removed" style={{ flex: 1, minWidth: 0 }} />
-          <button className="btn small" name="action" value="dismiss">Dismiss</button><button className="btn small danger" name="action" value="remove">{r.profile_id && !r.video_id && !r.petition_id ? 'Clear name and bio' : 'Remove'}</button></form>
+          <button className="btn small" formAction={resolveReport.bind(null, 'dismiss')}>Dismiss</button><button className="btn small danger" formAction={resolveReport.bind(null, 'remove')}>{r.profile_id && !r.video_id && !r.petition_id ? 'Clear name and bio' : 'Remove'}</button></form>
       </div>)) : <p className="hint">No open reports.</p>}
   </>);
 }
@@ -111,11 +111,11 @@ async function Petitions({ sb, q }: { sb: any; q: string }) {
     {ps?.map((p: any) => (
       <div className="panel" key={p.id} style={{ gap: 8 }}>
         <div className="row between"><Link href={`/p/${p.id}`} style={{ flex: 1, minWidth: 0 }}><b>{p.title}</b></Link><span className="hint">{p.status} · {n(Number((Array.isArray(p.petition_stats) ? p.petition_stats[0] : p.petition_stats)?.combined ?? 0))}{p.cluster_id ? ' · united' : ''}</span></div>
-        <form action={petitionStatus} className="row"><input type="hidden" name="id" value={p.id} />
+        <form action={noop} className="row"><input type="hidden" name="id" value={p.id} />
           <input name="note" placeholder="Reason if removing" style={{ flex: 1, minWidth: 0 }} />
-          {p.status !== 'live' && <button className="btn small" name="status" value="live">Make live</button>}
-          {p.status === 'live' && <button className="btn small" name="status" value="closed">Close</button>}
-          {p.status !== 'removed' && <button className="btn small danger" name="status" value="removed">Remove</button>}</form>
+          {p.status !== 'live' && <button className="btn small" formAction={petitionStatus.bind(null, 'live')}>Make live</button>}
+          {p.status === 'live' && <button className="btn small" formAction={petitionStatus.bind(null, 'closed')}>Close</button>}
+          {p.status !== 'removed' && <button className="btn small danger" formAction={petitionStatus.bind(null, 'removed')}>Remove</button>}</form>
         {p.status === 'live' && <form action={setFeatured} className="row"><input type="hidden" name="id" value={p.id} /><input type="hidden" name="on" value={p.featured ? '' : '1'} />
           <span className="hint" style={{ flex: 1 }}>{p.featured ? '★ Big community goal (shown on the Mylo page)' : 'Not a big community goal'}</span>
           <button className="btn small">{p.featured ? 'Unpin goal' : 'Pin as big goal'}</button></form>}
@@ -153,10 +153,10 @@ async function News({ sb }: { sb: any }) {
         <div key={x.id} className="stack" style={{ gap: 4, opacity: x.status === 'hidden' ? 0.45 : 1 }}>
           <a href={x.url} target="_blank" rel="noopener nofollow"><b>{x.title}</b></a>
           <span className="hint">{x.news_sources?.name} · {x.topic} · {x.lang} · {when(x.published_at)}{x.status === 'hidden' ? ' · hidden' : ''}</span>
-          <form action={newsAction} className="row"><input type="hidden" name="id" value={x.id} />
+          <form action={newsAction.bind(null, 'attach')} className="row"><input type="hidden" name="id" value={x.id} />
             <input name="petition_id" list="live-petitions" defaultValue={x.petition_id ?? ''} placeholder="Attach a petition (type a title)" style={{ flex: 1, minWidth: 0 }} />
-            <button className="btn small" name="do" value="attach">Attach</button>
-            {x.status !== 'hidden' && <button className="btn small danger" name="do" value="hide">Hide</button>}</form>
+            <button className="btn small">Attach</button>
+            {x.status !== 'hidden' && <button className="btn small danger" formAction={newsAction.bind(null, 'hide')}>Hide</button>}</form>
         </div>))}
     </div>
   </>);

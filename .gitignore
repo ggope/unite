@@ -4,3 +4,7 @@ node_modules
 .env.local
 *.tsbuildinfo
 next-env.d.ts
+
+# end-to-end test harness
+e2e/.bin/
+e2e/.env.e2e

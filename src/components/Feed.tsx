@@ -66,7 +66,7 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
   function learn(topic: Topic, s: Signal, k = 1) {
     if (chronological) return;
     setWeights((w) => { const n = applySignal(w, topic, s, k); if (!viewer.loggedIn) { try { localStorage.setItem(LS, JSON.stringify(n)); } catch {} } return n; });
-    if (viewer.loggedIn) sb.rpc('record_signal', { p_topic: topic, p_delta: ({ complete: 1, watch: 1, replay: 1.4, care: 1.5, share: 2.5, follow: 2.5, sign: 4, skip: -0.6, less: -8 } as const)[s] * k });
+    if (viewer.loggedIn) sb.rpc('record_signal', { p_topic: topic, p_delta: ({ complete: 1, watch: 1, replay: 1.4, care: 1.5, share: 2.5, follow: 2.5, sign: 4, skip: -0.6, less: -8 } as const)[s] * k }).then(() => {}, () => {}); // a query only runs once awaited
   }
 
   // keep two items queued ahead, chosen live from the latest signals

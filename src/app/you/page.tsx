@@ -8,12 +8,13 @@ import { Friends } from '@/components/Friends';
 import { LegalLinks } from '@/components/LegalLinks';
 import { saveSettings, withdraw, revokeConsent, resetFeed, signOut } from './actions';
 import { DeleteAccount } from './DeleteAccount';
+import { SaveForm } from './SaveForm';
 import { Icon } from '@/components/Icon';
 
 export const dynamic = 'force-dynamic';
 
-export default async function You({ searchParams }: { searchParams: Promise<{ friend?: string; err?: string }> }) {
-  const { friend, err } = await searchParams;
+export default async function You({ searchParams }: { searchParams: Promise<{ friend?: string }> }) {
+  const { friend } = await searchParams;
   const [{ sb, user, viewer, settings, weights }, { t }] = await Promise.all([loadViewer(), getT()]);
   if (!user) return <div className="stack"><div className="empty"><h2>{t('you.title')}</h2><p>{t('you.signedOut')}</p><Link className="btn primary" href="/login?next=/you">{t('common.signIn')}</Link></div><InstallApp /><div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div><LegalLinks /></div>;
   const [{ data: profile }, { data: sigs }, { data: vids }, { data: code }, { data: fr }, { data: mine }] = await Promise.all([
@@ -37,9 +38,8 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
       {friend && <p className="note" style={{ margin: 0 }}>{t('invite.done')}</p>}
       <InstallApp />
       <div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div>
-      <form action={saveSettings} className="panel" id="profile">
+      <SaveForm action={saveSettings}>
         <span className="label">{t('you.profile')}</span><span className="hint">{user.email}</span>
-        {err === 'handle' && <p className="error" role="alert" style={{ margin: 0 }}>{t('you.handleTaken')}</p>}
         <div className="field"><label htmlFor="handle">{t('you.handle')}</label><input id="handle" name="handle" defaultValue={profile?.handle ?? ''} placeholder={t('you.handlePh')} /></div>
         <div className="field"><label htmlFor="display_name">{t('you.name')}</label><input id="display_name" name="display_name" maxLength={40} defaultValue={profile?.display_name ?? ''} /></div>
         <div className="field"><label htmlFor="bio">{t('you.bio')}</label><input id="bio" name="bio" maxLength={160} defaultValue={profile?.bio ?? ''} placeholder={t('you.bioPh')} /></div>
@@ -56,8 +56,7 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
         <label className="check"><input type="checkbox" name="autoplay" defaultChecked={on('autoplay')} /><span>{t('you.autoplay')}</span></label>
         <label className="check"><input type="checkbox" name="is_minor" defaultChecked={on('is_minor')} /><span>{t('you.minor')}</span></label>
         <div className="field"><label htmlFor="br">{t('you.breakReminder')}</label><select id="br" name="break_reminder_minutes" defaultValue={settings?.break_reminder_minutes ?? 20}>{[10, 20, 30, 60].map((m) => <option key={m} value={m}>{t('you.minutes', { n: m })}</option>)}</select></div>
-        <button className="btn primary">{t('common.save')}</button>
-      </form>
+      </SaveForm>
       <Friends code={(code as string) ?? null} friends={friends} requests={requests} />
       <div className="panel"><span className="label">{t('you.today')}</span><b>{t('you.left', { n: Math.max(0, DAILY_LIMIT - today), max: DAILY_LIMIT })}</b></div>
       <div className="panel"><span className="label">{t('you.learns')}</span>
