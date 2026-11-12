@@ -5,11 +5,11 @@ import { TOPIC_KEYS } from '@/lib/topics';
 
 const SETTINGS = ['one_tap', 'share_signatures_with_friends', 'is_minor', 'autoplay', 'chronological_feed'] as const;
 
-export type SaveResult = { ok: true; error?: undefined } | { ok?: false; error: 'handle' | 'handleFormat' | 'save' | 'signedOut' };
+export type SaveResult = { ok: true; error?: undefined } | { ok?: false; error: 'handle' | 'handleFormat' | 'save' | 'signedOut'; detail?: string };
 
 export async function saveSettings(form: FormData): Promise<SaveResult> {
   const { sb, user } = await currentUser(); if (!user) return { error: 'signedOut' };
-  await sb.rpc('ensure_profile');   // repairs accounts that never got their profile row
+  const fix = await sb.rpc('ensure_profile');   // repairs accounts that never got their profile row
   const patch: Record<string, unknown> = Object.fromEntries(SETTINGS.map((k) => [k, form.get(k) === 'on']));
   const br = Number(form.get('break_reminder_minutes')); if ([10, 20, 30, 60].includes(br)) patch.break_reminder_minutes = br;
   // "Kovács Anna" becomes "kovacs_anna": accents dropped, spaces become _.
@@ -23,7 +23,11 @@ export async function saveSettings(form: FormData): Promise<SaveResult> {
   ]);
   revalidatePath('/you');
   if (p1.error?.code === '23505') return { error: 'handle' };   // handle taken
-  if (p1.error || s1.error || !p1.data?.length || !s1.data?.length) { console.error('saveSettings', p1.error ?? s1.error ?? 'no row updated'); return { error: 'save' }; }
+  if (p1.error || s1.error || !p1.data?.length || !s1.data?.length) { console.error('saveSettings', p1.error ?? s1.error ?? 'no row updated'); 
+    // a short reason helps whoever reports the problem; it never holds personal data
+    const why = p1.error?.message ?? s1.error?.message ?? (fix.error ? `profile missing (run 0009_fixes.sql): ${fix.error.message}` : `no ${!p1.data?.length ? 'profile' : 'settings'} row`);
+    return { error: 'save', detail: why.slice(0, 160) };
+  }
   return { ok: true };
 }
 export async function withdraw(form: FormData) {
