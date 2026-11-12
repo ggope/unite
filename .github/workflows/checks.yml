@@ -1,0 +1,39 @@
+# Safety net: on every push and pull request, check the types, the database rules,
+# and click through the whole site in a real browser (e2e/run.sh). A red cross means something broke.
+name: Checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Types
+        run: npx tsc --noEmit
+      - name: Tools for the browser checks
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          npm i --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+          sudo systemctl start postgresql.service
+      - name: Database rules
+        run: sudo -u postgres bash supabase/tests/run.sh
+      - name: Click through the whole site
+        run: sudo -E env "PATH=$PATH" bash e2e/run.sh
+      - name: Logs if something failed
+        if: failure()
+        run: for f in /tmp/e2e-*.log; do echo "::group::$f"; tail -80 "$f"; echo "::endgroup::"; done
