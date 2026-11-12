@@ -584,6 +584,23 @@ await check('sign out', async () => {
   await go(bb, '/you'); expect(await bb.locator('a[href^="/login"]').count(), 'still signed in');
 });
 
+console.log('Kids side');
+await check('kids corner, classroom pack and worksheets open for guests', async () => {
+  for (const url of ['/kids', '/kids/teachers', '/kids/teachers/print']) { const r = await go(g, url); expect(r.status() === 200, `${url}: ${r.status()}`); await noCrash(g); }
+  await go(g, '/kids/teachers/print'); expect(await g.locator('.ws').count() === 2, 'expected two worksheets');
+});
+await check('moderator writes an easy-read version; it shows in the kids corner and on the petition', async () => {
+  await go(a, `/admin?tab=petitions&tr=${seedId}`);
+  const f = a.locator(`#easy-${seedId}`);
+  await f.locator('input[name=title_en]').fill('Let the fish live');
+  await f.locator('textarea[name=text_en]').fill('Big boats scrape the sea floor. We ask them to stop in safe zones.');
+  await f.getByRole('button', { name: 'Save easy-read' }).click(); await settle(a);
+  expect(one(`select easy->'en'->>'title' from petitions where id = '${seedId}'`) === 'Let the fish live', 'easy-read not saved');
+  await go(g, '/kids'); expect(await g.getByText('Let the fish live').count(), 'not in the kids corner');
+  expect(!(await g.getByRole('button', { name: /^Sign/ }).count()), 'kids corner shows a sign button');
+  await go(g, `/p/${seedId}`); expect(await g.locator('.easy-box').getByText('Let the fish live').count(), 'no easy-read box on the petition');
+});
+
 await check('admin takes the sample petitions down before launch', async () => {
   await go(a, '/admin?tab=launch'); await a.getByRole('button', { name: 'Take the sample petitions down' }).click(); await settle(a);
   expect(one(`select count(*) from petitions where organiser_name ilike '%(sample)%' and status <> 'removed'`) === '0', 'samples still live');

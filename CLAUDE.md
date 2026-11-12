@@ -44,7 +44,7 @@ Next.js 15 App Router, React 19, TypeScript, Supabase (Postgres, auth, storage),
 - Every new function: `revoke execute … from public, anon` unless anon truly needs it, then grant to the right role.
 - Add tests in `supabase/tests/*.sql` and list new migrations and test files in `supabase/tests/run.sh`.
 - Gug runs migrations by hand in the Supabase SQL editor. Copy each new migration to the shared project files `sql/` folder and add a line to the README "Updates after the first launch" list.
-- **Run so far by Gug: 0001 to 0013. Still to run: 0014, 0015, 0016, 0017** (Admin → Launch checklist shows the live state).
+- **Run so far by Gug: 0001 to 0013. Still to run: 0014, 0015, 0016, 0017, 0018** (Admin → Launch checklist shows the live state).
 - Front end must keep working (empty, not crashing) when a newer migration has not been run yet.
 
 ## Test before every push
@@ -67,13 +67,13 @@ Add an e2e check in `e2e/flows.mjs` for each new feature. Sign-in in e2e uses `l
 
 ## Still to do by Gug (before launch)
 
-Run SQL 0014 to 0017; add VAPID keys and Cloudflare Turnstile keys in Vercel; buy a domain and set `NEXT_PUBLIC_SITE_URL`; fill the legal placeholders; take down the sample petitions (one button in Admin → Launch checklist).
+Run SQL 0014 to 0018; add VAPID keys and Cloudflare Turnstile keys in Vercel; buy a domain and set `NEXT_PUBLIC_SITE_URL`; fill the legal placeholders; take down the sample petitions (one button in Admin → Launch checklist).
 
 ## Working in parallel
 
 Several Claude threads may work on the repo at once. Keep to your area, pull/rebase before pushing, and expect `dict.ts`, `globals.css` and `e2e/flows.mjs` to be touched by others (add to them, don't reorder). Areas in progress:
 - Petition life cycle (end dates, "days without an answer", appeals)
-- Kids side (Mylo, easy-read, classroom)
+- Kids side (Mylo, easy-read, classroom): `/kids`, `/kids/teachers`, `src/components/kids/`, `src/lib/easy.ts`, migration 0018. Kids never sign or sign up there.
 - Easier signing (email-only) and error alerts
 - Quality check (security, accessibility, speed)
 - More languages: wait until the others are merged, since it touches every text.

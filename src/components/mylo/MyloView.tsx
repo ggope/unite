@@ -101,6 +101,7 @@ export async function MyloView({ m, viewer, signed }: { m: MyloToday; viewer: Vi
       <section className="panel">
         <h2>{t('mylo.about')}</h2>
         <p className="muted" style={{ margin: 0 }}>{t('mylo.aboutText')}</p>
+        <Link className="btn small" href="/kids" style={{ alignSelf: 'flex-start' }}>{t('kids.nav')} →</Link>
       </section>
     </div>
   );

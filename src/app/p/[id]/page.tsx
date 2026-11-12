@@ -14,6 +14,8 @@ import { ShareButton } from '@/components/ShareButton';
 import { LinkBar } from '@/components/LinkBar';
 import { AnswerLink } from '@/components/AnswerLink';
 import { localize } from '@/lib/petitionText';
+import { easyOf } from '@/lib/easy';
+import { MyloArt } from '@/components/mylo/MyloArt';
 import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
@@ -39,6 +41,7 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
   const { data: raw } = await sb.from('petitions').select('*').eq('id', id).maybeSingle();
   if (!raw) notFound();
   const p = localize(raw, lang);
+  const easy = easyOf(raw, lang);   // the easy-read version for kids (0018)
   const [{ data: st }, { data: members }, { data: updates }, { data: videos }, friends, { data: me }, { data: news }] = await Promise.all([
     sb.from('petition_stats').select('*').eq('id', id).maybeSingle(),
     p.cluster_id ? sb.from('petitions').select('id, title, organiser_name, origin, petition_stats(signatures)').eq('cluster_id', p.cluster_id) : Promise.resolve({ data: [] as any[] }),
@@ -63,6 +66,17 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
       <span className="hint">{t(`topic.${p.topic as keyof typeof TOPICS}`)} · {t('p.startedBy', { name: p.organiser_name })} · {p.region}</span>
       <h1>{p.title}</h1>
       <p className="muted" style={{ margin: 0 }}>{t('p.to', { target: p.target })}</p>
+      {easy && (
+        <aside className="easy-box" lang={lang} aria-labelledby="easy-h">
+          <MyloArt mood="happy" size={56} id="easy" label="" />
+          <div className="stack" style={{ gap: 4 }}>
+            <span className="label" id="easy-h">{t('p.easy')}</span>
+            <b>{easy.title}</b>
+            <span>{easy.text}</span>
+            <Link className="hint" href="/kids">{t('p.easyKids')} →</Link>
+          </div>
+        </aside>
+      )}
       <div className="panel">
         <div><span className="bignum">{fmt(combined)}</span> <span className="muted">{Number(st?.united_count) > 1 ? t('p.acrossUnited') : t('p.signatures')}</span></div>
         <span className="prog" style={{ height: 14 }}><i style={{ width: `${Math.min(100, combined / p.goal * 100)}%` }} /></span>

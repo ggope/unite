@@ -11,7 +11,7 @@ import type { Mood } from './art';
 const MyloArt = dynamic(() => import('./MyloArt').then((m) => m.MyloArt), { ssr: false });
 
 const DAY_KEY = 'mylo-greeted';
-const SKIP = ['/mylo', '/admin', '/moderate', '/login', '/auth', '/reset'];
+const SKIP = ['/mylo', '/kids', '/admin', '/moderate', '/login', '/auth', '/reset'];
 
 // Fire this after someone signs: Mylo pops up in the corner and cheers.
 export function myloCheer(count?: number) {

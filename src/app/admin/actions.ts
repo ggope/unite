@@ -3,7 +3,10 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
-import { isLang } from '@/lib/i18n/dict';
+import { isLang, LANGS } from '@/lib/i18n/dict';
+import { EASY_TEXT, EASY_TITLE } from '@/lib/easy';
+
+const LANG_KEYS = Object.keys(LANGS) as (keyof typeof LANGS)[];
 
 async function mod() {
   const { sb, user } = await currentUser();
@@ -76,6 +79,18 @@ export async function setTranslation(f: FormData) {
   const tr = { ...((p?.tr as Record<string, unknown>) ?? {}) };
   if (Object.keys(t).length) tr[to] = t; else delete tr[to];
   await done((await sb.from('petitions').update({ tr }).eq('id', s(f, 'id'))).error);
+}
+// The easy-read version for kids (0018), all languages in one form. Saving it empty takes the petition out of the kids corner.
+export async function setEasy(f: FormData) {
+  const sb = await mod();
+  const easy: Record<string, { title: string; text: string }> = {};
+  for (const l of LANG_KEYS) {
+    const title = s(f, `title_${l}`).slice(0, EASY_TITLE), text = s(f, `text_${l}`).slice(0, EASY_TEXT);
+    if (title && text) easy[l] = { title, text };
+    else if (title || text) return done({ message: `${l.toUpperCase()}: write both the kids' title and the text, or leave both empty.` });
+  }
+  revalidatePath('/kids');
+  await done((await sb.from('petitions').update({ easy }).eq('id', s(f, 'id'))).error);
 }
 export async function setOriginalLang(f: FormData) {
   const sb = await mod();
