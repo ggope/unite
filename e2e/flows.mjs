@@ -338,7 +338,9 @@ await check('admin: official link, organiser link, unite and separate', async ()
 await check('admin: declining without a reason is refused', async () => {
   const v3 = one(`insert into videos (petition_id, uploader_id, storage_path, caption, trim_start, trim_end) values ('${pid}', '${B.id}', '${B.id}/y.webm', 'Clip without a reason', 0, 5) returning id`);
   await go(a, '/admin?tab=queue');
-  await a.locator('.panel', { hasText: 'Clip without a reason' }).first().getByRole('button', { name: 'Reject' }).click(); await a.waitForTimeout(1200);
+  await a.locator('.panel', { hasText: 'Clip without a reason' }).first().getByRole('button', { name: 'Reject' }).click();
+  // wait for the answer itself, not a fixed time: on a slow CI machine the action and redirect can take longer than a second
+  await a.waitForSelector('text=Write the reason first', { timeout: 10000 }).catch(() => {});
   expect(one(`select status from videos where id = '${v3}'`) === 'pending', 'declined without a reason');
   expect(await a.locator('text=Write the reason first').count(), 'no message asking for a reason');
   sql(`delete from videos where id = '${v3}'`);
