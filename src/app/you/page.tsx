@@ -15,8 +15,8 @@ import { localize } from '@/lib/petitionText';
 
 export const dynamic = 'force-dynamic';
 
-export default async function You({ searchParams }: { searchParams: Promise<{ friend?: string }> }) {
-  const { friend } = await searchParams;
+export default async function You({ searchParams }: { searchParams: Promise<{ friend?: string; appealed?: string }> }) {
+  const { friend, appealed } = await searchParams;
   const [{ sb, user, viewer, settings, weights }, { lang, t }] = await Promise.all([loadViewer(), getT()]);
   if (!user) return <div className="stack"><div className="empty"><h1>{t('you.title')}</h1><p>{t('you.signedOut')}</p><Link className="btn primary" href="/login?next=/you">{t('common.signIn')}</Link></div><InstallApp /><div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div><LegalLinks /></div>;
   const [{ data: profile }, { data: sigs }, { data: vids }, { data: code }, { data: fr }, { data: mine }] = await Promise.all([
@@ -28,7 +28,10 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
     sb.from('petitions').select('id, title, status, moderation_note, created_at').eq('created_by', user.id).order('created_at', { ascending: false }),
   ]);
   const { data: impact } = await sb.rpc('my_impact');
-  const { data: notices } = await sb.from('notices').select('id, kind, body').order('created_at', { ascending: false });
+  // notices name their petition from 0018 on; before that, the plain list still works
+  let { data: notices, error: nErr }: { data: any[] | null; error: any } = await sb.from('notices').select('id, kind, body, petition_id, petitions(title)').order('created_at', { ascending: false });
+  if (nErr) ({ data: notices } = await sb.from('notices').select('id, kind, body').order('created_at', { ascending: false }));
+  const { data: appeals } = await sb.from('appeals').select('id, kind, status, decision, reply, created_at, decided_at, petition_id').order('created_at', { ascending: false }).limit(20);
   const { data: reqs } = await sb.from('friend_requests').select('from_id, profiles!friend_requests_from_id_fkey(handle, display_name)').eq('to_id', user.id);
   const requests = (reqs ?? []).map((r: any) => ({ id: r.from_id, handle: r.profiles?.handle ?? null, display_name: r.profiles?.display_name ?? null }));
   const interests: string[] = profile?.interests ?? [];
@@ -40,13 +43,21 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
     <div className="stack">
       <div className="row between"><h1>{t('you.title')}</h1><div className="row">{profile?.handle && <Link className="btn small" href={`/u/${profile.handle}`}>{t('pr.view')}</Link>}{profile?.is_moderator && <Link className="btn small" href="/admin">Admin</Link>}</div></div>
       {friend && <p className="note" style={{ margin: 0 }}>{t('invite.done')}</p>}
-      {(notices ?? []).map((n: any) => (
-        <form key={n.id} action={dismissNotice} className="panel row between" role="status">
-          <input type="hidden" name="id" value={n.id} />
-          <span style={{ flex: 1, minWidth: 0 }}>{t(n.kind === 'reason_hidden' ? 'notice.reasonHidden' : 'notice.cleared', { reason: (n.body ?? '').replace(/[.!?]+$/, '') })}</span>
-          <button className="btn small">{t('notice.dismiss')}</button>
-        </form>
-      ))}
+      {appealed && <p className="ok" role="status" style={{ margin: 0 }}>{t('appeal.sent')}</p>}
+      {(notices ?? []).map((n: any) => {
+        const reason = (n.body ?? '').replace(/[.!?]+$/, ''), title = n.petitions?.title ?? '';
+        const text = n.kind === 'reason_hidden' ? t('notice.reasonHidden', { reason }) : n.kind === 'deliver_nudge' ? t('notice.deliver', { title })
+          : n.kind === 'appeal_upheld' ? t('notice.appealUpheld', { reason }) : n.kind === 'appeal_reversed' ? t('notice.appealReversed', { reason }) : t('notice.cleared', { reason });
+        const appealKind = n.kind === 'reason_hidden' ? 'reason' : n.kind === 'profile_cleared' ? 'profile' : null;
+        return (
+          <form key={n.id} action={dismissNotice} className="panel row between" role="status">
+            <input type="hidden" name="id" value={n.id} />
+            <span style={{ flex: 1, minWidth: 0 }}>{text}</span>
+            {n.kind === 'deliver_nudge' && n.petition_id && <Link className="btn small primary" href={`/p/${n.petition_id}/report`}>{t('p.report')}</Link>}
+            {appealKind && <Link className="btn small ghost" href={`/appeal?kind=${appealKind}&id=${n.id}`}>{t('appeal.ask')}</Link>}
+            <button className="btn small">{t('notice.dismiss')}</button>
+          </form>);
+      })}
       <InstallApp />
       <div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div>
       <div className="panel"><span className="label">{t('impact.title')}</span>
@@ -90,12 +101,17 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
         {viewer.hasConsent && <form action={revokeConsent}><button className="btn small danger">{t('you.revoke')}</button></form>}
       </div>
       <div className="panel"><span className="label">{t('you.petitions')}</span>
-        {mine?.length ? mine.map((p: any) => <div key={p.id} className="row between"><Link href={`/p/${p.id}`} style={{ flex: 1, minWidth: 0 }}>{p.title}</Link>{p.status !== 'removed' && <Link className="btn small" href={`/p/${p.id}/dashboard`}>{t('dash.open')}</Link>}<span className="hint">{t(`status.${p.status as 'live'}`)}{p.status === 'removed' && p.moderation_note ? ` · ${t('mod.reason', { r: p.moderation_note })}` : ''}</span></div>)
+        {mine?.length ? mine.map((p: any) => <div key={p.id} className="row between"><Link href={`/p/${p.id}`} style={{ flex: 1, minWidth: 0 }}>{p.title}</Link>{p.status !== 'removed' && <Link className="btn small" href={`/p/${p.id}/dashboard`}>{t('dash.open')}</Link>}<span className="hint">{t(`status.${p.status as 'live'}`)}{p.status === 'removed' && p.moderation_note ? ` · ${t('mod.reason', { r: p.moderation_note })}` : ''}</span>{p.status === 'removed' && <Link className="btn small ghost" href={`/appeal?kind=petition&id=${p.id}`}>{t('appeal.ask')}</Link>}</div>)
           : <p className="hint" style={{ margin: 0 }}>{t('you.noPetitions')} <Link href="/start">{t('common.startPetition')}</Link></p>}
       </div>
       <div className="panel"><span className="label">{t('you.vids')}</span>
-        {vids?.length ? vids.map((v: any) => <div key={v.id} className="row between"><span>{v.caption}</span><span className="hint">{v.status === 'pending' ? t('you.inReview') : v.status === 'approved' ? t('you.live') : t('you.notApproved')}{v.status === 'rejected' && v.moderation_note ? ` · ${t('mod.reason', { r: v.moderation_note })}` : ''}</span></div>) : <p className="hint">{t('you.noVids')} <Link href="/post">{t('you.postOne')}</Link>.</p>}
+        {vids?.length ? vids.map((v: any) => <div key={v.id} className="row between"><span>{v.caption}</span><span className="hint">{v.status === 'pending' ? t('you.inReview') : v.status === 'approved' ? t('you.live') : t('you.notApproved')}{v.status === 'rejected' && v.moderation_note ? ` · ${t('mod.reason', { r: v.moderation_note })}` : ''}</span>{v.status === 'rejected' && <Link className="btn small ghost" href={`/appeal?kind=video&id=${v.id}`}>{t('appeal.ask')}</Link>}</div>) : <p className="hint">{t('you.noVids')} <Link href="/post">{t('you.postOne')}</Link>.</p>}
       </div>
+      {!!appeals?.length && <div className="panel" id="appeals"><span className="label">{t('appeal.mine')}</span>
+        {appeals.map((x: any) => <div key={x.id} className="stack" style={{ gap: 2 }}>
+          <span className="row between"><b>{t(`appeal.k.${x.kind as 'petition'}`)}{x.decision ? ` · ${t('mod.reason', { r: x.decision })}` : ''}</b><span className={`hint appeal-${x.status}`}>{t(`appeal.s.${x.status as 'open'}`)}</span></span>
+          {x.reply && <span className="hint">{t('appeal.reply', { r: x.reply })}</span>}</div>)}
+        <span className="hint">{t('appeal.rights')}</span></div>}
       <div className="panel"><span className="label">{t('you.data')}</span>
         <p className="hint" style={{ margin: 0 }}>{t('you.dataText')}</p>
         <a className="btn small" href="/api/account/export" download><Icon name="download" />{t('you.export')}</a>

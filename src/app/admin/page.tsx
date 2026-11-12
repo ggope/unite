@@ -2,11 +2,11 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN, LANGS, type Lang } from '@/lib/i18n/dict';
-import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, removeSamples } from './actions';
+import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, removeSamples, decideAppeal, runLifecycle } from './actions';
 import { legalPlaceholders } from '@/lib/legal';
 
 export const dynamic = 'force-dynamic';
-const TABS = [['overview', 'Overview'], ['launch', 'Launch checklist'], ['queue', 'Review queue'], ['reports', 'Reports'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People']] as const;
+const TABS = [['overview', 'Overview'], ['launch', 'Launch checklist'], ['queue', 'Review queue'], ['reports', 'Reports'], ['appeals', 'Appeals'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People']] as const;
 type Tab = (typeof TABS)[number][0];
 const when = (d: string) => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const n = (x: number) => fmtN(x, 'en');
@@ -24,7 +24,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
   const tab = (TABS.some(([k]) => k === raw) ? raw : 'overview') as Tab;
   const { data: stats } = await sb.rpc('admin_stats');
   const st = (stats ?? {}) as Record<string, number>;
-  const badge: Partial<Record<Tab, number>> = { queue: (st.petitions_pending ?? 0) + (st.videos_pending ?? 0), reports: st.reports_open ?? 0 };
+  const { count: appealsOpen } = await sb.from('appeals').select('id', { count: 'exact', head: true }).eq('status', 'open');   // null before 0018
+  const badge: Partial<Record<Tab, number>> = { queue: (st.petitions_pending ?? 0) + (st.videos_pending ?? 0), reports: st.reports_open ?? 0, appeals: appealsOpen ?? 0 };
 
   return (
     <div className="stack admin">
@@ -37,6 +38,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       {tab === 'launch' && <Launch sb={sb} />}
       {tab === 'queue' && <Queue sb={sb} />}
       {tab === 'reports' && <Reports sb={sb} />}
+      {tab === 'appeals' && <Appeals sb={sb} me={user.id} />}
       {tab === 'petitions' && <Petitions sb={sb} q={q} open={open} />}
       {tab === 'news' && <News sb={sb} />}
       {tab === 'people' && <People sb={sb} q={q} me={user.id} />}
@@ -89,8 +91,9 @@ const MIGRATIONS: [string, string, string][] = [
   ['0002', 'invites', 'user_id'], ['0003', 'news_items', 'id'], ['0004', 'reports', 'resolved_at'], ['0005', 'petitions', 'official_url'],
   ['0006', 'profiles', 'bio'], ['0007', 'petitions', 'link_url'], ['0012', 'petitions', 'tr'], ['0014', 'notices', 'id'],
   ['0015', 'share_codes', 'code'], ['0016', 'answer_links', 'petition_id'], ['0017', 'signatures', 'reason_key'],
+  ['0018', 'appeals', 'id'],
 ];
-const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins' };
+const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle' };
 const missing = (e: any) => !!e && /does not exist|PGRST20[45]|42703|42P01|schema cache/i.test(`${e.code} ${e.message}`);
 
 async function Launch({ sb }: { sb: any }) {
@@ -158,6 +161,42 @@ async function Reports({ sb }: { sb: any }) {
   </>);
 }
 
+// Appeals: people asking for a second look at a moderation decision (EU Digital Services Act, article 20).
+async function Appeals({ sb, me }: { sb: any; me: string }) {
+  const [{ data: open, error }, { data: recent }] = await Promise.all([
+    sb.from('appeals').select('*, petitions(title, status), videos(caption, storage_path)').eq('status', 'open').order('created_at').limit(50),
+    sb.from('appeals').select('id, kind, status, reply, decided_at, petitions(title)').neq('status', 'open').order('decided_at', { ascending: false }).limit(15),
+  ]);
+  if (error) return <p className="hint">Appeals arrive here once the database update 0018_lifecycle.sql has run (see Launch checklist).</p>;
+  const urls = new Map<string, string>();
+  for (const a of (open ?? []).filter((x: any) => x.videos?.storage_path)) {
+    const { data } = await sb.storage.from('videos').createSignedUrl(a.videos.storage_path, 3600); if (data?.signedUrl) urls.set(a.id, data.signedUrl);
+  }
+  const said = new Map<string, any>(await Promise.all((open ?? []).filter((a: any) => a.reason_key)
+    .map(async (a: any) => [a.reason_key, (await sb.rpc('reported_reason', { p_key: a.reason_key })).data] as const)));
+  const label: Record<string, string> = { petition: 'Petition removed', video: 'Video not approved', reason: 'Reason for signing hidden', profile: 'Name and bio cleared' };
+  const wait = (d: string) => Math.floor((Date.now() - Date.parse(d)) / 864e5);
+  return (<>
+    <p className="hint" style={{ margin: 0 }}>Look at the decision again with fresh eyes. Reverse puts the content back; Keep leaves it down. Either way the author sees your reason, so write it for them. Answer within a week where you can.</p>
+    {open?.length ? open.map((a: any) => (
+      <div className="panel" key={a.id}>
+        <span className="hint">{label[a.kind]} · appealed {when(a.created_at)}{wait(a.created_at) >= 7 ? ` · waiting ${wait(a.created_at)} days` : ''}</span>
+        {a.kind === 'petition' && a.petition_id && <Link href={`/p/${a.petition_id}`}><b>{a.petitions?.title ?? 'Petition'}</b></Link>}
+        {a.kind === 'video' && <><b>{a.videos?.caption ?? 'Video'}</b>{urls.get(a.id) && <video src={urls.get(a.id)} controls muted playsInline style={{ width: '100%', maxHeight: 360, background: '#000', borderRadius: 10 }} />}</>}
+        {a.kind === 'reason' && <b>“{said.get(a.reason_key)?.why ?? 'Reason no longer exists'}”</b>}
+        {a.decision && <span>First decision: “{a.decision}”</span>}
+        <p style={{ margin: 0, whiteSpace: 'pre-line' }}><b>Their appeal:</b> {a.body}</p>
+        {a.decided_first === me && <p className="note" style={{ margin: 0 }}>You made the first decision. If another moderator can look at this, let them, so the second look is a fresh one.</p>}
+        <form action={noop} className="row"><input type="hidden" name="id" value={a.id} />
+          <input name="note" required placeholder="Your reason (the author sees this)" style={{ flex: 1, minWidth: 0 }} />
+          <button className="btn small" formAction={decideAppeal.bind(null, false)}>Keep decision</button>
+          <button className="btn small primary" formAction={decideAppeal.bind(null, true)}>{a.kind === 'profile' ? 'Agree (they can rewrite it)' : 'Reverse and restore'}</button></form>
+      </div>)) : <p className="hint">No open appeals.</p>}
+    {!!recent?.length && <div className="panel" style={{ gap: 6 }}><b>Recently decided</b>
+      {recent.map((a: any) => <span key={a.id} className="hint">{a.decided_at ? when(a.decided_at) : ''} · {label[a.kind]}{a.petitions?.title ? ` · ${a.petitions.title}` : ''} · <b>{a.status === 'reversed' ? 'reversed' : 'kept'}</b>{a.reply ? ` · “${a.reply}”` : ''}</span>)}</div>}
+  </>);
+}
+
 // The petition in other languages. The original stays as written; readers see the version for their language.
 function Translation({ p, open, q }: { p: any; open: boolean; q: string }) {
   const orig = (p.lang ?? 'en') as Lang;
@@ -199,10 +238,11 @@ async function Petitions({ sb, q, open }: { sb: any; q: string; open: string }) 
   const [{ data: ps }, { data: all }] = await Promise.all([query, sb.from('petitions').select('id, title').eq('status', 'live').order('title').limit(500)]);
   return (<>
     <LiveList items={all} />
+    <form action={runLifecycle} className="row"><button className="btn small">Close ended petitions now</button><span className="hint">Also runs every night: closes petitions after their end date, reminds organisers to deliver, and tells followers when a target has been silent 30 or 90 days.</span></form>
     <form className="field" action="/admin"><input type="hidden" name="tab" value="petitions" /><input name="q" type="search" defaultValue={q} placeholder="Search petitions" aria-label="Search petitions" /></form>
     {ps?.map((p: any) => (
       <div className="panel" key={p.id} style={{ gap: 8 }}>
-        <div className="row between"><Link href={`/p/${p.id}`} style={{ flex: 1, minWidth: 0 }}><b>{p.title}</b></Link><span className="hint">{p.status} · {n(Number((Array.isArray(p.petition_stats) ? p.petition_stats[0] : p.petition_stats)?.combined ?? 0))}{p.cluster_id ? ' · united' : ''}</span></div>
+        <div className="row between"><Link href={`/p/${p.id}`} style={{ flex: 1, minWidth: 0 }}><b>{p.title}</b></Link><span className="hint">{p.status}{p.ends_on ? ` · ends ${p.ends_on}` : ''} · {n(Number((Array.isArray(p.petition_stats) ? p.petition_stats[0] : p.petition_stats)?.combined ?? 0))}{p.cluster_id ? ' · united' : ''}</span></div>
         <form action={noop} className="row"><input type="hidden" name="id" value={p.id} />
           <input name="note" placeholder="Reason if removing" style={{ flex: 1, minWidth: 0 }} />
           {p.status !== 'live' && <button className="btn small" formAction={petitionStatus.bind(null, 'live')}>Make live</button>}

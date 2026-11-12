@@ -21,7 +21,7 @@ export async function GET() {
     q(sb.from('topic_weights').select('topic, weight')),
   ]);
   // People features (0006_social.sql): your messages, requests and blocks.
-  const [messages, friend_requests, blocks, reports_sent, invite, notices, devices] = await Promise.all([
+  const [messages, friend_requests, blocks, reports_sent, invite, notices, devices, appeals] = await Promise.all([
     q(sb.from('messages').select('id, sender_id, recipient_id, body, created_at, read_at').order('id')),
     q(sb.from('friend_requests').select('from_id, to_id, created_at')),
     q(sb.from('blocks').select('blocked_id, created_at')),
@@ -29,8 +29,9 @@ export async function GET() {
     q(sb.from('invites').select('code, created_at').eq('user_id', user.id).maybeSingle()),
     q(sb.from('notices').select('kind, body, created_at').eq('user_id', user.id)),
     q(sb.from('push_subscriptions').select('endpoint, lang, created_at').eq('user_id', user.id)),
+    q(sb.from('appeals').select('kind, petition_id, video_id, decision, body, status, reply, created_at, decided_at').eq('user_id', user.id)),   // 0018
   ]);
-  const body = { exported_at: new Date().toISOString(), account: { id: user.id, email: user.email }, profile, settings, consents, signatures, follows, friends, petitions, videos, updates_posted: updates, feed_learning: weights, messages, friend_requests, blocks, reports_sent, invite, notices, notification_devices: devices,
+  const body = { exported_at: new Date().toISOString(), account: { id: user.id, email: user.email }, profile, settings, consents, signatures, follows, friends, petitions, videos, updates_posted: updates, feed_learning: weights, messages, friend_requests, blocks, reports_sent, invite, notices, appeals, notification_devices: devices,
     note: 'Video files are stored privately; they are deleted with your account. Write to us if you want copies of the files.' };
   return new NextResponse(JSON.stringify(body, null, 2), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': `attachment; filename="unier-my-data-${new Date().toISOString().slice(0, 10)}.json"`, 'Cache-Control': 'no-store' } });
 }

@@ -15,6 +15,7 @@ import { LinkBar } from '@/components/LinkBar';
 import { AnswerLink } from '@/components/AnswerLink';
 import { localize } from '@/lib/petitionText';
 import { headers } from 'next/headers';
+import { daysLeft, isEnded, silence, targetAnchor } from '@/lib/lifecycle';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,7 +52,12 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
   const { data: reasons } = await sb.rpc('public_reasons', { p_petition: id, p_limit: 8 });   // empty until 0016 has run; the report flag needs 0017
   const combined = Number(st?.combined ?? 0);
   const isFounder = user && p.created_by === user.id;
-  const canUpdate = !!user && p.status === 'live' && (isFounder || !!me?.is_moderator);
+  // after the end date signing stops, but the organiser keeps posting what happened next
+  const ended = isEnded(p); const open = p.status === 'live' && !ended;
+  const canUpdate = !!user && (p.status === 'live' || p.status === 'closed') && (isFounder || !!me?.is_moderator);
+  const left = open ? daysLeft(p.ends_on) : null;
+  const sil = silence(updates);
+  const date = (d: string) => new Date(d).toLocaleDateString(locale(lang), { year: 'numeric', month: 'long', day: 'numeric' });
   const stat = (m: any) => (Array.isArray(m.petition_stats) ? m.petition_stats[0] : m.petition_stats)?.signatures ?? 0;
 
   const h = await headers(); const origin = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('x-forwarded-host') ?? h.get('host')}`;
@@ -59,26 +65,34 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
     <div className="stack">
       <Link href="/petitions" className="hint">{t('p.back')}</Link>
       {p.status === 'pending' && <p className="note">{t('p.pending')}</p>}
-      {p.status === 'removed' && <p className="note">{t('p.removed')}{p.moderation_note ? ` ${t('mod.reason', { r: p.moderation_note })}` : ''}</p>}
+      {p.status === 'removed' && <p className="note">{t('p.removed')}{p.moderation_note ? ` ${t('mod.reason', { r: p.moderation_note })}` : ''}{isFounder && <> <Link href={`/appeal?kind=petition&id=${p.id}`}>{t('appeal.ask')}</Link></>}</p>}
       <span className="hint">{t(`topic.${p.topic as keyof typeof TOPICS}`)} · {t('p.startedBy', { name: p.organiser_name })} · {p.region}</span>
       <h1>{p.title}</h1>
       <p className="muted" style={{ margin: 0 }}>{t('p.to', { target: p.target })}</p>
       <div className="panel">
         <div><span className="bignum">{fmt(combined)}</span> <span className="muted">{Number(st?.united_count) > 1 ? t('p.acrossUnited') : t('p.signatures')}</span></div>
         <span className="prog" style={{ height: 14 }}><i style={{ width: `${Math.min(100, combined / p.goal * 100)}%` }} /></span>
-        <span className="hint">{t('p.goal', { n: fmt(p.goal) })} · {t('p.lastHour', { n: fmt(Number(st?.last_hour ?? 0)) })}{p.ends_on ? ` · ${t('p.ends', { d: new Date(p.ends_on).toLocaleDateString(locale(lang)) })}` : ''}</span>
+        <span className="hint">{t('p.goal', { n: fmt(p.goal) })} · {t('p.lastHour', { n: fmt(Number(st?.last_hour ?? 0)) })}{left != null ? ` · ${left === 0 ? t('life.lastDay') : left === 1 ? t('life.tomorrow', { d: date(p.ends_on) }) : t('life.daysLeft', { n: left, d: date(p.ends_on) })}` : ''}</span>
         {!!friends.data?.length && <span className="hint">{(() => { const names = friends.data.map((f: any) => f.display_name || '@' + f.handle).slice(0, 3).join(', '); return friends.data.length > 3 ? t('p.friendsMore', { names, n: friends.data.length - 3 }) : t('p.friendsSigned', { names }); })()}</span>}
         <div className="row">
-          {p.status === 'live' && <SignButton petitionId={p.id} title={p.title} signed={signed.has(p.id)} viewer={viewer} />}
+          {open && <SignButton petitionId={p.id} title={p.title} signed={signed.has(p.id)} viewer={viewer} />}
           <FollowButton petitionId={p.id} following={followed.has(p.id)} loggedIn={viewer.loggedIn} />
           <ShareButton path={`/p/${p.id}`} title={p.title} />
           <a className="btn ghost small" href={`/api/card/${p.id}`} target="_blank" rel="noopener">{t('sign.shareCard')}</a>
           {(p.status === 'live' || p.status === 'closed') && <Link className="btn ghost small" href={`/p/${p.id}/report`}>{t('p.report')}</Link>}
-          {!isFounder && p.status === 'live' && <ReportButton petitionId={p.id} loggedIn={viewer.loggedIn} />}
-          {(isFounder || signed.has(p.id)) && p.status === 'live' && <Link className="btn ghost small" href={`/post?petition=${p.id}`}>{t('common.postVideo')}</Link>}
+          {!isFounder && (p.status === 'live' || p.status === 'closed') && <ReportButton petitionId={p.id} loggedIn={viewer.loggedIn} />}
+          {(isFounder || signed.has(p.id)) && open && <Link className="btn ghost small" href={`/post?petition=${p.id}`}>{t('common.postVideo')}</Link>}
           {(isFounder || !!me?.is_moderator) && <Link className="btn small" href={`/p/${p.id}/dashboard`}>{t('dash.open')}</Link>}
         </div>
       </div>
+      {ended && <section className="panel life-closed" role="status"><b>{t('life.closed', { d: date(p.closed_at ?? p.ends_on ?? p.created_at), n: fmt(combined) })}</b>
+        {!sil.delivered && <span className="hint">{isFounder ? t('life.deliverYou', { target: p.target }) : t('life.deliverNext', { target: p.target })}</span>}
+        {isFounder && !sil.delivered && <Link className="btn primary small" href={`/p/${p.id}/report`}>{t('p.report')}</Link>}</section>}
+      {sil.silentDays != null && <section className="panel silence">
+        <div className="silence-n"><span className="bignum num">{fmt(sil.silentDays)}</span><b>{t('sil.label', { target: p.target })}</b></div>
+        <span className="hint">{t('sil.since', { d: date(sil.delivered!), target: p.target })}</span>
+        <Link href={`/targets#${targetAnchor(raw.target)}`}>{t('sil.board')} →</Link></section>}
+      {sil.answeredAfter != null && <p className="hint" style={{ margin: 0 }}>{sil.answeredAfter === 0 ? t('sil.answeredSameDay', { target: p.target }) : sil.answeredAfter === 1 ? t('sil.answeredNextDay', { target: p.target }) : t('sil.answeredAfter', { n: sil.answeredAfter, target: p.target })}</p>}
       {p.link_url && <LinkBar url={p.link_url} cta={p.link_cta} />}
       {(p.status === 'live' || p.status === 'closed') && (
         <details className="panel embed"><summary>{t('embed.title')}</summary>

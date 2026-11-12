@@ -6,6 +6,7 @@ import { useT } from '@/lib/i18n/client';
 import { fmtN } from '@/lib/i18n/langs';
 import { CTAS } from '@/components/LinkBar';
 import { Similar } from './Similar';
+import { addDays, unierToday } from '@/lib/lifecycle';
 
 type Draft = { title: string; target: string; ask: string; why: string; source: string; ends: string };
 // Words that name nobody who can actually decide.
@@ -56,7 +57,7 @@ export function StartForm({ then, source, topic }: { then: 'video' | 'page'; sou
       <div className="field"><label htmlFor="topic">{t('start.topic')}</label><select id="topic" name="topic" defaultValue={topic && (TOPIC_KEYS as string[]).includes(topic) ? topic : undefined}>{TOPIC_KEYS.map((k) => <option key={k} value={k}>{t(`topic.${k}`)}</option>)}</select></div>
       <div className="field"><label htmlFor="goal">{t('start.goal')}</label><select id="goal" name="goal" defaultValue="10000">{GOALS.map((g) => <option key={g} value={g}>{fmtN(g, lang)}</option>)}</select></div>
       <div className="field"><label htmlFor="organiser_name">{t('start.organiser')}</label><input id="organiser_name" name="organiser_name" required placeholder={t('start.organiserPh')} /></div>
-      <div className="field"><label htmlFor="ends_on">{t('start.ends')}</label><input id="ends_on" name="ends_on" type="date" /></div>
+      <div className="field"><label htmlFor="ends_on">{t('start.ends')}</label><input id="ends_on" name="ends_on" type="date" min={addDays(unierToday(), 1)} max={addDays(unierToday(), 366)} aria-describedby="ends_hint" /><span className="hint" id="ends_hint">{t('start.endsHint')}</span></div>
       <Checklist d={d} />
       <label className="check"><input type="checkbox" name="facts" required /><span>{t('start.facts')}</span></label>
       {state.error && <p className="error">{state.error}</p>}
