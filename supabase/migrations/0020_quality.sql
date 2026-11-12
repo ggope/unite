@@ -1,6 +1,7 @@
 -- 0020: quality check (security, speed). Safe to run more than once.
 --  1. Petition totals no longer count every signature on the site each time a page asks for one number.
 --     A small counter per petition is kept up to date as people sign or withdraw. Same numbers, same columns.
+--     Works before or after 0021 (signing with only an email): either way, email signatures are counted.
 --  2. Missing indexes for the pages added lately (updates, wins, followers, videos, "popular in your country").
 --  3. Updates of a petition that is still waiting for review, or was removed, are no longer readable by anyone
 --     through the API. The organiser and moderators still see them.
@@ -27,16 +28,28 @@ begin
 end $$;
 revoke execute on function public.count_signature() from public, anon, authenticated;
 
+-- People who signed with only an email (0021, if it has run already) count too; 0021 keeps them counted after that.
+create or replace function public.email_signed(p_petition uuid, p_since timestamptz default null) returns bigint
+language plpgsql stable security definer set search_path = public as $$
+declare n bigint;
+begin
+  if to_regclass('public.email_signatures') is null then return 0; end if;
+  execute 'select count(*) from public.email_signatures where petition_id = $1 and confirmed_at is not null and ($2 is null or confirmed_at > $2)'
+    into n using p_petition, p_since;
+  return n;
+end $$;
+revoke execute on function public.email_signed(uuid, timestamptz) from public, anon, authenticated;
+
 -- Nobody can sign while the counter is filled, so it starts exactly right.
 do $$ begin
   lock table public.signatures in share row exclusive mode;
+  if to_regclass('public.email_signatures') is not null then execute 'lock table public.email_signatures in share row exclusive mode'; end if;
   drop trigger if exists count_signature on public.signatures;
   create trigger count_signature after insert or delete on public.signatures for each row execute function public.count_signature();
   insert into public.petition_counts (petition_id, n)
-  select petition_id, count(*) from public.signatures group by 1
+  select p.id, (select count(*) from public.signatures s where s.petition_id = p.id) + public.email_signed(p.id)
+  from public.petitions p
   on conflict (petition_id) do update set n = excluded.n;
-  update public.petition_counts c set n = 0
-  where n <> 0 and not exists (select 1 from public.signatures s where s.petition_id = c.petition_id);
 end $$;
 
 -- Same columns and types as before, but asking for one petition now reads only that petition (and its united group).
@@ -44,7 +57,8 @@ create or replace view public.petition_stats as
 select p.id,
        p.cluster_id,
        p.imported_count + coalesce(c.n, 0) as signatures,
-       (select count(*) from public.signatures s where s.petition_id = p.id and s.created_at > now() - interval '1 hour') as last_hour,
+       (select count(*) from public.signatures s where s.petition_id = p.id and s.created_at > now() - interval '1 hour')
+         + public.email_signed(p.id, now() - interval '1 hour') as last_hour,
        case when p.cluster_id is null then (p.imported_count + coalesce(c.n, 0))::numeric
             else (select sum(q.imported_count + coalesce(qc.n, 0)) from public.petitions q
                   left join public.petition_counts qc on qc.petition_id = q.id
