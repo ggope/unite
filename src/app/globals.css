@@ -228,3 +228,14 @@ main{min-width:0;width:100%;max-width:680px;margin:0 auto;padding:16px max(16px,
 .composer{position:sticky;bottom:calc(var(--tabbar-h,64px) + 8px);display:flex;gap:8px;background:var(--bg);padding:8px 0}
 .composer textarea{flex:1;min-width:0;resize:none;border:2px solid var(--edge);border-radius:var(--r);padding:10px 12px;background:var(--surface);font:inherit;max-height:140px}
 @media (min-width:900px){.composer{bottom:8px}}
+/* organiser link bar and sponsored posts */
+.linkbar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#111;color:#F2EEE6;border:2px solid #111;padding:10px 14px;text-decoration:none;font-size:14px}
+.txt a.linkbar{color:#F2EEE6}
+.linkbar:hover,.txt a.linkbar:hover{color:#F2EEE6;background:#2A2722}
+.linkbar b{font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-right:8px}
+.linkbar small{font-size:12px;opacity:.8}
+.linkbar>span:last-child{font-size:20px;line-height:1}
+.adslot{display:flex;align-items:center;justify-content:center;padding:70px 18px 28px}
+.adbox{display:flex;flex-direction:column;gap:16px;width:100%;max-width:420px;border:4px dashed #111;padding:28px 22px;background:repeating-linear-gradient(-45deg,transparent 0 14px,rgba(17,17,17,.04) 14px 28px)}
+.adbox h2{font-size:clamp(44px,12vw,64px);line-height:.95}
+.adbox p{margin:0;font-size:16px;color:#4A453E}

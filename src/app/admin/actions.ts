@@ -48,6 +48,14 @@ export async function setOfficial(f: FormData) {
   await done((await sb.from('petitions').update({ official_url: url || null }).eq('id', s(f, 'id'))).error);
 }
 
+// The organiser's link bar. Moderators can fix or remove it at any time.
+export async function setLink(f: FormData) {
+  const sb = await mod();
+  const url = s(f, 'url'), cta = s(f, 'cta');
+  if (url && !url.startsWith('https://')) return done({ message: 'The link must start with https://' });
+  await done((await sb.from('petitions').update({ link_url: url || null, link_cta: ['learn', 'visit', 'donate', 'join', 'event'].includes(cta) ? cta : 'learn' }).eq('id', s(f, 'id'))).error);
+}
+
 // Unite: both petitions join one group; each keeps its own count, and the total is shown on both.
 export async function unite(f: FormData) {
   const sb = await mod();

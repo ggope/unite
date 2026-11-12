@@ -28,6 +28,7 @@ export default async function Home() {
     uploader_handle: r.uploader_handle, role: r.role, combined: Number(r.combined), last_hour: Number(r.last_hour), goal: r.goal,
     united_count: Number(r.united_count), trim_start: Number(r.trim_start), trim_end: Number(r.trim_end), blur_faces: r.blur_faces,
     created_at: r.created_at, video_url: url(r.storage_path), cover_url: url(r.cover_path),
+    link_url: r.link_url ?? null, link_cta: r.link_cta ?? null,
   }));
   return <Feed items={items} news={news} viewer={viewer} signed={[...signed]} followed={[...followed]} serverWeights={weights}
     chronological={!!settings?.chronological_feed} autoplay={settings?.autoplay !== false && !settings?.is_minor}

@@ -10,12 +10,14 @@ import { SignButton, type Viewer } from './SignButton';
 import { Icon } from './Icon';
 import { NewsCard } from './NewsCard';
 import { ReportButton } from './ReportButton';
+import { LinkBar } from './LinkBar';
 import { ShareButton } from './ShareButton';
 import type { NewsStory } from '@/lib/news/load';
 import { TOPICS } from '@/lib/topics';
 
-type Slot = { item: FeedItem; explore: boolean } | { news: NewsStory } | { end: true };
+type Slot = { item: FeedItem; explore: boolean } | { news: NewsStory } | { ad: true } | { end: true };
 const NEWS_EVERY = 3;   // one headline after every three videos
+const AD_FIRST = 7, AD_EVERY = 15;   // the empty ad slot: after 7 videos, then every 15
 const LS = 'unite-weights';
 
 export function Feed({ items, news = [], viewer, signed, followed, serverWeights, chronological, autoplay, breakMinutes = 20 }: {
@@ -74,6 +76,8 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
       const usedNews = new Set(next.flatMap((s) => ('news' in s ? [s.news.id] : [])));
       while (next.length - active < 3) {
         let since = 0; for (let k = next.length - 1; k >= 0 && 'item' in next[k]; k--) since++;
+        const vids = next.filter((s) => 'item' in s).length, ads = next.filter((s) => 'ad' in s).length;
+        if (since > 0 && vids >= AD_FIRST + ads * AD_EVERY) { next.push({ ad: true }); continue; }
         if (since >= NEWS_EVERY) {
           // the headline closest to what this person cares about, among the biggest stories
           const n = news.filter((x) => !usedNews.has(x.id)).sort((a, b) => (weights[b.topic] ?? 0) + b.outlets - ((weights[a.topic] ?? 0) + a.outlets))[0];
@@ -152,6 +156,20 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
               <div className="newsslide"><NewsCard n={s.news} viewer={viewer} signed={!!s.news.petition && ctx.signed.has(s.news.petition.id)} /></div>
             </div>
           </section>
+        ) : 'ad' in s ? (
+          <section className="slide" data-i={i} key={'ad' + i}>
+            <div className="frame paper adslot">
+              <span className="newskind">{t('ad.label')}</span>
+              <div className="adbox">
+                <h2>{t('ad.title')}</h2>
+                <p>{t('ad.text')}</p>
+                <div className="row">
+                  <Link className="btn primary big" href="/donate">{t('ad.support')}</Link>
+                  <button className="btn" onClick={() => scroller.current?.scrollBy({ top: scroller.current.clientHeight, behavior: 'smooth' })}>{t('ad.skip')}</button>
+                </div>
+              </div>
+            </div>
+          </section>
         ) : 'end' in s ? (
           <section className="slide" data-i={i} key="end"><div className="endcard">
             <h2>{t('feed.caughtUp')}</h2><p>{t('feed.caughtUpText')}</p>
@@ -179,6 +197,7 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
                   <span className="bar"><i style={{ width: `${Math.min(100, (s.item.combined / s.item.goal) * 100)}%` }} /></span>
                   <small><span className="num">{fmt(s.item.combined)} {t('common.of')} {fmt(s.item.goal)}</span><span>{t('feed.thisHour', { n: fmt(s.item.last_hour) })}</span></small>
                 </Link>
+                {s.item.link_url && <LinkBar url={s.item.link_url} cta={s.item.link_cta ?? 'learn'} />}
               </div>
               <div className="col">
                 <SignButton variant="reel" petitionId={s.item.petition_id} title={s.item.petition_title} signed={ctx.signed.has(s.item.petition_id)} viewer={viewer}

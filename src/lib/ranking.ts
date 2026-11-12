@@ -14,6 +14,7 @@ export type FeedItem = {
   uploader_handle: string | null; role: 'founder' | 'supporter'; combined: number; last_hour: number;
   goal: number; united_count: number; trim_start: number; trim_end: number; blur_faces: boolean;
   created_at: string; video_url: string | null; cover_url: string | null;
+  link_url?: string | null; link_cta?: string | null;
 };
 
 export function score(item: FeedItem, w: Weights, ctx: { followed: Set<string>; signed: Set<string>; seen: Record<string, number>; mine?: string | null }) {

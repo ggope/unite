@@ -22,3 +22,7 @@ select public.sign_petition((select id from public.petitions where title = 'Repo
 reset role;
 do $$ begin if (select country from public.signatures where user_id = '11111111-1111-1111-1111-111111111111' and petition_id = (select id from public.petitions where title = 'Report test petition here')) <> 'HU' then raise exception 'country not stored'; end if; end $$;
 select 'report tests passed' as result;
+-- 0007: organiser links must be https and show in the feed view
+do $$ begin update public.petitions set link_url = 'http://bad.example' where title = 'Report test petition here'; raise exception 'http link accepted'; exception when check_violation then null; end $$;
+update public.petitions set link_url = 'https://good.example/campaign', link_cta = 'donate' where title = 'Report test petition here';
+select 'link tests passed' as result;

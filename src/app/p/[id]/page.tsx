@@ -11,6 +11,7 @@ import { FollowButton } from '@/components/FollowButton';
 import { PostUpdate, RemoveUpdate } from '@/components/PostUpdate';
 import { ReportButton } from '@/components/ReportButton';
 import { ShareButton } from '@/components/ShareButton';
+import { LinkBar } from '@/components/LinkBar';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +71,7 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
           {(isFounder || signed.has(p.id)) && p.status === 'live' && <Link className="btn ghost small" href={`/post?petition=${p.id}`}>{t('common.postVideo')}</Link>}
         </div>
       </div>
+      {p.link_url && <LinkBar url={p.link_url} cta={p.link_cta} />}
       {p.official_url && p.status === 'live' && (
         <section className="panel official"><b>{t('off.title')}</b><p className="muted" style={{ margin: 0 }}>{t('off.text')}</p>
           <a className="btn small" href={p.official_url} target="_blank" rel="noopener nofollow">{t('off.go')} ↗</a></section>

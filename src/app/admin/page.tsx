@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN } from '@/lib/i18n/dict';
-import { review, petitionStatus, setOfficial, unite, separate, resolveReport, setModerator, importNews, newsAction, toggleSource } from './actions';
+import { review, petitionStatus, setOfficial, setLink, unite, separate, resolveReport, setModerator, importNews, newsAction, toggleSource } from './actions';
 
 export const dynamic = 'force-dynamic';
 const TABS = [['overview', 'Overview'], ['queue', 'Review queue'], ['reports', 'Reports'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People']] as const;
@@ -69,13 +69,13 @@ const Decide = ({ kind, id }: { kind: string; id: string }) => (
 
 async function Queue({ sb }: { sb: any }) {
   const [{ data: pets }, { data: vids }] = await Promise.all([
-    sb.from('petitions').select('id, title, target, region, ask, why, source_url, organiser_name, topic, goal, created_at').eq('status', 'pending').order('created_at').limit(30),
+    sb.from('petitions').select('*').eq('status', 'pending').order('created_at').limit(30),
     sb.from('videos').select('id, caption, storage_path, petition_id, created_at, blur_faces, audience, petitions(title)').eq('status', 'pending').order('created_at').limit(30),
   ]);
   const urls = vids?.length ? (await sb.storage.from('videos').createSignedUrls(vids.map((v: any) => v.storage_path), 3600)).data ?? [] : [];
   return (<>
     <h2>Petitions ({pets?.length ?? 0})</h2>
-    {pets?.length ? pets.map((p: any) => <div className="panel" key={p.id}><b>{p.title}</b><span className="hint">{p.organiser_name} → {p.target} · {p.region} · {p.topic} · goal {n(p.goal)} · {when(p.created_at)}</span><p style={{ margin: 0 }}>{p.ask}</p><p className="hint" style={{ margin: 0 }}>{p.why}</p>{p.source_url && <a href={p.source_url} target="_blank" rel="noopener nofollow">Source</a>}<Decide kind="petition" id={p.id} /></div>) : <p className="hint">Nothing waiting.</p>}
+    {pets?.length ? pets.map((p: any) => <div className="panel" key={p.id}><b>{p.title}</b><span className="hint">{p.organiser_name} → {p.target} · {p.region} · {p.topic} · goal {n(p.goal)} · {when(p.created_at)}</span><p style={{ margin: 0 }}>{p.ask}</p><p className="hint" style={{ margin: 0 }}>{p.why}</p>{p.source_url && <a href={p.source_url} target="_blank" rel="noopener nofollow">Source</a>}{p.link_url && <span className="hint">Button link ({p.link_cta}): <a href={p.link_url} target="_blank" rel="noopener nofollow">{p.link_url}</a> · check it is safe and belongs to the organiser</span>}<Decide kind="petition" id={p.id} /></div>) : <p className="hint">Nothing waiting.</p>}
     <h2>Videos ({vids?.length ?? 0})</h2>
     {vids?.length ? vids.map((v: any, i: number) => <div className="panel" key={v.id}><b>{v.caption}</b><span className="hint">For: {v.petitions?.title} · {v.audience === 'friends' ? 'friends only · ' : ''}{when(v.created_at)}</span>{v.blur_faces && <p className="error" style={{ margin: 0 }}>The uploader says other people can be recognised. Approve only if they clearly agreed to be filmed or cannot be identified.</p>}{urls[i]?.signedUrl && <video src={urls[i].signedUrl} controls muted playsInline style={{ width: '100%', maxHeight: 420, background: '#000', borderRadius: 10 }} />}<Decide kind="video" id={v.id} /></div>) : <p className="hint">Nothing waiting.</p>}
   </>);
@@ -122,6 +122,10 @@ async function Petitions({ sb, q }: { sb: any; q: string }) {
         <form action={setOfficial} className="row"><input type="hidden" name="id" value={p.id} />
           <input name="url" type="url" defaultValue={p.official_url ?? ''} placeholder="Official petition link (https://…)" style={{ flex: 1, minWidth: 0 }} />
           <button className="btn small">Save link</button></form>
+        <form action={setLink} className="row"><input type="hidden" name="id" value={p.id} />
+          <input name="url" type="url" defaultValue={p.link_url ?? ''} placeholder="Organiser's website (https://…)" style={{ flex: 1, minWidth: 0 }} />
+          <select name="cta" defaultValue={p.link_cta ?? 'learn'}>{['learn', 'visit', 'donate', 'join', 'event'].map((c) => <option key={c} value={c}>{c}</option>)}</select>
+          <button className="btn small">Save</button></form>
         {p.cluster_id && <form action={separate}><input type="hidden" name="id" value={p.id} /><button className="btn ghost small">Separate from its group</button></form>}
       </div>))}
   </>);
