@@ -1,3 +1,4 @@
+import { LogoBlink } from '@/lib/logo';
 // Shown instantly while a page loads, so a tap never feels ignored.
 export function ListSkeleton({ rows = 6, title = true }: { rows?: number; title?: boolean }) {
   return (
@@ -13,6 +14,7 @@ export function ListSkeleton({ rows = 6, title = true }: { rows?: number; title?
 export function ReelSkeleton() {
   return (
     <div className="reel" aria-busy="true" aria-label="Loading">
+      <div className="sk-logo"><LogoBlink size={84} id="load-logo" /></div>
       <div className="sk-reel"><div className="sk dark sk-line mid" /><div className="sk dark sk-line" /><div className="sk dark sk-card" /></div>
     </div>
   );

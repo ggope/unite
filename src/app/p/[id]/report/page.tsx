@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
-import { supabaseServer } from '@/lib/supabase/server';
+import { currentUser, supabaseServer } from '@/lib/supabase/server';
+import { AnswerLink } from '@/components/AnswerLink';
+import { MarkDelivered } from '@/components/MarkDelivered';
 import { getT } from '@/lib/i18n/server';
 import { fmtN, locale } from '@/lib/i18n/dict';
 import { PrintButton } from '@/components/PrintButton';
@@ -19,13 +21,17 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 // A page the organiser hands to the target: totals only, how people were confirmed, never a name.
 export default async function DeliveryReport({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const sb = await supabaseServer();
-  const [{ data: p }, { data: r }, { lang, t }, h] = await Promise.all([
-    sb.from('petitions').select('id, title, target, ask, organiser_name, region').eq('id', id).maybeSingle(),
+  const { sb, user } = await currentUser();
+  const [{ data: p }, { data: r }, { lang, t }, h, { data: reasons }, { data: delivered }] = await Promise.all([
+    sb.from('petitions').select('id, title, target, ask, organiser_name, region, created_by, status').eq('id', id).maybeSingle(),
     sb.rpc('petition_report', { p_petition: id }),
     getT(), headers(),
+    sb.rpc('public_reasons', { p_petition: id, p_limit: 12 }),
+    sb.from('petition_updates').select('created_at').eq('petition_id', id).eq('kind', 'delivered').order('created_at').limit(1),
   ]);
   if (!p || !r) notFound();
+  const { data: me } = user ? await sb.from('profiles').select('is_moderator').eq('id', user.id).maybeSingle() : { data: null };
+  const organiser = !!user && (p.created_by === user.id || !!me?.is_moderator);
   const rep = r as Report;
   const loc = locale(lang); const n = (x: number) => fmtN(Number(x), lang);
   const day = (d: string | null) => (d ? new Date(d).toLocaleDateString(loc, { year: 'numeric', month: 'long', day: 'numeric' }) : '–');
@@ -61,6 +67,15 @@ export default async function DeliveryReport({ params }: { params: Promise<{ id:
 
       {rep.days.length > 0 && <section className="stack" style={{ gap: 8 }}><h2>{t('rep.days')}</h2>
         <div className="spark" role="img" aria-label={rep.days.map((x) => `${day(x.d)}: ${x.n}`).join(', ')}>{rep.days.map((x) => <i key={x.d} title={`${day(x.d)}: ${n(x.n)}`} style={{ height: `${Math.max(4, (Number(x.n) / dayMax) * 100)}%` }} />)}</div></section>}
+
+      {!!reasons?.length && <section className="stack" style={{ gap: 8 }}><h2>{t('rep.inWords')}</h2>
+        <ul className="reasons">{reasons.map((x: any, k: number) => <li key={k}>“{x.why}”</li>)}</ul>
+        <span className="hint">{t('rep.inWordsHint')}</span></section>}
+
+      {organiser && <AnswerLink petitionId={p.id} target={p.target} />}
+      {organiser && (delivered?.length
+        ? <p className="hint noprint" style={{ margin: 0 }}>{t('dlv.already', { d: day(delivered[0].created_at) })}</p>
+        : p.status === 'live' && <div className="noprint"><MarkDelivered petitionId={p.id} target={p.target} userId={user!.id} /></div>)}
 
       <p className="hint" style={{ margin: 0 }}>{t('rep.generated', { d: day(rep.generated) })} <a href={live}>{live.replace(/^https:\/\//, '')}</a></p>
       <p className="note noprint">{t('rep.forOrganisers')}</p>

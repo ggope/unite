@@ -6,6 +6,8 @@ import { TOPICS } from '@/lib/topics';
 import { MyloArt } from './MyloArt';
 import { MYLO_COLOR } from './art';
 import { SignButton, type Viewer } from '../SignButton';
+import { ShareButton } from '../ShareButton';
+import { MyloStory, STORY } from './MyloStory';
 
 // Mylo's own page: how he is today, the real numbers behind it, and the big goals we push together.
 export async function MyloView({ m, viewer, signed }: { m: MyloToday; viewer: Viewer; signed: Set<string> }) {
@@ -27,6 +29,13 @@ export async function MyloView({ m, viewer, signed }: { m: MyloToday; viewer: Vi
           <div className="meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={m.future} aria-label={t('mylo.future')}><i style={{ width: `${m.future}%` }} /></div>
           <span className="hint" style={{ color: '#4A453E' }}>{t('mylo.futureHint')}</span>
         </div>
+      </section>
+
+      <section className="panel story-panel" aria-labelledby="story-h">
+        <h2 id="story-h" style={{ margin: 0 }}>{t('story.title')}</h2>
+        <p className="hint" style={{ margin: 0 }}>{t('story.sub')}</p>
+        <MyloStory pages={STORY} id="mp" again />
+        <div className="row"><Link className="btn small" href="/mylo/story">{t('story.read')}</Link><ShareButton path="/mylo/story" title={t('story.title')} /></div>
       </section>
 
       <section className="stack" style={{ gap: 10 }}>

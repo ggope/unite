@@ -11,6 +11,7 @@ const b = await chromium.launch();
 const errors = [];
 async function as(user) {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.addInitScript(() => { try { localStorage.setItem('mylo-intro', '1'); } catch {} });   // Mylo's intro has its own check
   if (user) await login(ctx, user);
   const p = await ctx.newPage();
   p.on('pageerror', (e) => errors.push(`${user?.email ?? 'guest'} ${p.url()}: ${e.message}`));
@@ -422,6 +423,78 @@ await check('delete account', async () => {
   const E = newUser('emil'); const e = await as(E);
   const r = await e.request.post(APP + '/api/account/delete'); expect(r.status() < 400, `status ${r.status()} ${await r.text()}`);
   expect(one(`select count(*) from auth.users where id = '${E.id}'`) === '0', 'user still there');
+});
+
+console.log('Mylo story, answers and open numbers');
+await check('first visit: Mylo introduces himself once, and the story reads to the end', async () => {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 } }); const f = await ctx.newPage();
+  f.on('pageerror', (e) => errors.push(`first visit ${f.url()}: ${e.message}`));
+  await go(f, '/'); await f.waitForSelector('.intro-sheet', { timeout: 8000 });
+  expect(await f.locator('.intro-sheet').getByText(/Meet Mylo/).count(), 'intro text missing');
+  await f.locator('.intro-sheet').getByRole('button', { name: 'Next' }).click();
+  await f.locator('.intro-sheet').getByRole('button', { name: 'Next' }).click();
+  await f.getByRole('button', { name: "Let's go" }).click();
+  expect(!(await f.locator('.intro-sheet').count()), 'intro did not close');
+  await go(f, '/'); await f.waitForTimeout(800); expect(!(await f.locator('.intro-sheet').count()), 'intro came back');
+  await go(f, '/mylo/story'); expect(await f.getByRole('heading', { name: 'Why is Mylo trapped?' }).count(), 'story page has no title');
+  for (let k = 0; k < 5; k++) await f.locator('.story').getByRole('button', { name: 'Next' }).click();
+  expect(await f.getByText(/better place to be stuck in/).count(), 'story did not reach the last page');
+  expect(await f.getByRole('link', { name: 'How is Mylo today?' }).count(), 'no way back to Mylo');
+  await go(f, '/mylo'); expect(await f.locator('.story-panel').count(), 'story missing on the Mylo page');
+  await ctx.close();
+});
+await check('the target answers through the private link, and the petition shows it', async () => {
+  await go(a, `/p/${seedId}`);
+  await a.getByRole('button', { name: 'Make answer link' }).click();
+  const link = await a.locator('.answer-link input').inputValue({ timeout: 5000 });
+  expect(/\/answer\/[A-Za-z0-9_-]{20,}$/.test(link), `bad link ${link}`);
+  const ctx = await b.newContext(); const tp = await ctx.newPage();
+  await tp.goto(link); await tp.waitForFunction(() => document.documentElement.dataset.hydrated === '1', null, { timeout: 15000 }).catch(() => {});
+  await tp.fill('#a-name', 'Erika Test'); await tp.fill('#a-role', 'Minister of Fisheries');
+  await tp.fill('#a-body', 'We will close the protected areas to bottom trawling from next spring.');
+  await tp.getByRole('button', { name: 'Publish answer' }).click();
+  await tp.waitForSelector('text=Your answer is published', { timeout: 8000 });
+  expect(one(`select count(*) from petition_updates where petition_id = '${seedId}' and via_link and kind = 'response'`) === '1', 'answer not saved');
+  await go(g, `/p/${seedId}`); expect(await g.locator('.official-answer', { hasText: 'Erika Test' }).count(), 'answer not shown on the petition');
+  await a.getByRole('button', { name: 'Make a new link' }).click(); await a.waitForTimeout(800);
+  await tp.goto(link); expect(await tp.getByText(/no longer works/).count(), 'old link still works');
+  await ctx.close();
+});
+await check('report: reasons people chose to show, and mark as delivered', async () => {
+  sql(`insert into signatures (user_id, petition_id, why, show_reason) values ('${C.id}', '${seedId}', 'My grandad fished here', true) on conflict (user_id, petition_id) do update set why = excluded.why, show_reason = true`);
+  await go(a, `/p/${seedId}/report`);
+  expect(await a.getByText('My grandad fished here').count(), 'shown reason missing in the report');
+  await a.getByRole('button', { name: 'Mark as delivered' }).click(); await a.waitForTimeout(1200);
+  expect(Number(one(`select count(*) from petition_updates where petition_id = '${seedId}' and kind = 'delivered'`)) >= 1, 'not marked delivered');
+  await go(g, `/p/${seedId}`); expect(await g.getByText('My grandad fished here').count(), 'shown reason missing on the petition');
+});
+await check('petitions popular in a country', async () => {
+  sql(`update petitions set region = 'Hungary' where id = '${seedId}'`);
+  await go(g, '/petitions?sort=near&country=HU');
+  expect(await g.locator('.chip[aria-current=page]', { hasText: 'Popular in Hungary' }).count(), 'country chip missing');
+  expect(await g.locator('.prow').count() >= 1, 'no petitions for Hungary');
+  await go(g, '/petitions?sort=near&country=IS'); expect(await g.getByText(/Nothing is popular in Iceland/).count(), 'empty country has no note');
+  sql(`update petitions set region = 'Worldwide' where id = '${seedId}'`);
+});
+await check('start page tips react while writing', async () => {
+  await go(a, '/start');
+  expect(await a.locator('.checklist li.ok').count() === 0, 'tips ticked on an empty form');
+  await a.fill('#title', 'Open every school playground to children at weekends');
+  await a.fill('#target', 'the government');
+  await a.waitForTimeout(200);
+  expect(await a.locator('.checklist li.ok').count() === 1, 'title tip not ticked, or vague target accepted');
+  await a.fill('#target', 'Budapest City Council'); await a.waitForTimeout(200);
+  expect(await a.locator('.checklist li.ok').count() === 2, 'named target not ticked');
+});
+await check('open numbers download as CSV without names', async () => {
+  for (const f of ['totals', 'petitions', 'targets', 'countries']) {
+    const r = await g.request.get(APP + `/open/${f}.csv`); expect(r.status() === 200 && (r.headers()['content-type'] ?? '').includes('text/csv'), `${f}: ${r.status()}`);
+    const txt = await r.text(); expect(txt.split('\r\n')[0].length > 5, `${f} has no header`);
+    expect(!/@e2e\.test/.test(txt), `${f} leaks emails`);
+  }
+  const p = await (await g.request.get(APP + '/open/petitions.csv')).text(); expect(p.includes('End bottom trawling'), 'petitions missing');
+  expect((await g.request.get(APP + '/open/nope.csv')).status() === 404, 'unknown file served');
+  await go(g, '/transparency'); expect(await g.locator('a[href="/open/petitions.csv"]').count(), 'no download link');
 });
 
 await check('revoke consent, then signing asks again', async () => {

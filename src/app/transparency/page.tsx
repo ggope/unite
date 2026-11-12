@@ -41,6 +41,10 @@ export default async function Transparency() {
 
       <section className="panel tsec"><h2>{t('tr.power')}</h2><p style={{ margin: 0 }}>{t('tr.powerText')}</p>
         <Link href="/targets">{t('board.title')} →</Link></section>
+
+      <section className="panel tsec" id="open-numbers"><h2>{t('od.title')}</h2><p style={{ margin: 0 }}>{t('od.text')}</p>
+        <ul className="downloads">{([['totals', 'od.totals'], ['petitions', 'od.petitions'], ['targets', 'od.targets'], ['countries', 'od.countries']] as const).map(([f, k]) => (
+          <li key={f}><a href={`/open/${f}.csv`} download>{t(k)}</a> <span className="hint">CSV</span></li>))}</ul></section>
       <LegalLinks />
     </div>
   );

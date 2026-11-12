@@ -24,10 +24,17 @@ const ART =
   // hands on the rim
   `<ellipse cx="44" cy="116" rx="13" ry="11" fill="${HAND}"/><ellipse cx="156" cy="116" rx="13" ry="11" fill="${HAND}"/>`;
 
+// Eyelids that close for a moment every few seconds (only for logos drawn on a page, not PNG icons).
+const LIDS =
+  `<style>.lid{transform-box:fill-box;transform-origin:50% 0;transform:scaleY(0);animation:unier-blink 5s infinite}` +
+  `@keyframes unier-blink{0%,93%,100%{transform:scaleY(0)}96%{transform:scaleY(1)}}` +
+  `@media (prefers-reduced-motion:reduce){.lid{animation:none}}</style>` +
+  `<ellipse class="lid" cx="79" cy="96" rx="15" ry="18" fill="${BODY}"/><ellipse class="lid" cx="121" cy="96" rx="15" ry="18" fill="${BODY}"/>`;
+
 // pad: empty space around the drawing, as a share of its size (more for maskable icons).
 // round: rounded corners for places the OS does not round for us (tab icon, side rail).
 // paper: the torn-paper edge and shadow; skip it where the icon is drawn very small.
-export function logoSvg({ pad = 0, round = false, paper = true, id = 'unier-logo' }: { pad?: number; round?: boolean; paper?: boolean; id?: string } = {}) {
+export function logoSvg({ pad = 0, round = false, paper = true, blink = false, id = 'unier-logo' }: { pad?: number; round?: boolean; paper?: boolean; blink?: boolean; id?: string } = {}) {
   const o = 200 * pad, s = 200 + o * 2;
   const filter = paper
     ? `<filter id="${id}" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency=".06" numOctaves="3" seed="4"/>` +
@@ -36,10 +43,15 @@ export function logoSvg({ pad = 0, round = false, paper = true, id = 'unier-logo
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-o} ${-o} ${s} ${s}">` +
     `<defs>${filter}<clipPath id="${id}-c"><rect x="${-o}" y="${-o}" width="${s}" height="${s}" rx="${round ? s * 0.22 : 0}"/></clipPath></defs>` +
     `<g clip-path="url(#${id}-c)"><rect x="${-o}" y="${-o}" width="${s}" height="${s}" fill="${LOGO_ORANGE}"/>` +
-    `<g${paper ? ` filter="url(#${id})"` : ''}>${ART}</g></g></svg>`;
+    `<g${paper ? ` filter="url(#${id})"` : ''}>${blink ? ART.replace('<path d="M58 74', LIDS + '<path d="M58 74') : ART}</g></g></svg>`;
 }
 
 export const logoDataUri = (o?: Parameters<typeof logoSvg>[0]) => `data:image/svg+xml;base64,${btoa(logoSvg(o))}`;
+
+// The logo on a page, blinking now and then.
+export function LogoBlink({ size = 72, id }: { size?: number; id: string }) {
+  return <span className="logo-blink" aria-hidden="true" style={{ width: size, height: size }} dangerouslySetInnerHTML={{ __html: logoSvg({ round: true, blink: true, id }) }} />;
+}
 
 // For generated PNG icons (next/og).
 export function LogoMark({ size, pad = 0, round = false }: { size: number; pad?: number; round?: boolean }) {

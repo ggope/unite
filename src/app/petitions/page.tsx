@@ -3,17 +3,34 @@ import { localize } from '@/lib/petitionText';
 import { loadViewer } from '@/lib/viewer';
 import { TOPICS, TOPIC_KEYS } from '@/lib/topics';
 import { getT } from '@/lib/i18n/server';
-import { fmtN } from '@/lib/i18n/dict';
+import { fmtN, LANGS, locale } from '@/lib/i18n/dict';
+import { cookies } from 'next/headers';
 import { SignButton } from '@/components/SignButton';
 import { MyloArt } from '@/components/mylo/MyloArt';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Petitions({ searchParams }: { searchParams: Promise<{ q?: string; topic?: string; sort?: string }> }) {
-  const { q = '', topic = '', sort = 'recent' } = await searchParams;
-  const [{ sb, viewer, signed }, { lang, t }] = await Promise.all([loadViewer(), getT()]);
+// A country's name in every language UNIER speaks, to match petitions whose region names it.
+function countryNames(cc: string) {
+  const out = new Set<string>();
+  for (const l of Object.keys(LANGS) as (keyof typeof LANGS)[]) { try { const n = new Intl.DisplayNames([locale(l)], { type: 'region' }).of(cc); if (n && n !== cc) out.add(n); } catch {} }
+  return [...out];
+}
+
+export default async function Petitions({ searchParams }: { searchParams: Promise<{ q?: string; topic?: string; sort?: string; country?: string }> }) {
+  const { q = '', topic = '', sort = 'recent', country: asked = '' } = await searchParams;
+  const [{ sb, viewer, signed }, { lang, t }, jar] = await Promise.all([loadViewer(), getT(), cookies()]);
   const fmt = (n: number) => fmtN(n, lang);
+  // the approximate country of this connection, or one picked in the address
+  const cc = (/^[A-Za-z]{2}$/.test(asked) ? asked : jar.get('geo')?.value ?? '').toUpperCase();
+  const ccName = cc ? (() => { try { return new Intl.DisplayNames([locale(lang)], { type: 'region' }).of(cc) ?? cc; } catch { return cc; } })() : '';
+  let near: string[] | null = null;
+  if (sort === 'near' && cc) {
+    const { data } = await sb.rpc('popular_in', { p_country: cc, p_names: countryNames(cc), p_limit: 50 });
+    near = (data ?? []).map((r: any) => r.petition_id);
+  }
   let query = sb.from('petitions').select('id, title, target, topic, goal, cluster_id, created_at, lang, tr, petition_stats(signatures, combined, united_count)').eq('status', 'live').limit(50);
+  if (near) query = query.in('id', near.length ? near : ['00000000-0000-0000-0000-000000000000']);
   if (q.trim()) query = query.textSearch('search', q.trim().split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter(Boolean).join(' & '), { config: 'simple' });
   if (topic && topic in TOPICS) query = query.eq('topic', topic);
   const { data } = await query.order('created_at', { ascending: false });
@@ -22,7 +39,8 @@ export default async function Petitions({ searchParams }: { searchParams: Promis
   let rows = (data ?? []).map((p: any) => localize(p, lang)).filter((p: any) => !p.cluster_id || (!seen.has(p.cluster_id) && seen.add(p.cluster_id)));
   const stat = (p: any) => (Array.isArray(p.petition_stats) ? p.petition_stats[0] : p.petition_stats) ?? { combined: 0, united_count: 1 };
   if (sort === 'signed') rows = rows.sort((a: any, b: any) => stat(b).combined - stat(a).combined);
-  const href = (o: Record<string, string>) => '/petitions?' + new URLSearchParams({ q, topic, sort, ...o }).toString();
+  if (near) rows = rows.sort((a: any, b: any) => near!.indexOf(a.id) - near!.indexOf(b.id));
+  const href = (o: Record<string, string>) => '/petitions?' + new URLSearchParams({ q, topic, sort, ...(asked ? { country: asked } : {}), ...o }).toString();
 
   return (
     <div className="stack">
@@ -33,7 +51,8 @@ export default async function Petitions({ searchParams }: { searchParams: Promis
         <Link className="chip" aria-current={(!topic) ? 'page' : undefined} href={href({ topic: '' })}>{t('pet.all')}</Link>
         {TOPIC_KEYS.map((k) => <Link key={k} className="chip" aria-current={(topic === k) ? 'page' : undefined} href={href({ topic: k })}>{t(`topic.${k}`)}</Link>)}
       </div>
-      <div className="row"><Link className="chip" aria-current={(sort === 'recent') ? 'page' : undefined} href={href({ sort: 'recent' })}>{t('pet.recent')}</Link><Link className="chip" aria-current={(sort === 'signed') ? 'page' : undefined} href={href({ sort: 'signed' })}>{t('pet.mostSigned')}</Link></div>
+      <div className="row"><Link className="chip" aria-current={(sort === 'recent') ? 'page' : undefined} href={href({ sort: 'recent' })}>{t('pet.recent')}</Link><Link className="chip" aria-current={(sort === 'signed') ? 'page' : undefined} href={href({ sort: 'signed' })}>{t('pet.mostSigned')}</Link>
+        {cc && <Link className="chip" aria-current={(sort === 'near') ? 'page' : undefined} href={href({ sort: 'near' })}>{t('pet.near', { country: ccName })}</Link>}</div>
       <div>
         {rows.length ? rows.map((p: any) => (
           <div className="prow" key={p.id}>
@@ -44,7 +63,7 @@ export default async function Petitions({ searchParams }: { searchParams: Promis
             </div>
             <SignButton variant="small" petitionId={p.id} title={p.title} signed={signed.has(p.id)} viewer={viewer} />
           </div>
-        )) : <div className="empty">{t('pet.none')} <Link href="/start">{t('pet.startOne')}</Link>.</div>}
+        )) : <div className="empty">{near ? t('pet.nearNone', { country: ccName }) : t('pet.none')} <Link href="/start">{t('pet.startOne')}</Link>.</div>}
       </div>
     </div>
   );

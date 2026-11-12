@@ -46,6 +46,7 @@ export function MyloCorner() {
     try { if (localStorage.getItem(DAY_KEY) === today) return; } catch { return; }
     let gone = false;
     const wait = window.setTimeout(async () => {
+      try { if (localStorage.getItem(DAY_KEY) === today) return; } catch { return; }   // the intro may have said hello already
       try {
         const r = await fetch('/api/mylo');
         const m = (await r.json()) as { mood: Mood };

@@ -148,6 +148,9 @@ main{min-width:0;width:100%;max-width:680px;margin:0 auto;padding:16px max(16px,
 .sk-line.short{width:35%;height:11px}
 .sk-line.mid{width:70%}
 .sk-pill{width:72px;height:32px;border-radius:999px}
+.logo-blink{display:inline-block;flex:none}.logo-blink svg{display:block;width:100%;height:100%}
+.sk-logo{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);opacity:.9}
+.empty .logo-blink{display:block;margin:0 auto 10px}
 .sk-reel{position:absolute;left:18px;right:84px;bottom:32px;display:flex;flex-direction:column;gap:10px;max-width:400px}
 .sk-reel .sk-line{height:18px}
 .sk-card{height:74px;border-radius:12px}
@@ -342,3 +345,35 @@ main:focus{outline:none}
 .embed summary{cursor:pointer;font-weight:700}
 .embed textarea{width:100%;font:12px/1.4 ui-monospace,monospace;resize:vertical}
 .tsec ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+
+/* Mylo's story: a picture book */
+.story{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;touch-action:pan-y;user-select:none}
+.story-page{display:flex;flex-direction:column;align-items:center;gap:10px;animation:story-in .35s ease-out both}
+.story-text{margin:0;max-width:34ch;font-size:18px;line-height:1.45;font-weight:600;text-wrap:balance;min-height:4.4em}
+.story.big .story-text{font-size:clamp(20px,4.6vw,26px);max-width:30ch}
+.story-dots{display:flex;gap:6px}.story-dots i{width:9px;height:9px;border-radius:50%;background:var(--edge);opacity:.25}.story-dots i.on{opacity:1;background:var(--accent)}
+.story-nav{justify-content:center}
+.story-end{justify-content:center;flex-wrap:wrap}
+.story-wrap{max-width:640px;margin:0 auto}
+.story-wrap > .story{padding:22px 16px;border:3px solid var(--edge);border-radius:var(--r);box-shadow:var(--shadow);background:#E9DDC6;color:#111}
+.story-wrap > .story .btn.ghost{color:#111}
+.story-panel .story{padding-top:4px}
+.intro{align-items:center;z-index:90}
+.intro-sheet{border:3px solid var(--edge);border-radius:var(--r);margin:12px;max-width:440px}
+@keyframes story-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.story-page{animation:none}}
+
+/* official answers and shown reasons */
+.official-answer{border:3px solid var(--edge);border-radius:var(--r);padding:12px 14px;background:var(--surface);box-shadow:var(--shadow)}
+.badge-answer{display:inline-block;margin-bottom:6px;padding:2px 8px;border-radius:999px;background:var(--ink);color:var(--bg);font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.reasons{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.reasons li{padding:10px 12px;border-left:4px solid var(--accent);background:var(--sunk);border-radius:0 var(--r) var(--r) 0;font-style:italic}
+.answer-link input{font-size:13px}
+
+/* petition checklist on the start page */
+.checklist{display:grid;gap:8px;padding:14px;border:2px dashed var(--edge);border-radius:var(--r);background:var(--sunk)}
+.checklist ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.checklist li{display:flex;gap:10px;align-items:flex-start}
+.checklist li > span:first-child{flex:none;width:22px;height:22px;display:grid;place-items:center;border:2px solid var(--edge);border-radius:50%;font-size:12px;font-weight:900}
+.checklist li.ok > span:first-child{background:var(--accent);color:var(--accent-ink)}
+.checklist li > span:last-child{display:grid;gap:2px}
