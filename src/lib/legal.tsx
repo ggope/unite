@@ -125,6 +125,8 @@ const termsEn: Doc = { title: 'Terms of use', updated: 'Last updated: 12 Novembe
   <ul>
     <li>A petition must be truthful, lawful and ask for something specific. Organisers are responsible for what they write.</li>
     <li>We review petitions before they go live, and may decline or remove ones that break these terms.</li>
+    <li>When we decline or remove anything of yours, we tell you why. You can ask for a second look for free within 6 months (under You); a person decides and tells you the reason. You can also turn to a certified out-of-court dispute settlement body or a court.</li>
+    <li>A petition can have an end date. After it, signing closes; the petition and its updates stay online.</li>
     <li>Delivering a petition is the organiser’s job. UNIER cannot promise any result. Signatures on UNIER are not the same as an official petition with legal effect, unless the petition says it links to one.</li>
   </ul>
   <h2>Videos and links</h2>
@@ -162,6 +164,8 @@ const termsHu: Doc = { title: 'Felhasználási feltételek', updated: 'Utolsó m
   <ul>
     <li>A petíció legyen igaz, jogszerű, és kérjen valami konkrétat. A szervező felel azért, amit ír.</li>
     <li>Megjelenés előtt ellenőrizzük a petíciókat, és elutasíthatjuk vagy eltávolíthatjuk azokat, amelyek megsértik ezeket a feltételeket.</li>
+    <li>Ha bármit elutasítunk vagy eltávolítunk tőled, megírjuk az okát. 6 hónapon belül ingyen kérheted az újbóli felülvizsgálatot (a Te oldalon); ember dönt, és megírja az indoklást. Fordulhatsz tanúsított peren kívüli vitarendezési testülethez vagy bírósághoz is.</li>
+    <li>A petíciónak lehet lezárási dátuma. Utána az aláírás lezárul, de a petíció és a hírei fent maradnak.</li>
     <li>A petíció átadása a szervező feladata. Az UNIER nem ígérhet eredményt. Az UNIER-en gyűjtött aláírás nem azonos a joghatással járó hivatalos petícióval, kivéve ha a petíció ilyenre mutat.</li>
   </ul>
   <h2>Videók és linkek</h2>

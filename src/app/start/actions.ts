@@ -26,6 +26,7 @@ export async function createPetition(_: StartState, form: FormData): Promise<Sta
   let { data, error } = await sb.from('petitions').insert(row).select('id').single();
   // until 0015_reach.sql runs, the database only knows English and Hungarian
   if (error?.message.includes('petitions_lang_check')) ({ data, error } = await sb.from('petitions').insert({ ...row, lang: 'en' }).select('id').single());
+  if (error && /end_date_(past|far)/.test(error.message)) return { error: t('start.errEnd') };
   if (error) return { error: error.message.includes('slow_down') ? t('err.slow') : error.message.includes('check') ? t('start.errLength') : t('start.errSave') };
   // the database counts the founder as the first signature
   if (!data) return { error: t('start.errSave') };

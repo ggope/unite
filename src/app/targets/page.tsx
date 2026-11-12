@@ -4,6 +4,7 @@ import { publicRpc, publicPetitions } from '@/lib/supabase/public';
 import { getT } from '@/lib/i18n/server';
 import { fmtN } from '@/lib/i18n/dict';
 import { localize } from '@/lib/petitionText';
+import { targetAnchor } from '@/lib/lifecycle';
 
 export const revalidate = 300;
 export async function generateMetadata(): Promise<Metadata> { const { t } = await getT(); return { title: `${t('board.title')} · UNIER`, description: t('board.intro') }; }
@@ -23,7 +24,7 @@ export default async function Targets() {
         const first: any = byId.get(r.ids?.[0]);
         const status = r.wins ? 'win' : r.silent_days != null ? 'silent' : r.answered ? 'answered' : r.delivered ? 'delivered' : 'waiting';
         return (
-          <article key={r.ids?.[0]} className={`panel target t-${status}`}>
+          <article key={r.ids?.[0]} id={targetAnchor(r.target ?? '')} className={`panel target t-${status}`}>
             <div className="row between" style={{ alignItems: 'flex-start' }}>
               <h2 style={{ flex: 1, minWidth: 0 }}>{first?.target ?? r.target}</h2>
               <span className={`tbadge t-${status}`}>{status === 'silent' ? t('board.silent', { n: r.silent_days }) : t(`board.${status}` as any)}</span>
