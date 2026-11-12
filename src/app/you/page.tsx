@@ -6,17 +6,18 @@ import { LangSwitch } from '@/lib/i18n/client';
 import { InstallApp } from '@/components/InstallApp';
 import { Friends } from '@/components/Friends';
 import { LegalLinks } from '@/components/LegalLinks';
-import { saveSettings, withdraw, revokeConsent, resetFeed, signOut } from './actions';
+import { saveSettings, withdraw, revokeConsent, resetFeed, signOut, dismissNotice } from './actions';
 import { DeleteAccount } from './DeleteAccount';
 import { SaveForm } from './SaveForm';
 import { Icon } from '@/components/Icon';
+import { PushToggle } from '@/components/PushToggle';
 
 export const dynamic = 'force-dynamic';
 
 export default async function You({ searchParams }: { searchParams: Promise<{ friend?: string }> }) {
   const { friend } = await searchParams;
   const [{ sb, user, viewer, settings, weights }, { t }] = await Promise.all([loadViewer(), getT()]);
-  if (!user) return <div className="stack"><div className="empty"><h2>{t('you.title')}</h2><p>{t('you.signedOut')}</p><Link className="btn primary" href="/login?next=/you">{t('common.signIn')}</Link></div><InstallApp /><div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div><LegalLinks /></div>;
+  if (!user) return <div className="stack"><div className="empty"><h1>{t('you.title')}</h1><p>{t('you.signedOut')}</p><Link className="btn primary" href="/login?next=/you">{t('common.signIn')}</Link></div><InstallApp /><div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div><LegalLinks /></div>;
   const [{ data: profile }, { data: sigs }, { data: vids }, { data: code }, { data: fr }, { data: mine }] = await Promise.all([
     sb.from('profiles').select('*').eq('id', user.id).single(),
     sb.from('signatures').select('petition_id, why, created_at, petitions(title)').order('created_at', { ascending: false }),
@@ -25,6 +26,7 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
     sb.from('friendships').select('friend_id, profiles!friendships_friend_id_fkey(handle, display_name)').eq('user_id', user.id),
     sb.from('petitions').select('id, title, status, moderation_note, created_at').eq('created_by', user.id).order('created_at', { ascending: false }),
   ]);
+  const { data: notices } = await sb.from('notices').select('id, kind, body').order('created_at', { ascending: false });
   const { data: reqs } = await sb.from('friend_requests').select('from_id, profiles!friend_requests_from_id_fkey(handle, display_name)').eq('to_id', user.id);
   const requests = (reqs ?? []).map((r: any) => ({ id: r.from_id, handle: r.profiles?.handle ?? null, display_name: r.profiles?.display_name ?? null }));
   const interests: string[] = profile?.interests ?? [];
@@ -36,8 +38,16 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
     <div className="stack">
       <div className="row between"><h1>{t('you.title')}</h1><div className="row">{profile?.handle && <Link className="btn small" href={`/u/${profile.handle}`}>{t('pr.view')}</Link>}{profile?.is_moderator && <Link className="btn small" href="/admin">Admin</Link>}</div></div>
       {friend && <p className="note" style={{ margin: 0 }}>{t('invite.done')}</p>}
+      {(notices ?? []).map((n: any) => (
+        <form key={n.id} action={dismissNotice} className="panel row between" role="status">
+          <input type="hidden" name="id" value={n.id} />
+          <span style={{ flex: 1, minWidth: 0 }}>{t('notice.cleared', { reason: n.body ?? '' })}</span>
+          <button className="btn small">{t('notice.dismiss')}</button>
+        </form>
+      ))}
       <InstallApp />
       <div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div>
+      <PushToggle />
       <SaveForm action={saveSettings}>
         <span className="label">{t('you.profile')}</span><span className="hint">{user.email}</span>
         <div className="field"><label htmlFor="handle">{t('you.handle')}</label><input id="handle" name="handle" defaultValue={profile?.handle ?? ''} placeholder={t('you.handlePh')} /></div>

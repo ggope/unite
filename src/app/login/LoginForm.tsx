@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n/client';
 import { authError } from '@/lib/authError';
+import { Turnstile, TURNSTILE_KEY } from '@/components/Turnstile';
 
 type Mode = 'signin' | 'signup' | 'link' | 'forgot';
 
@@ -21,7 +22,8 @@ function GoogleLogo() {
 
 export function LoginForm({ next, initialError }: { next: string; initialError?: string }) {
   const router = useRouter();
-  const { t } = useT();
+  const { lang, t } = useT();
+  const [captcha, setCaptcha] = useState<string | null>(null); const [tsKey, setTsKey] = useState(0);
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,25 +41,26 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setErr('');
     const sb = supabaseBrowser();
+    const captchaToken = captcha ?? undefined; setCaptcha(null); setTsKey((k) => k + 1);   // each token works once
     if (mode === 'signin') {
-      const { error } = await sb.auth.signInWithPassword({ email, password });
+      const { error } = await sb.auth.signInWithPassword({ email, password, options: { captchaToken } });
       setBusy(false);
       if (!error) { router.replace(next); router.refresh(); return; }
       if (/confirm/i.test(error.message)) setErr(t('login.errConfirm'));
       else setErr(t('login.errWrong'));
     } else if (mode === 'signup') {
-      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: callback(next) } });
+      const { data, error } = await sb.auth.signUp({ email, password, options: { captchaToken, emailRedirectTo: callback(next) } });
       setBusy(false);
       if (error) { setErr(authError(t, error, 'login.errCreate')); return; }
       if (data.session) { router.replace(next); router.refresh(); return; }
       setSent(t('login.sentConfirm', { email }));
     } else if (mode === 'link') {
-      const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: callback(next) } });
+      const { error } = await sb.auth.signInWithOtp({ email, options: { captchaToken, emailRedirectTo: callback(next) } });
       setBusy(false);
       if (error) setErr(authError(t, error, 'login.errSend'));
       else setSent(t('login.sentLink', { email }));
     } else {
-      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: callback('/reset') });
+      const { error } = await sb.auth.resetPasswordForEmail(email, { captchaToken, redirectTo: callback('/reset') });
       setBusy(false);
       if (error) setErr(authError(t, error, 'login.errReset'));
       else setSent(t('login.sentReset', { email }));
@@ -92,8 +95,9 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
               {mode === 'signup' && <span className="muted" style={{ fontSize: 13 }}>{t('login.pwHint')}</span>}
             </div>
           )}
+          <Turnstile key={tsKey} lang={lang} onToken={setCaptcha} />
           {err && <p className="error" style={{ margin: 0 }}>{err}</p>}
-          <button className="btn primary big block" disabled={busy}>{busy ? t('login.wait') : label}</button>
+          <button className="btn primary big block" disabled={busy || (!!TURNSTILE_KEY && !captcha)}>{busy ? t('login.wait') : label}</button>
         </form>
         <div className="links">
           {mode === 'signin' && <button className="linkbtn" onClick={() => { setMode('forgot'); setErr(''); }}>{t('login.forgot')}</button>}

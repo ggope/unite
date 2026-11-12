@@ -106,11 +106,11 @@ export async function resolveReport(action: 'dismiss' | 'remove', f: FormData) {
   const video = s(f, 'video_id'), petition = s(f, 'petition_id'), person = s(f, 'profile_id');
   const resolved = { status: 'resolved', resolved_at: new Date().toISOString() };
   if (action === 'remove') {
-    if ((video || petition) && !note) return done(NEED_REASON);
+    if (!note) return done(NEED_REASON);
     const { error } = video
       ? await sb.from('videos').update({ status: 'rejected', moderation_note: note }).eq('id', video)
       : petition ? await sb.from('petitions').update({ status: 'removed', moderation_note: note }).eq('id', petition)
-      : await sb.rpc('clear_profile', { p_user: person });
+      : await sb.rpc('clear_profile', { p_user: person, p_note: note });
     if (error) return done(error);
     // Removing the item settles every open report about it, not just this one.
     const q = sb.from('reports').update(resolved).eq('status', 'open');
@@ -139,4 +139,12 @@ export async function newsAction(op: 'attach' | 'hide', f: FormData) {
 export async function toggleSource(f: FormData) {
   const sb = await mod();
   await done((await sb.from('news_sources').update({ active: s(f, 'active') === 'true' }).eq('id', s(f, 'id'))).error);
+}
+
+export async function setHumanCheck(f: FormData) {
+  const sb = await mod();
+  const on = s(f, 'on') === 'true';
+  if (on && !(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && process.env.TURNSTILE_SECRET_KEY)) return done({ message: 'Add the Cloudflare Turnstile keys in Vercel first.' });
+  const { error } = await sb.from('site_settings').update({ require_human_check: on }).eq('id', true);
+  await done(error);
 }

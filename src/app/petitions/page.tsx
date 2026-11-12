@@ -30,16 +30,16 @@ export default async function Petitions({ searchParams }: { searchParams: Promis
       <Link className="mylolink" href="/mylo"><MyloArt mood="fired" size={44} id="pet" label="" /><span>{t('mylo.goals')}<br /><span className="hint" style={{ color: '#4A453E', fontWeight: 600 }}>{t('mylo.goalsText')}</span></span>→</Link>
       <form className="field" action="/petitions"><input name="q" type="search" defaultValue={q} placeholder={t('pet.search')} aria-label={t('pet.search')} /><input type="hidden" name="topic" value={topic} /></form>
       <div className="chips">
-        <Link className="chip" aria-pressed={!topic} href={href({ topic: '' })}>{t('pet.all')}</Link>
-        {TOPIC_KEYS.map((k) => <Link key={k} className="chip" aria-pressed={topic === k} href={href({ topic: k })}>{t(`topic.${k}`)}</Link>)}
+        <Link className="chip" aria-current={(!topic) ? 'page' : undefined} href={href({ topic: '' })}>{t('pet.all')}</Link>
+        {TOPIC_KEYS.map((k) => <Link key={k} className="chip" aria-current={(topic === k) ? 'page' : undefined} href={href({ topic: k })}>{t(`topic.${k}`)}</Link>)}
       </div>
-      <div className="row"><Link className="chip" aria-pressed={sort === 'recent'} href={href({ sort: 'recent' })}>{t('pet.recent')}</Link><Link className="chip" aria-pressed={sort === 'signed'} href={href({ sort: 'signed' })}>{t('pet.mostSigned')}</Link></div>
+      <div className="row"><Link className="chip" aria-current={(sort === 'recent') ? 'page' : undefined} href={href({ sort: 'recent' })}>{t('pet.recent')}</Link><Link className="chip" aria-current={(sort === 'signed') ? 'page' : undefined} href={href({ sort: 'signed' })}>{t('pet.mostSigned')}</Link></div>
       <div>
         {rows.length ? rows.map((p: any) => (
           <div className="prow" key={p.id}>
             <div className="stack" style={{ gap: 6, minWidth: 0 }}>
               <span className="hint">{t(`topic.${p.topic as keyof typeof TOPICS}`)} · {t('pet.to', { target: p.target })} {stat(p).united_count > 1 && <span className="united">{t('pet.united', { n: stat(p).united_count })}</span>}</span>
-              <h3><Link href={`/p/${p.id}`}>{p.title}</Link></h3>
+              <h2><Link href={`/p/${p.id}`}>{p.title}</Link></h2>
               <span className="row hint"><b className="num">{fmt(stat(p).combined)}</b> {t('common.of')} {fmt(p.goal)}<span className="prog"><i style={{ width: `${Math.min(100, stat(p).combined / p.goal * 100)}%` }} /></span></span>
             </div>
             <SignButton variant="small" petitionId={p.id} title={p.title} signed={signed.has(p.id)} viewer={viewer} />

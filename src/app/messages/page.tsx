@@ -10,7 +10,7 @@ type C = { partner: string; handle: string | null; display_name: string | null; 
 
 export default async function Messages() {
   const [{ sb, user }, { lang, t }] = await Promise.all([currentUser(), getT()]);
-  if (!user) return <div className="empty"><h2>{t('msg.title')}</h2><Link className="btn primary" href="/login?next=/messages">{t('common.signIn')}</Link></div>;
+  if (!user) return <div className="empty"><h1>{t('msg.title')}</h1><Link className="btn primary" href="/login?next=/messages">{t('common.signIn')}</Link></div>;
   const { data } = await sb.rpc('conversations');
   const list = (data as C[]) ?? [];
   const unread = list.reduce((a, c) => a + c.unread, 0);

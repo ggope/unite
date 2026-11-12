@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ key: stri
 export default async function Profile({ params }: { params: Promise<{ key: string }> }) {
   const { key } = await params;
   const [v, { lang, t }] = await Promise.all([load(key), getT()]);
-  if (!v) return <div className="empty"><h2>{t('pr.notFound')}</h2><Link className="btn" href="/">{t('nav.feed')}</Link></div>;
+  if (!v) return <div className="empty"><h1>{t('pr.notFound')}</h1><Link className="btn" href="/">{t('nav.feed')}</Link></div>;
   const name = v.display_name || (v.handle ? '@' + v.handle : t('invite.someone'));
   const initial = (v.display_name || v.handle || '?').trim()[0]?.toUpperCase() ?? '?';
   const n = (x: number) => fmtN(Number(x), lang);

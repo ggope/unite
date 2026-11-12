@@ -277,6 +277,31 @@ await check('report a person, then block and unblock', async () => {
   await go(bb, '/u/anna_e2e'); await bb.getByRole('button', { name: /unblock/i }).first().click(); await bb.waitForTimeout(800);
   expect(one(`select count(*) from blocks where user_id = '${B.id}'`) === '0', 'not unblocked');
 });
+await check('moderator clears a profile and the person is told why', async () => {
+  sql(`update profiles set display_name = 'Rude Cili', bio = 'rude words' where id = '${C.id}'`);
+  sql(`insert into reports (reporter_id, profile_id, reason) values ('${B.id}', '${C.id}', 'offensive name')`);
+  await go(a, '/admin?tab=reports');
+  const panel = a.locator('.panel', { hasText: 'offensive name' }).first();
+  await panel.getByRole('button', { name: /clear name and bio/i }).click(); await settle(a);
+  expect(one(`select display_name from profiles where id = '${C.id}'`) === 'Rude Cili', 'cleared without a reason');
+  await go(a, '/admin?tab=reports');
+  await a.locator('.panel', { hasText: 'offensive name' }).first().locator('input[name=note]').fill('Your name insulted people');
+  await a.locator('.panel', { hasText: 'offensive name' }).first().getByRole('button', { name: /clear name and bio/i }).click(); await settle(a);
+  expect(one(`select display_name from profiles where id = '${C.id}'`) === null, 'not cleared');
+  const c = await as(C); await go(c, '/you');
+  expect(await c.getByText('Your name insulted people').count(), 'person not told why');
+  await c.getByRole('button', { name: /^OK$/ }).first().click(); await settle(c);
+  expect(one(`select count(*) from notices where user_id = '${C.id}'`) === '0', 'notice not dismissed');
+  await c.context().close();
+});
+await check('notifications: an update is queued for followers, sender is off without keys', async () => {
+  const pid = one(`select id from petitions where status = 'live' order by created_at limit 1`);
+  sql(`insert into petition_updates (petition_id, kind, title, created_by) values ('${pid}', 'response', 'The ministry replied today', '${A.id}')`);
+  expect(one(`select count(*) from push_events where petition_id = '${pid}' and title = 'The ministry replied today'`) === '1', 'no event queued');
+  const r = await a.request.post(APP + '/api/push'); const j = await r.json();
+  expect(r.ok() && j.off === true, 'sender answered wrongly: ' + JSON.stringify(j));
+  await go(a, '/you'); expect(!(await a.getByText('Phone notifications').count()), 'toggle shown without keys');
+});
 await check('admin: official link, organiser link, unite and separate', async () => {
   await go(a, '/admin?tab=petitions&q=fountains');
   await a.fill('input[placeholder^="Official petition link"]', 'https://citizens-initiative.europa.eu/x'); await a.getByRole('button', { name: 'Save link' }).first().click();

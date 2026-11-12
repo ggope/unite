@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN } from '@/lib/i18n/dict';
-import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, unite, separate, resolveReport, setModerator, importNews, newsAction, toggleSource } from './actions';
+import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource } from './actions';
 
 export const dynamic = 'force-dynamic';
 const TABS = [['overview', 'Overview'], ['queue', 'Review queue'], ['reports', 'Reports'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People']] as const;
@@ -15,7 +15,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
   if (!user) redirect('/login?next=/admin');
   const { data: me } = await sb.from('profiles').select('is_moderator').eq('id', user.id).single();
   if (!me?.is_moderator) return (
-    <div className="empty"><h2>Admin is for moderators</h2>
+    <div className="empty"><h1>Admin is for moderators</h1>
       <p>You are signed in as <b>{user.email}</b>, but this account is not a moderator yet. Make it one in the Supabase SQL editor, then reload this page.</p>
       <Link className="btn" href="/">← Back to UNIER</Link></div>
   );
@@ -29,7 +29,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
     <div className="stack admin">
       <div className="row between"><h1>Admin</h1><Link className="hint" href="/">← Back to UNIER</Link></div>
       <nav className="chips" aria-label="Admin sections">
-        {TABS.map(([k, label]) => <Link key={k} className="chip" aria-pressed={tab === k} href={`/admin?tab=${k}`}>{label}{badge[k] ? ` · ${badge[k]}` : ''}</Link>)}
+        {TABS.map(([k, label]) => <Link key={k} className="chip" aria-current={(tab === k) ? 'page' : undefined} href={`/admin?tab=${k}`}>{label}{badge[k] ? ` · ${badge[k]}` : ''}</Link>)}
       </nav>
       {err && <p className="error" role="alert">That did not work: {err}</p>}
       {tab === 'overview' && <Overview st={st} sb={sb} />}
@@ -189,8 +189,18 @@ async function News({ sb }: { sb: any }) {
 const LiveList = ({ items }: { items: any[] | null }) => <datalist id="live-petitions">{items?.map((o) => <option key={o.id} value={o.id} label={o.title} />)}</datalist>;
 
 async function People({ sb, q, me }: { sb: any; q: string; me: string }) {
-  const { data: people } = await sb.rpc('admin_find_people', { p_query: q });
+  const [{ data: people }, { data: site }] = await Promise.all([sb.rpc('admin_find_people', { p_query: q }), sb.from('site_settings').select('require_human_check').maybeSingle()]);
+  const keys = !!(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && process.env.TURNSTILE_SECRET_KEY);
+  const push = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+  const on = !!site?.require_human_check;
   return (<>
+    <form action={setHumanCheck} className="panel stack" style={{ gap: 8 }}>
+      <span className="label">Protection against fake accounts</span>
+      <span className="hint">Cloudflare keys: {keys ? 'set ✓' : 'not set yet (sign-up and signing work without the check)'} · Phone notifications: {push ? 'ready ✓' : 'need the two VAPID keys'}</span>
+      <input type="hidden" name="on" value={String(!on)} />
+      <span>Bot check before signing: <b>{on ? 'on' : 'off'}</b>. People pass it once every 30 days.</span>
+      <button className={`btn small ${on ? 'danger' : ''}`} disabled={!on && !keys}>{on ? 'Switch off' : keys ? 'Switch on' : 'Add the Cloudflare keys first'}</button>
+    </form>
     <form className="field" action="/admin"><input type="hidden" name="tab" value="people" /><input name="q" type="search" defaultValue={q} placeholder="Search by email, handle or name" aria-label="Search people" /></form>
     <p className="hint" style={{ margin: 0 }}>{q ? 'Results' : 'Moderators'}. Signatures stay private, even here.</p>
     {people?.map((p: any) => (

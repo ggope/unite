@@ -184,7 +184,7 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
             <div className="frame" onClick={(e) => { if (!(e.target as HTMLElement).closest('a,button')) setQuiet((q) => ({ ...q, [i]: !q[i] })); }}>
               {s.item.kind === 'card' && (
                 <PosterCard id={s.item.petition_id} topic={s.item.topic} title={s.item.petition_title} target={s.item.target ?? ''} ask={s.item.caption}
-                  combined={s.item.combined} goal={s.item.goal} lastHour={s.item.last_hour} active={i === active} />
+                  combined={s.item.combined} goal={s.item.goal} lastHour={s.item.last_hour} active={i === active} tone={i} />
               )}
               {s.item.video_url && (
                 <video src={s.item.video_url} poster={s.item.cover_url ?? undefined} muted playsInline autoPlay={autoplay && i === 0} preload={i <= active + 1 ? 'auto' : 'metadata'}

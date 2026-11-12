@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { CONSENT_VERSION, DAILY_LIMIT } from '@/lib/topics';
@@ -10,6 +10,9 @@ import { fmtN, type Key, type T } from '@/lib/i18n/dict';
 import { Icon } from './Icon';
 import { authError } from '@/lib/authError';
 import { savePending } from './PendingSign';
+import { PushToggle } from './PushToggle';
+import { Turnstile, TURNSTILE_KEY } from './Turnstile';
+import { verifyHuman } from '@/lib/human/actions';
 
 export type Viewer = { loggedIn: boolean; hasConsent: boolean; oneTap: boolean };
 
@@ -32,7 +35,9 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
   const path = usePathname();
   const [signed, setSigned] = useState(initial);
   const [consented, setConsented] = useState(viewer.hasConsent);
-  const [sheet, setSheet] = useState<null | 'form' | 'why' | 'guest'>(null);
+  const [sheet, setSheet] = useState<null | 'form' | 'why' | 'guest' | 'human'>(null);
+  const [toast, setToast] = useState(false); const [captcha, setCaptcha] = useState<string | null>(null); const [tsKey, setTsKey] = useState(0);
+  const pendingWhy = useRef<string | undefined>(undefined); const needHuman = useRef(false);
   const [undo, setUndo] = useState<number | null>(null);
   const [why, setWhy] = useState(''); const [show, setShow] = useState(true); const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
@@ -47,15 +52,19 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
     }
     const { data, error } = await signRpc(sb, { petition: petitionId, why: reason || null, show });
     setBusy(false);
+    // the bot check is switched on and this account has not passed it lately
+    if (error?.message.includes('human_check_required') && TURNSTILE_KEY) { needHuman.current = true; pendingWhy.current = reason; setSheet('human'); return false; }
     if (error) { setErr(errorText(t, error.message)); return false; }
     setSigned(true); onChange?.(true, data as number); myloCheer(typeof data === 'number' ? data : undefined); router.refresh();
+    if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) fetch('/api/push', { method: 'POST', keepalive: true }).catch(() => {});
     return true;
   }
   async function start() {
     if (!viewer.loggedIn) { setSheet('guest'); return; }
     if (signed) { router.push(`/p/${petitionId}`); return; }
     if (consented && viewer.oneTap) {                     // one tap, with 5 seconds to undo
-      if (await sign()) { const t = window.setTimeout(() => setUndo(null), 5000); setUndo(t); } else setSheet('form');
+      needHuman.current = false;
+      if (await sign()) { const t = window.setTimeout(() => setUndo(null), 5000); setUndo(t); } else if (!needHuman.current) setSheet('form');
       return;
     }
     setSheet('form');
@@ -70,14 +79,25 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
     setSheet(null); router.refresh();
   }
 
+  async function passedCheck(token: string | null) {
+    if (!token) return;
+    setBusy(true); setErr('');
+    const r = await verifyHuman(token);
+    setBusy(false);
+    if (!r.ok) { setErr(t('human.err')); setTsKey((k) => k + 1); return; }
+    setSheet(null);
+    if (await sign(pendingWhy.current)) afterSign();
+  }
+  function afterSign() { setToast(true); window.setTimeout(() => setToast(false), 7000); }
+
   // Signed out: one email link both confirms the person and the signature (finished by PendingSign).
   async function guestSign() {
     setBusy(true); setErr('');
     const clean = email.trim().toLowerCase();
     savePending({ petitionId, email: clean, why: why.trim(), show, lang, at: Date.now() });
     const next = `/p/${petitionId}`;
-    const { error } = await sb.auth.signInWithOtp({ email: clean, options: { shouldCreateUser: true, emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}` } });
-    setBusy(false);
+    const { error } = await sb.auth.signInWithOtp({ email: clean, options: { shouldCreateUser: true, captchaToken: captcha ?? undefined, emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}` } });
+    setBusy(false); setCaptcha(null); setTsKey((k) => k + 1);
     if (error) { setErr(authError(t, error, 'sign.errOther')); return; }
     setSent(clean);
   }
@@ -96,7 +116,11 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
           <a href={`/api/card/${petitionId}`} target="_blank" rel="noopener">{t('sign.shareCard')}</a>
           <button onClick={() => { if (undo) clearTimeout(undo); setUndo(null); setSheet('why'); }}>{t('sign.addWhy')}</button>
           <button onClick={undoSign}>{t('sign.undo')}</button>
+          <PushToggle compact />
         </div>
+      )}
+      {toast && undo === null && (
+        <div className="undo" role="status"><span>{t('sign.signed')}</span><PushToggle compact /></div>
       )}
       {sheet && (
         <div className="backdrop" onClick={(e) => e.target === e.currentTarget && setSheet(null)}>
@@ -112,11 +136,20 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
                 <div className="field"><label htmlFor={`gw-${petitionId}`}>{t('sign.whyLabel')} <span className="muted">{t('sign.optional')}</span></label>
                   <input id={`gw-${petitionId}`} maxLength={90} value={why} onChange={(e) => setWhy(e.target.value)} placeholder={t('sign.whyPh')} /></div>
                 <label className="check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>{t('consent.text')} <a href="/privacy" target="_blank" rel="noopener">{t('consent.more')}</a></span></label>
+                <Turnstile key={tsKey} lang={lang} onToken={setCaptcha} />
                 {err && <p className="error">{err}</p>}
-                <button className="btn primary big block" disabled={busy || !agree || !email.includes('@')}>{busy ? t('sign.signing') : t('guest.send')}</button>
+                <button className="btn primary big block" disabled={busy || !agree || !email.includes('@') || (!!TURNSTILE_KEY && !captcha)}>{busy ? t('sign.signing') : t('guest.send')}</button>
               </form>
               <a className="hint" href={`/login?next=${encodeURIComponent(path)}`}>{t('guest.haveAccount')}</a>
             </>)}
+          </div>
+          ) : sheet === 'human' ? (
+          <div className="sheet" role="dialog" aria-modal="true" aria-label={t('human.title')}>
+            <div className="row between sheethead"><div><span className="label">{t('human.title')}</span><h2>{title}</h2></div>
+              <button className="btn ghost" onClick={() => setSheet(null)} aria-label={t('common.close')}><Icon name="x" /></button></div>
+            <Turnstile key={tsKey} lang={lang} onToken={passedCheck} />
+            {busy && <p className="hint" role="status">{t('sign.signing')}</p>}
+            {err && <p className="error">{err}</p>}
           </div>
           ) : (
           <div className="sheet" role="dialog" aria-modal="true" aria-label={sheet === 'why' ? t('sign.addReason') : t('sign.signPetition')}>
@@ -130,7 +163,7 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
             )}
             {err && <p className="error">{err}</p>}
             {sheet === 'form'
-              ? <button className="btn primary big block" disabled={busy || (!consented && !agree)} onClick={async () => { if (await sign(why)) setSheet(null); }}>{busy ? t('sign.signing') : t('sign.sign')}</button>
+              ? <button className="btn primary big block" disabled={busy || (!consented && !agree)} onClick={async () => { needHuman.current = false; if (await sign(why)) { setSheet(null); afterSign(); } }}>{busy ? t('sign.signing') : t('sign.sign')}</button>
               : <button className="btn primary block" onClick={saveWhy}>{t('common.save')}</button>}
             {sheet === 'form' && !consented && <p className="hint">{t('sign.afterHint')}</p>}
           </div>

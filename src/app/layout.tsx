@@ -26,10 +26,10 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: [{ media: '(prefers-color-scheme: light)', color: '#F2EEE6' }, { media: '(prefers-color-scheme: dark)', color: '#15130F' }] };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const { lang } = await getT();
+  const { lang, t } = await getT();
   return (
     <html lang={lang} className={`${anton.variable} ${inter.variable}`}>
-      <body><LangProvider lang={lang}><div className="app"><Nav /><main>{children}</main></div><PendingSign /><MyloCorner /></LangProvider></body>
+      <body><LangProvider lang={lang}><a className="skip" href="#main">{t('a11y.skip')}</a><div className="app"><Nav /><main id="main" tabIndex={-1}>{children}</main></div><PendingSign /><MyloCorner /></LangProvider></body>
     </html>
   );
 }

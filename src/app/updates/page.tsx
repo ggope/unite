@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function Updates() {
   const [{ sb, user, signed, followed }, { lang, t }] = await Promise.all([loadViewer(), getT()]);
-  if (!user) return <div className="empty"><h2>{t('upd.title')}</h2><p>{t('upd.signedOut')}</p><Link className="btn primary" href="/login?next=/updates">{t('common.signIn')}</Link></div>;
+  if (!user) return <div className="empty"><h1>{t('upd.title')}</h1><p>{t('upd.signedOut')}</p><Link className="btn primary" href="/login?next=/updates">{t('common.signIn')}</Link></div>;
   const ids = [...new Set([...signed, ...followed])];
   const { data } = ids.length
     ? await sb.from('petition_updates').select('id, kind, title, body, created_at, petition_id, petitions(title)').in('petition_id', ids).order('created_at', { ascending: false }).limit(50)

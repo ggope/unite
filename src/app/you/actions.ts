@@ -45,3 +45,9 @@ export async function resetFeed() {
 export async function signOut() {
   const { sb } = await currentUser(); await sb.auth.signOut(); revalidatePath('/');
 }
+
+export async function dismissNotice(form: FormData) {
+  const { sb } = await currentUser();
+  await sb.from('notices').delete().eq('id', Number(form.get('id')));
+  revalidatePath('/you');
+}
