@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og';
 import { LogoMark } from '@/lib/logo';
 
 export const runtime = 'edge';
-const SIZES: Record<string, { px: number; pad: number }> = { '192': { px: 192, pad: 0.12 }, '512': { px: 512, pad: 0.12 }, maskable: { px: 512, pad: 0.24 } };
+const SIZES: Record<string, { px: number; pad: number }> = { '192': { px: 192, pad: 0 }, '512': { px: 512, pad: 0 }, maskable: { px: 512, pad: 0.24 } };
 
 export async function GET(_: Request, { params }: { params: Promise<{ size: string }> }) {
   const s = SIZES[(await params).size] ?? SIZES['512'];

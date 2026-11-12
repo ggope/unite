@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { makeT, fmtN, pickLang, type Lang } from '@/lib/i18n/dict';
 import { localize } from '@/lib/petitionText';
+import { logoSvg } from '@/lib/logo';
 
 // A small sign box other websites can put in an iframe. Signing itself happens on UNIER.
 export const revalidate = 120;
@@ -28,7 +29,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 @media (prefers-color-scheme:dark){:root{--bg:#15130F;--ink:#F2EEE6;--muted:#B8B1A6;--accent:#FF6A33;--edge:#F2EEE6}}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 .box{border:2px solid var(--edge);padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-height:100vh}
-.brand{font-weight:900;letter-spacing:.12em;font-size:11px;color:var(--muted);text-decoration:none}
+.brand{display:inline-flex;align-items:center;gap:6px;font-weight:900;letter-spacing:.12em;font-size:11px;color:var(--muted);text-decoration:none}.brand svg{width:18px;height:18px}
 h1{font-size:19px;line-height:1.15;margin:0;text-transform:uppercase;font-weight:900}
 .to{color:var(--muted);font-size:13px}
 .n{font-weight:900;font-size:22px}.goal{color:var(--muted);font-size:13px}
@@ -36,7 +37,7 @@ h1{font-size:19px;line-height:1.15;margin:0;text-transform:uppercase;font-weight
 a.go{align-self:flex-start;background:var(--accent);color:#111;font-weight:900;text-decoration:none;text-transform:uppercase;padding:10px 16px;border:2px solid var(--edge);box-shadow:3px 3px 0 var(--edge)}
 a.go:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 </style></head><body><div class="box">
-<a class="brand" href="${base}" target="_blank" rel="noopener">UNIER</a>
+<a class="brand" href="${base}" target="_blank" rel="noopener">${logoSvg({ round: true, paper: false, id: 'em' })}UNIER</a>
 <h1>${esc(p.title)}</h1><span class="to">${esc(t('poster.to', { target: p.target }))}</span>
 <div><span class="n">${fmtN(n, lang)}</span> <span class="goal">${esc(t('poster.signed', { goal: fmtN(p.goal, lang) }))}</span></div>
 <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct.toFixed(1)}%"></i></div>

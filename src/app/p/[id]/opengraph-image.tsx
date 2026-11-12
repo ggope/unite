@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { createClient } from '@supabase/supabase-js';
-import { antonFont } from '@/lib/ogfont';
+import { ogFonts } from '@/lib/ogfont';
+import { LogoMark } from '@/lib/logo';
 import { fmtN } from '@/lib/i18n/dict';
 
 // The picture WhatsApp, Messenger, Facebook and others show when a petition link is shared.
@@ -19,19 +20,19 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   ]);
   const n = Number(st?.combined ?? 0), goal = p?.goal ?? 1000, pct = Math.min(100, (n / goal) * 100);
   const title = (p?.title ?? 'UNIER').toUpperCase();
-  const fonts = await antonFont(`UNIER${title}${fmtN(n, 'en')}${fmtN(goal, 'en')}/0123456789,`);
-  const display = fonts.length ? 'Anton' : 'sans-serif';
+  const toLine = p?.target ? `TO ${p.target.toUpperCase()}`.slice(0, 48) : '';
+  const { fonts, display, body } = await ogFonts(`UNIER${title}${fmtN(n, 'en')}${fmtN(goal, 'en')}/0123456789,`, `${toLine}/ 0123456789,.`);
   return new ImageResponse(
     (
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: 60, color: '#111', backgroundColor: '#F2EEE6' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', fontFamily: display, fontSize: 52, letterSpacing: 2 }}>UNIER</div>
-          {p?.target && <div style={{ display: 'flex', padding: '8px 16px', background: '#111', color: '#F2EEE6', fontSize: 26, fontWeight: 800 }}>{`TO ${p.target.toUpperCase()}`.slice(0, 48)}</div>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}><LogoMark size={72} round /><div style={{ display: 'flex', fontFamily: display, fontSize: 52, letterSpacing: 2 }}>UNIER</div></div>
+          {toLine && <div style={{ display: 'flex', padding: '8px 16px', background: '#111', color: '#F2EEE6', fontFamily: body, fontSize: 26, fontWeight: 800 }}>{toLine}</div>}
         </div>
         <div style={{ display: 'flex', marginTop: 34, fontFamily: display, fontSize: title.length > 60 ? 76 : 92, lineHeight: 1 }}>{title}</div>
         <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'flex-end', gap: 18 }}>
           <div style={{ display: 'flex', fontFamily: display, fontSize: 96, lineHeight: 1 }}>{fmtN(n, 'en')}</div>
-          <div style={{ display: 'flex', fontSize: 32, fontWeight: 700, color: '#4A453E', paddingBottom: 10 }}>{`/ ${fmtN(goal, 'en')}`}</div>
+          <div style={{ display: 'flex', fontFamily: body, fontSize: 32, fontWeight: 800, color: '#4A453E', paddingBottom: 10 }}>{`/ ${fmtN(goal, 'en')}`}</div>
         </div>
         <div style={{ display: 'flex', marginTop: 16, height: 30, border: '5px solid #111', background: '#E6E0D3' }}><div style={{ width: `${pct}%`, background: '#FF5A1F' }} /></div>
       </div>

@@ -1,4 +1,5 @@
 'use client';
+import { logoSvg } from '@/lib/logo';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -33,7 +34,7 @@ export function Nav() {
   return (
     <>
       <aside className="rail" aria-label={t('nav.main')}>
-        <Link className="logo" href="/">UNIER</Link>
+        <Link className="logo" href="/"><span className="logo-mark" aria-hidden="true" dangerouslySetInnerHTML={{ __html: logoSvg({ round: true, id: 'rail-logo' }) }} />UNIER</Link>
         {ITEMS.map((i) => (
           <Link key={i.href} href={i.href} aria-current={active(i.href) ? 'page' : undefined}><Icon name={i.icon} />{t(i.label)}{dot(i.href)}</Link>
         ))}
