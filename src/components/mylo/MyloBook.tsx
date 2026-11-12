@@ -1,21 +1,19 @@
 'use client';
 import Link from 'next/link';
-import { Baloo_2 } from 'next/font/google';
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useT } from '@/lib/i18n/client';
 import { STORY } from './MyloStory';
-import { COVER_SCENE, END_SCENE, SCENES, sceneSvg } from './scenes';
+import { ALT, COVER_SCENE, END_SCENE, SCENES, sceneSvg } from './scenes';
 import { ShareButton } from '../ShareButton';
-
-// A rounded, friendly face for the words, like a printed picture book.
-const book = Baloo_2({ subsets: ['latin', 'latin-ext'], weight: ['600', '800'], display: 'swap' });
+import { bookFont as book } from './bookFont';
 
 const N = STORY.length;           // story pages; page N is "The end"
 const WIDE = 700;                 // from this width the book opens as a two-page spread
 
 const Scene = memo(function Scene({ i, slot }: { i: number; slot: string }) {
+  const { t } = useT();
   const html = sceneSvg(i < N ? SCENES[i] : END_SCENE, `bk-${i}-${slot}`);
-  return <div className="bk-scene" dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div className="bk-scene" role="img" aria-label={t(ALT[i])} dangerouslySetInnerHTML={{ __html: html }} />;
 });
 
 function Cover() {
@@ -23,7 +21,7 @@ function Cover() {
   return (
     <span className={`bk-cover ${book.className}`}>
       <span className="bk-cover-title">{t('story.title')}</span>
-      <span className="bk-cover-art" dangerouslySetInnerHTML={{ __html: sceneSvg(COVER_SCENE, 'bk-cover') }} />
+      <span className="bk-cover-art" role="img" aria-label={t('book.altCover')} dangerouslySetInnerHTML={{ __html: sceneSvg(COVER_SCENE, 'bk-cover') }} />
       <span className="bk-cover-by">{t('book.by')}</span>
     </span>
   );
@@ -38,6 +36,7 @@ function Words({ i, restart }: { i: number; restart: () => void }) {
       <div className="bk-end-actions">
         <button type="button" className="btn" onClick={restart}>{t('story.again')}</button>
         <ShareButton path="/mylo/story" title={t('story.title')} />
+        <Link className="btn" href="/mylo/story/print">{t('print.title')}</Link>
         <Link className="btn primary" href="/mylo">{t('story.end')}</Link>
       </div>
     </div>
@@ -102,9 +101,9 @@ export function BookStage({ onClose }: { onClose?: () => void }) {
       <>
         <div className="bk-page bk-left">{!opening && <Scene i={left} slot="l" />}</div>
         <div className="bk-page bk-right"><Words i={right} restart={restart} /></div>
-        {opening && <div className="bk-leaf bk-leaf-r bk-open" onAnimationEnd={landed}><div className="bk-face"><Cover /></div><div className="bk-face bk-back"><Scene i={0} slot="o" /></div></div>}
-        {turn?.dir === 1 && <div className="bk-leaf bk-leaf-r bk-fwd" onAnimationEnd={landed}><div className="bk-face bk-paper"><Words i={turn.from} restart={restart} /></div><div className="bk-face bk-back"><Scene i={turn.from + 1} slot="b" /></div></div>}
-        {turn?.dir === -1 && <div className="bk-leaf bk-leaf-l bk-bwd" onAnimationEnd={landed}><div className="bk-face"><Scene i={turn.from} slot="f" /></div><div className="bk-face bk-back bk-paper"><Words i={turn.from - 1} restart={restart} /></div></div>}
+        {opening && <div aria-hidden="true" className="bk-leaf bk-leaf-r bk-open" onAnimationEnd={landed}><div className="bk-face"><Cover /></div><div className="bk-face bk-back"><Scene i={0} slot="o" /></div></div>}
+        {turn?.dir === 1 && <div aria-hidden="true" className="bk-leaf bk-leaf-r bk-fwd" onAnimationEnd={landed}><div className="bk-face bk-paper"><Words i={turn.from} restart={restart} /></div><div className="bk-face bk-back"><Scene i={turn.from + 1} slot="b" /></div></div>}
+        {turn?.dir === -1 && <div aria-hidden="true" className="bk-leaf bk-leaf-l bk-bwd" onAnimationEnd={landed}><div className="bk-face"><Scene i={turn.from} slot="f" /></div><div className="bk-face bk-back bk-paper"><Words i={turn.from - 1} restart={restart} /></div></div>}
       </>
     );
   } else {
@@ -112,9 +111,9 @@ export function BookStage({ onClose }: { onClose?: () => void }) {
     body = (
       <>
         <div className="bk-page bk-full"><Single i={under} restart={restart} slot="u" /></div>
-        {opening && <div className="bk-leaf bk-leaf-full bk-open1" onAnimationEnd={landed}><div className="bk-face"><Cover /></div><div className="bk-face bk-back bk-paper" /></div>}
-        {turn?.dir === 1 && <div className="bk-leaf bk-leaf-full bk-fwd1" onAnimationEnd={landed}><div className="bk-face bk-paper"><Single i={turn.from} restart={restart} slot="f" /></div><div className="bk-face bk-back bk-paper" /></div>}
-        {turn?.dir === -1 && <div className="bk-leaf bk-leaf-full bk-bwd1" onAnimationEnd={landed}><div className="bk-face bk-paper"><Single i={turn.from - 1} restart={restart} slot="f" /></div><div className="bk-face bk-back bk-paper" /></div>}
+        {opening && <div aria-hidden="true" className="bk-leaf bk-leaf-full bk-open1" onAnimationEnd={landed}><div className="bk-face"><Cover /></div><div className="bk-face bk-back bk-paper" /></div>}
+        {turn?.dir === 1 && <div aria-hidden="true" className="bk-leaf bk-leaf-full bk-fwd1" onAnimationEnd={landed}><div className="bk-face bk-paper"><Single i={turn.from} restart={restart} slot="f" /></div><div className="bk-face bk-back bk-paper" /></div>}
+        {turn?.dir === -1 && <div aria-hidden="true" className="bk-leaf bk-leaf-full bk-bwd1" onAnimationEnd={landed}><div className="bk-face bk-paper"><Single i={turn.from - 1} restart={restart} slot="f" /></div><div className="bk-face bk-back bk-paper" /></div>}
       </>
     );
   }

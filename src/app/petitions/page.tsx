@@ -52,7 +52,8 @@ export default async function Petitions({ searchParams }: { searchParams: Promis
         {TOPIC_KEYS.map((k) => <Link key={k} className="chip" aria-current={(topic === k) ? 'page' : undefined} href={href({ topic: k })}>{t(`topic.${k}`)}</Link>)}
       </div>
       <div className="row"><Link className="chip" aria-current={(sort === 'recent') ? 'page' : undefined} href={href({ sort: 'recent' })}>{t('pet.recent')}</Link><Link className="chip" aria-current={(sort === 'signed') ? 'page' : undefined} href={href({ sort: 'signed' })}>{t('pet.mostSigned')}</Link>
-        {cc && <Link className="chip" aria-current={(sort === 'near') ? 'page' : undefined} href={href({ sort: 'near' })}>{t('pet.near', { country: ccName })}</Link>}</div>
+        {cc && <Link className="chip" aria-current={(sort === 'near') ? 'page' : undefined} href={href({ sort: 'near' })}>{t('pet.near', { country: ccName })}</Link>}
+        <Link className="chip" href="/wins">{t('wins.title')}</Link></div>
       <div>
         {rows.length ? rows.map((p: any) => (
           <div className="prow" key={p.id}>

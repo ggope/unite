@@ -113,9 +113,14 @@ export async function resolveReport(action: 'dismiss' | 'remove', f: FormData) {
   const sb = await mod();
   const note = s(f, 'note') || null;
   const video = s(f, 'video_id'), petition = s(f, 'petition_id'), person = s(f, 'profile_id');
+  const reason = s(f, 'reason_key'), answer = s(f, 'update_id');
   const resolved = { status: 'resolved', resolved_at: new Date().toISOString() };
   if (action === 'remove') {
     if (!note) return done(NEED_REASON);
+    // A reason for signing: hidden from every page, and the signer is told why. Its reports close with it.
+    if (reason) return done((await sb.rpc('hide_reason', { p_key: reason, p_note: note })).error);
+    // An official answer: deleted. Its open reports are closed by the database as it goes.
+    if (answer) return done((await sb.from('petition_updates').delete().eq('id', answer)).error);
     const { error } = video
       ? await sb.from('videos').update({ status: 'rejected', moderation_note: note }).eq('id', video)
       : petition ? await sb.from('petitions').update({ status: 'removed', moderation_note: note }).eq('id', petition)

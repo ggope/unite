@@ -370,7 +370,11 @@ main:focus{outline:none}
 .official-answer{border:3px solid var(--edge);border-radius:var(--r);padding:12px 14px;background:var(--surface);box-shadow:var(--shadow)}
 .badge-answer{display:inline-block;margin-bottom:6px;padding:2px 8px;border-radius:999px;background:var(--ink);color:var(--bg);font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
 .reasons{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-.reasons li{padding:10px 12px;border-left:4px solid var(--accent);background:var(--sunk);border-radius:0 var(--r) var(--r) 0;font-style:italic}
+.reasons li{padding:10px 12px;border-left:4px solid var(--accent);background:var(--sunk);border-radius:0 var(--r) var(--r) 0;font-style:italic;display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
+.flag-mini{flex:none;display:inline-grid;place-items:center;width:32px;height:32px;margin:-6px -6px -6px 0;border:0;border-radius:50%;background:transparent;color:var(--muted);cursor:pointer;opacity:.7}
+.flag-mini:hover,.flag-mini:focus-visible{opacity:1;background:var(--surface);color:var(--fg)}
+.flag-mini svg{width:16px;height:16px}
+.upd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .answer-link input{font-size:13px}
 
 /* petition checklist on the start page */
@@ -449,3 +453,43 @@ main:focus{outline:none}
 .bk-closed-wrap.small .bk-edges{right:-4px;width:5px}
 .bk-closed-wrap.small .hint{font-size:11px;font-weight:800;color:#4A453E;text-align:center;max-width:90px;line-height:1.2}
 .bk-closed-wrap.small .bk-closed:hover .bk-cover{transform:rotateY(-4deg) translateY(-2px) rotate(-2deg)}
+/* wins */
+.wins-head{display:flex;align-items:center;gap:16px}
+.wins-head .mylo-art{flex:none}
+.wins{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.win{gap:6px}
+.badge-win{display:inline-block;padding:2px 8px;border-radius:999px;background:#2F8E45;color:#fff;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+@media (max-width:520px){.wins-head .mylo-art{width:84px;height:101px}}
+/* organiser dashboard */
+.dash-next{flex-direction:row;align-items:center;gap:14px}
+.dash-next .mylo-art{flex:none}
+.milestones{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.milestones li{display:flex;align-items:center;gap:10px;color:var(--muted)}
+.milestones li::before{content:"";flex:none;width:14px;height:14px;border-radius:50%;border:2px solid var(--line)}
+.milestones li.done{color:var(--ink);font-weight:700}
+.milestones li.done::before{background:#2F8E45;border-color:#2F8E45}
+@media (max-width:420px){.dash-next .mylo-art{display:none}}
+/* the printable book */
+.print-book{max-width:720px;margin:0 auto;width:100%}
+.pp{position:relative;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px;background:#FFFDF6;color:#111;border:2px solid var(--edge);border-radius:var(--r)}
+.pp-art{width:100%;max-width:560px;aspect-ratio:1;border-radius:6px;overflow:hidden}
+.pp-art svg{display:block;width:100%;height:100%}
+.pp-line{border:2px solid #111;background:#fff}
+.pp-title{margin:0;font-family:inherit;text-transform:none;letter-spacing:0;font-size:34px;line-height:1.1;text-align:center;font-weight:800}
+.pp-text{margin:0;font-size:22px;line-height:1.4;text-align:center;font-weight:600;max-width:34em}
+.pp-end{font-size:34px;font-weight:800}
+.pp-num{position:absolute;bottom:10px;right:16px;font-weight:800;color:#6E655A}
+.pp-by{margin:0;font-weight:800;color:#6E655A}
+.pp-owner{margin:0;display:flex;gap:8px;align-items:flex-end;width:100%;max-width:420px;font-weight:600}
+.pp-owner span{flex:1;border-bottom:2px solid #111;height:1.2em}
+@media print{
+  @page{size:A4;margin:12mm}
+  .print-book{max-width:none;gap:0!important}
+  .pp{border:0;border-radius:0;padding:0;break-after:page;page-break-after:always;height:270mm;justify-content:center;background:#fff}
+  .pp:last-child{break-after:auto;page-break-after:auto}
+  .pp-art{max-width:170mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pp-title,.pp-end{font-size:34pt}
+  .pp-text{font-size:20pt}
+  .pp-by,.pp-owner,.pp-num{font-size:14pt}
+  .skip{display:none!important}
+}

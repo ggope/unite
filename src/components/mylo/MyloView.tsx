@@ -64,8 +64,10 @@ export async function MyloView({ m, viewer, signed }: { m: MyloToday; viewer: Vi
         <section className="panel">
           <h2>{t('mylo.cheer')}</h2>
           {m.wins.map((w) => <Link key={w.id} href={`/p/${w.id}`}><b>{w.title}</b></Link>)}
+          <Link className="btn small" href="/wins" style={{ alignSelf: 'flex-start' }}>{t('wins.link')}</Link>
         </section>
       )}
+      {m.wins.length === 0 && <Link className="hint" href="/wins">{t('wins.link')}</Link>}
 
       {m.grim_headlines.length > 0 && (
         <section className="panel">

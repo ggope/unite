@@ -8,6 +8,7 @@ import { MarkDelivered } from '@/components/MarkDelivered';
 import { getT } from '@/lib/i18n/server';
 import { fmtN, locale } from '@/lib/i18n/dict';
 import { PrintButton } from '@/components/PrintButton';
+import { ReportButton } from '@/components/ReportButton';
 
 export const dynamic = 'force-dynamic';
 type Report = { verified: number; imported: number; first_at: string | null; last_at: string | null; last_7d: number; reasons: number; countries: { c: string; n: number }[]; other: number; days: { d: string; n: number }[]; generated: string };
@@ -69,7 +70,7 @@ export default async function DeliveryReport({ params }: { params: Promise<{ id:
         <div className="spark" role="img" aria-label={rep.days.map((x) => `${day(x.d)}: ${x.n}`).join(', ')}>{rep.days.map((x) => <i key={x.d} title={`${day(x.d)}: ${n(x.n)}`} style={{ height: `${Math.max(4, (Number(x.n) / dayMax) * 100)}%` }} />)}</div></section>}
 
       {!!reasons?.length && <section className="stack" style={{ gap: 8 }}><h2>{t('rep.inWords')}</h2>
-        <ul className="reasons">{reasons.map((x: any, k: number) => <li key={k}>“{x.why}”</li>)}</ul>
+        <ul className="reasons">{reasons.map((x: any, k: number) => <li key={x.rid ?? k}><span>“{x.why}”</span>{x.rid && <ReportButton reasonKey={x.rid} loggedIn={!!user} variant="mini" />}</li>)}</ul>
         <span className="hint">{t('rep.inWordsHint')}</span></section>}
 
       {organiser && <AnswerLink petitionId={p.id} target={p.target} />}

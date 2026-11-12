@@ -43,7 +43,7 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
       {(notices ?? []).map((n: any) => (
         <form key={n.id} action={dismissNotice} className="panel row between" role="status">
           <input type="hidden" name="id" value={n.id} />
-          <span style={{ flex: 1, minWidth: 0 }}>{t('notice.cleared', { reason: n.body ?? '' })}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>{t(n.kind === 'reason_hidden' ? 'notice.reasonHidden' : 'notice.cleared', { reason: (n.body ?? '').replace(/[.!?]+$/, '') })}</span>
           <button className="btn small">{t('notice.dismiss')}</button>
         </form>
       ))}
@@ -90,7 +90,7 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
         {viewer.hasConsent && <form action={revokeConsent}><button className="btn small danger">{t('you.revoke')}</button></form>}
       </div>
       <div className="panel"><span className="label">{t('you.petitions')}</span>
-        {mine?.length ? mine.map((p: any) => <div key={p.id} className="row between"><Link href={`/p/${p.id}`} style={{ flex: 1, minWidth: 0 }}>{p.title}</Link><span className="hint">{t(`status.${p.status as 'live'}`)}{p.status === 'removed' && p.moderation_note ? ` · ${t('mod.reason', { r: p.moderation_note })}` : ''}</span></div>)
+        {mine?.length ? mine.map((p: any) => <div key={p.id} className="row between"><Link href={`/p/${p.id}`} style={{ flex: 1, minWidth: 0 }}>{p.title}</Link>{p.status !== 'removed' && <Link className="btn small" href={`/p/${p.id}/dashboard`}>{t('dash.open')}</Link>}<span className="hint">{t(`status.${p.status as 'live'}`)}{p.status === 'removed' && p.moderation_note ? ` · ${t('mod.reason', { r: p.moderation_note })}` : ''}</span></div>)
           : <p className="hint" style={{ margin: 0 }}>{t('you.noPetitions')} <Link href="/start">{t('common.startPetition')}</Link></p>}
       </div>
       <div className="panel"><span className="label">{t('you.vids')}</span>

@@ -440,6 +440,7 @@ await check('first visit: Mylo introduces himself once, and the story reads to t
   await f.locator('.bk-closed').click(); await f.waitForSelector('.bk-book');
   await f.waitForFunction(() => !document.querySelector('.bk-leaf'), null, { timeout: 5000 });   // the cover has swung open
   expect(await f.getByText(/same world as you/).count(), 'first page missing');
+  expect(await f.locator('.bk-scene[role=img][aria-label*="Mylo"]').count(), 'picture has no description for screen readers');
   for (let k = 0; k < 12 && !(await f.getByText('The end').count()); k++) {
     await f.locator('.bk-nav').getByRole('button', { name: 'Next' }).click({ timeout: 3000 }).catch(() => {}); await f.waitForTimeout(950);
   }
@@ -476,6 +477,53 @@ await check('report: reasons people chose to show, and mark as delivered', async
   await a.getByRole('button', { name: 'Mark as delivered' }).click(); await a.waitForTimeout(1200);
   expect(Number(one(`select count(*) from petition_updates where petition_id = '${seedId}' and kind = 'delivered'`)) >= 1, 'not marked delivered');
   await go(g, `/p/${seedId}`); expect(await g.getByText('My grandad fished here').count(), 'shown reason missing on the petition');
+});
+await check('a shown reason is reported; a moderator hides it and the signer is told', async () => {
+  await go(bb, `/p/${seedId}`);
+  await bb.locator('.reasons li', { hasText: 'My grandad fished here' }).getByRole('button', { name: 'Report this reason' }).click();
+  await bb.getByText('Hate or harassment').click(); await bb.getByRole('button', { name: 'Send report' }).click();
+  await bb.waitForSelector('text=A person on our team will look at it', { timeout: 8000 });
+  expect(one(`select count(*) from reports where reason_key is not null and petition_id is null and status = 'open'`) === '1', 'reason report not saved on its own');
+  await go(a, '/admin?tab=reports');
+  const panel = a.locator('.panel', { hasText: 'My grandad fished here' }).first();
+  expect(await panel.getByText('Reason for signing').count(), 'admin does not show what kind of report it is');
+  await panel.locator('input[name=note]').fill('Personal attack'); await panel.getByRole('button', { name: 'Hide reason' }).click(); await settle(a);
+  expect(one(`select reason_hidden from signatures where user_id = '${C.id}' and petition_id = '${seedId}'`) === 't', 'reason not hidden');
+  expect(one(`select count(*) from notices where user_id = '${C.id}' and kind = 'reason_hidden'`) === '1', 'signer not told');
+  await go(g, `/p/${seedId}`); expect(!(await g.getByText('My grandad fished here').count()), 'hidden reason still shown');
+});
+await check('an official answer is reported and a moderator removes it', async () => {
+  await go(bb, `/p/${seedId}`);
+  await bb.locator('.official-answer', { hasText: 'Erika Test' }).getByRole('button', { name: 'Report this answer' }).click();
+  await bb.getByText('Spam or a scam').click(); await bb.getByRole('button', { name: 'Send report' }).click();
+  await bb.waitForSelector('text=A person on our team will look at it', { timeout: 8000 });
+  await go(a, '/admin?tab=reports');
+  const panel = a.locator('.panel', { hasText: 'Official answer' }).first();
+  await panel.locator('input[name=note]').fill('Not from the ministry'); await panel.getByRole('button', { name: 'Remove' }).click(); await settle(a);
+  expect(one(`select count(*) from petition_updates where petition_id = '${seedId}' and via_link`) === '0', 'answer not removed');
+  expect(one(`select count(*) from reports where reason = 'spam' and status = 'resolved' and update_id is null`) === '1', 'answer report still open, or lost');
+});
+await check('wins page lists petitions that won', async () => {
+  sql(`insert into petition_updates (petition_id, kind, title, created_by) values ('${seedId}', 'win', 'The ministry agreed', '${A.id}')`);
+  const r = await go(g, '/wins'); expect(r.ok(), `wins ${r.status()}`);
+  expect(await g.locator('.win', { hasText: 'End bottom trawling' }).count() === 1, 'win missing or listed twice');
+  await go(g, '/petitions'); expect(await g.locator('a[href="/wins"]').count(), 'no link to wins');
+});
+await check('organiser dashboard is private and suggests a next step', async () => {
+  const r = await go(a, `/p/${seedId}/dashboard`); expect(r.ok(), `dashboard ${r.status()}`);
+  expect(await a.getByRole('heading', { name: 'How your petition is doing' }).count(), 'no title');
+  expect(await a.locator('.tile').count() === 7 && await a.locator('.spark i').count() === 30, 'numbers or 30-day bars missing');
+  expect(await a.getByText('This petition won').count(), 'won petition not celebrated');
+  await go(bb, `/p/${seedId}/dashboard`); expect(!(await bb.locator('.tile').count()), 'someone else saw the dashboard');
+  await go(g, `/p/${seedId}/dashboard`); expect(g.url().includes('/login'), 'guest not sent to sign in');
+});
+await check('printable book with pictures described, plus colouring pages', async () => {
+  const r = await go(g, '/mylo/story/print'); expect(r.ok(), `print ${r.status()}`);
+  expect(await g.locator('.pp').count() === 12, `pages: ${await g.locator('.pp').count()}`);
+  expect(await g.locator('.pp [role=img][aria-label]').count() === 12, 'a picture has no description');
+  const colours = await g.locator('.pp-line > svg').evaluateAll((els) => els.map((e) => e.outerHTML));
+  expect(colours.length === 4 && colours.every((h) => !/filter=|#F7862E|#4CAF5B/i.test(h)), 'colouring pages still coloured');
+  await go(g, '/mylo/story'); expect(await g.locator('a[href="/mylo/story/print"]').count(), 'no link to print');
 });
 await check('petitions popular in a country', async () => {
   sql(`update petitions set region = 'Hungary' where id = '${seedId}'`);

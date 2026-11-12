@@ -1,3 +1,4 @@
+import type { Key } from '@/lib/i18n/langs';
 import { MYLO_ART, type Mood } from './art';
 
 // The pictures in Mylo's picture book, drawn as cut paper like Mylo himself.
@@ -107,6 +108,9 @@ const cover = () =>
   mylo('worried', 96, 62, 108);
 
 export const SCENES = [home, hurt, small, together, grow, better];
+// What each picture shows (the six pages, then the end), for people who listen with a screen reader.
+export const ALT: Key[] = ['book.alt0', 'book.alt1', 'book.alt2', 'book.alt3', 'book.alt4', 'book.alt5', 'book.altEnd'];
+export const MYLO = mylo;
 export const COVER_SCENE = cover;
 export const END_SCENE = end;
 

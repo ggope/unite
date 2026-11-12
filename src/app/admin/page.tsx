@@ -83,21 +83,30 @@ async function Queue({ sb }: { sb: any }) {
 
 async function Reports({ sb }: { sb: any }) {
   const base = 'id, reason, video_id, petition_id, created_at, videos(caption, storage_path), petitions(title)';
-  let { data: reports, error } = await sb.from('reports').select(`${base}, profile_id, person:profiles!reports_profile_id_fkey(handle, display_name, bio)`).eq('status', 'open').order('created_at').limit(50);
+  let { data: reports, error } = await sb.from('reports').select(`${base}, profile_id, person:profiles!reports_profile_id_fkey(handle, display_name, bio), reason_key, update_id, answer:petition_updates(title, body, petition_id)`).eq('status', 'open').order('created_at').limit(50);
+  if (error) ({ data: reports, error } = await sb.from('reports').select(`${base}, profile_id, person:profiles!reports_profile_id_fkey(handle, display_name, bio)`).eq('status', 'open').order('created_at').limit(50));   // before 0017
   if (error) ({ data: reports } = await sb.from('reports').select(base).eq('status', 'open').order('created_at').limit(50));   // before 0006_social.sql
+  // A reported reason is read through a moderator-only function, which never says who wrote it.
+  const said = new Map<string, any>(await Promise.all((reports ?? []).filter((r: any) => r.reason_key)
+    .map(async (r: any) => [r.reason_key, (await sb.rpc('reported_reason', { p_key: r.reason_key })).data] as const)));
+  const kind = (r: any) => r.reason_key ? 'Reason for signing' : r.update_id ? 'Official answer' : r.video_id ? 'Video' : r.petition_id ? 'Petition' : 'Person';
   return (<>
     <p className="hint" style={{ margin: 0 }}>Removing something sends your reason to its author. Dismiss keeps it online.</p>
-    {reports?.length ? reports.map((r: any) => (
+    {reports?.length ? reports.map((r: any) => {
+      const why = r.reason_key ? said.get(r.reason_key) : null;
+      return (
       <div className="panel" key={r.id}>
-        <span className="hint">{when(r.created_at)} · {r.video_id ? 'Video' : r.petition_id ? 'Petition' : 'Person'}</span>
-        <b>{r.video_id ? r.videos?.caption : r.petition_id ? <Link href={`/p/${r.petition_id}`}>{r.petitions?.title}</Link>
-          : <Link href={`/u/${r.person?.handle ?? r.profile_id}`}>{r.person?.display_name || (r.person?.handle ? '@' + r.person.handle : 'Profile')}</Link>}</b>
-        {r.profile_id && r.person?.bio && <span className="hint">Bio: “{r.person.bio}”</span>}
-        <p style={{ margin: 0 }}>“{r.reason}”</p>
-        <form action={noop} className="row"><input type="hidden" name="report_id" value={r.id} /><input type="hidden" name="video_id" value={r.video_id ?? ''} /><input type="hidden" name="petition_id" value={r.petition_id ?? ''} /><input type="hidden" name="profile_id" value={r.profile_id ?? ''} />
-          <input name="note" placeholder="Reason shown to the author if removed" style={{ flex: 1, minWidth: 0 }} />
-          <button className="btn small" formAction={resolveReport.bind(null, 'dismiss')}>Dismiss</button><button className="btn small danger" formAction={resolveReport.bind(null, 'remove')}>{r.profile_id && !r.video_id && !r.petition_id ? 'Clear name and bio' : 'Remove'}</button></form>
-      </div>)) : <p className="hint">No open reports.</p>}
+        <span className="hint">{when(r.created_at)} · {kind(r)}</span>
+        {r.reason_key ? <>{why?.petition_id && <Link href={`/p/${why.petition_id}`}>{why.title}</Link>}<b>“{why?.why ?? 'Already removed'}”</b>{why?.hidden && <span className="hint">Already hidden</span>}</>
+          : r.update_id ? <>{r.answer?.petition_id && <Link href={`/p/${r.answer.petition_id}`}>See the petition</Link>}<b>{r.answer?.title ?? 'Already removed'}</b>{r.answer?.body && <span className="hint" style={{ whiteSpace: 'pre-line' }}>{r.answer.body}</span>}</>
+          : <><b>{r.video_id ? r.videos?.caption : r.petition_id ? <Link href={`/p/${r.petition_id}`}>{r.petitions?.title}</Link>
+            : <Link href={`/u/${r.person?.handle ?? r.profile_id}`}>{r.person?.display_name || (r.person?.handle ? '@' + r.person.handle : 'Profile')}</Link>}</b>
+            {r.profile_id && r.person?.bio && <span className="hint">Bio: “{r.person.bio}”</span>}</>}
+        <p style={{ margin: 0 }}>Report: “{r.reason}”</p>
+        <form action={noop} className="row"><input type="hidden" name="report_id" value={r.id} /><input type="hidden" name="video_id" value={r.video_id ?? ''} /><input type="hidden" name="petition_id" value={r.petition_id ?? ''} /><input type="hidden" name="profile_id" value={r.profile_id ?? ''} /><input type="hidden" name="reason_key" value={r.reason_key ?? ''} /><input type="hidden" name="update_id" value={r.update_id ?? ''} />
+          <input name="note" placeholder={r.update_id ? 'Why it was removed (kept in the log)' : 'Reason shown to the author if removed'} style={{ flex: 1, minWidth: 0 }} />
+          <button className="btn small" formAction={resolveReport.bind(null, 'dismiss')}>Dismiss</button><button className="btn small danger" formAction={resolveReport.bind(null, 'remove')}>{r.reason_key ? 'Hide reason' : r.profile_id && !r.video_id && !r.petition_id ? 'Clear name and bio' : 'Remove'}</button></form>
+      </div>); }) : <p className="hint">No open reports.</p>}
   </>);
 }
 
