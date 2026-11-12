@@ -286,6 +286,9 @@ main{min-width:0;width:100%;max-width:680px;margin:0 auto;padding:16px max(16px,
 .mylohero .say{margin:0;max-width:440px;font-size:17px;line-height:1.4}
 .mylohero .moodtag{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:.06em}
 .mylohero .moodtag i{width:14px;height:14px;border:2px solid #111;display:inline-block}
+.future-wrap{display:flex;align-items:center;gap:18px;width:100%;max-width:520px;margin-top:6px;text-align:left}
+.future-wrap .future{flex:1;min-width:0;margin-top:0}
+.future-wrap .story-panel{flex:none}
 .future{display:flex;flex-direction:column;gap:6px;width:100%;max-width:440px;margin-top:6px}
 .future .row{justify-content:space-between}
 .future .meter{height:22px;border:3px solid #111;background:#FBF9F4;overflow:hidden}
@@ -438,3 +441,11 @@ main:focus{outline:none}
 .bk-nav{display:flex;align-items:center;gap:14px}
 .bk-count{font-weight:800;font-size:13px;min-width:7em;text-align:center}
 @media (prefers-reduced-motion:reduce){.bk-leaf{animation-duration:.01s!important;animation-delay:0s!important}}
+
+.bk-closed-wrap.small{gap:4px;padding:0}
+.bk-closed-wrap.small .bk-closed{width:78px;margin-bottom:6px;border-radius:2px 5px 5px 2px}
+.bk-closed-wrap.small .bk-cover{padding:8% 7% 6%;border-radius:2px 5px 5px 2px;box-shadow:4px 5px 0 rgba(0,0,0,.2),0 1px 0 #9e3a10}
+.bk-closed-wrap.small .bk-cover-title{font-size:13cqw}
+.bk-closed-wrap.small .bk-edges{right:-4px;width:5px}
+.bk-closed-wrap.small .hint{font-size:11px;font-weight:800;color:#4A453E;text-align:center;max-width:90px;line-height:1.2}
+.bk-closed-wrap.small .bk-closed:hover .bk-cover{transform:rotateY(-4deg) translateY(-2px) rotate(-2deg)}

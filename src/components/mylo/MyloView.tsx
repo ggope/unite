@@ -23,16 +23,16 @@ export async function MyloView({ m, viewer, signed }: { m: MyloToday; viewer: Vi
         <MyloArt mood={m.mood} size={200} id="hero" label={t('mylo.label', { mood: moodName })} />
         <h1>{t('mylo.title')}</h1>
         <p className="say">{t(`mylo.say.${m.mood}` as Key)}</p>
+        <div className="future-wrap">
         <div className="future">
           <div className="row"><b>{t('mylo.future')}</b><b className="num">{m.future}%</b></div>
           <div className="meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={m.future} aria-label={t('mylo.future')}><i style={{ width: `${m.future}%` }} /></div>
           <span className="hint" style={{ color: '#4A453E' }}>{t('mylo.futureHint')}</span>
         </div>
+        <div className="story-panel"><MyloBook small /></div>
+        </div>
       </section>
 
-      <section className="stack story-panel" aria-label={t('story.title')} style={{ gap: 6, alignItems: 'center', textAlign: 'center' }}>
-        <MyloBook />
-      </section>
 
       <section className="stack" style={{ gap: 10 }}>
         <h2>{t('mylo.why')}</h2>

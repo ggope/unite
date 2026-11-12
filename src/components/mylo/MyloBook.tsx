@@ -137,7 +137,7 @@ export function BookStage({ onClose }: { onClose?: () => void }) {
 }
 
 // The closed book. Tapping it opens the story, in place or over the page.
-export function MyloBook({ inline = false }: { inline?: boolean }) {
+export function MyloBook({ inline = false, small = false }: { inline?: boolean; small?: boolean }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
@@ -153,11 +153,11 @@ export function MyloBook({ inline = false }: { inline?: boolean }) {
   if (open && inline) return <BookStage />;
   return (
     <>
-      <div className="bk-closed-wrap">
+      <div className={`bk-closed-wrap ${small ? 'small' : ''}`}>
         <button ref={btn} type="button" className="bk-closed" onClick={() => setOpen(true)} aria-label={`${t('story.title')}: ${t('book.tap')}`}>
           <Cover /><span className="bk-edges" aria-hidden="true" />
         </button>
-        <span className="hint">{t('book.tap')}</span>
+        <span className="hint">{small ? t('story.read') : t('book.tap')}</span>
       </div>
       {open && (
         <div className="bk-overlay" role="dialog" aria-modal="true" aria-label={t('story.title')}>
