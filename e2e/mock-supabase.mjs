@@ -15,6 +15,7 @@ const PORT = Number(process.env.E2E_SUPABASE_PORT || 54321);
 const REST = process.env.E2E_POSTGREST || 'http://127.0.0.1:54322';
 const FILES = fs.mkdtempSync(path.join(os.tmpdir(), 'unite-e2e-storage-'));
 export const otps = [];   // email codes "sent", for tests to read
+const mails = [];         // UNIER's own emails (SMTP stand-in), read back at GET /__mail
 
 const b64u = (b) => Buffer.from(b).toString('base64url');
 export function jwt(claims) {
@@ -106,6 +107,8 @@ export function start() {
     const url = new URL(req.url, `http://localhost:${PORT}`);
     if (req.method === 'OPTIONS' && !url.pathname.startsWith('/rest/v1')) return send(res, 204);
     try {
+      if (url.pathname === '/__mail' && req.method === 'POST') { mails.push(JSON.parse((await read(req)).toString())); return send(res, 200, {}); }
+      if (url.pathname === '/__mail') return send(res, 200, mails.filter((m) => !url.searchParams.get('to') || m.to === url.searchParams.get('to')));
       if (url.pathname.startsWith('/rest/v1')) return await proxy(req, res, url);
       if (url.pathname.startsWith('/auth/v1')) return await auth(req, res, url);
       if (url.pathname.startsWith('/storage/v1')) return await storage(req, res, url);

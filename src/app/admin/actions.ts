@@ -200,3 +200,18 @@ export async function runLifecycle() {
   if (!error) { const { sendPending } = await import('@/lib/push/send'); await sendPending(50).catch(() => {}); }
   await done(error);
 }
+
+// Errors tab: mark one as fixed (it comes back, and alerts again, if it happens again).
+export async function resolveError(f: FormData) {
+  const sb = await mod();
+  await done((await sb.rpc('resolve_error', { p_fingerprint: s(f, 'fp') })).error);
+}
+
+// Errors tab: sends a test alert, so the owner knows the emails arrive.
+export async function testAlert() {
+  await mod();
+  const { mailReady, sendMail } = await import('@/lib/mail/send');
+  if (!process.env.ALERT_EMAIL || !mailReady()) return done({ message: 'Set ALERT_EMAIL and the SMTP settings in Vercel first.' });
+  const r = await sendMail({ to: process.env.ALERT_EMAIL, subject: 'UNIER test alert', text: 'This is a test. Error alerts from UNIER will arrive like this.' });
+  await done(r.ok ? null : { message: `Sending failed: ${r.error}` });
+}
