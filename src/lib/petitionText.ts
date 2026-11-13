@@ -19,3 +19,10 @@ export function localize<T extends Translatable>(p: T, lang: Lang): T {
   const t = trOf(p, lang);
   return Object.keys(t).length ? { ...p, ...t } : p;
 }
+
+// True when the reader would see a machine translation (0026) rather than the original or a person's translation.
+export function isMachine(p: Translatable, lang: Lang): boolean {
+  if (!p || p.lang === lang || !p.tr || typeof p.tr !== 'object') return false;
+  const t = (p.tr as Record<string, unknown>)[lang] as Record<string, unknown> | undefined;
+  return !!t && typeof t === 'object' && t.auto === true && Object.keys(trOf(p, lang)).length > 0;
+}
