@@ -551,6 +551,26 @@ main:focus{outline:none}
 .appeal-what{border-left:8px solid var(--warn)}
 .appeal-reversed{color:var(--ok);font-weight:700}
 .appeal-upheld{font-weight:700}
+/* Donate page: amount picker, why tiles, other ways, questions */
+.give{box-shadow:var(--shadow)}
+.amounts{border:0;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.amounts legend{padding:0;margin-bottom:8px}
+.amt{border:2px solid var(--edge);background:var(--surface);border-radius:var(--r);padding:12px 6px;font-weight:800;font-size:17px;font-variant-numeric:tabular-nums;color:var(--ink);min-height:48px}
+.amt:hover{background:var(--sunk)}
+.amt[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.impact{border-left:4px solid var(--accent);padding-left:10px}
+.why-grid,.ways{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+@media (min-width:640px){.why-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.ways{grid-template-columns:repeat(2,minmax(0,1fr))}.amounts{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.why{display:flex;flex-direction:column;gap:4px;border-top:4px solid var(--accent);padding-top:10px}
+.why b{font-family:var(--f-display);font-weight:400;font-size:20px;text-transform:uppercase;line-height:1.1}
+.why span{color:var(--muted);font-size:14px}
+.way{gap:6px}
+.bank{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;margin:4px 0 0}
+.bank dt{font-size:13px;color:var(--muted)}
+.bank dd{margin:0;overflow-wrap:anywhere;user-select:all}
+.faq details{border:2px solid var(--edge);border-radius:var(--r);background:var(--surface);padding:0 14px}
+.faq summary{cursor:pointer;font-weight:800;padding:12px 0}
+.faq details p{margin:0 0 12px}
 
 /* AI check labels in the admin queues (0024) */
 .ai-flag{border-left:6px solid var(--edge);background:var(--sunk);border-radius:8px;padding:6px 10px;font-size:14px}

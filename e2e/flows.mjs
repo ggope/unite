@@ -810,6 +810,26 @@ console.log('Petition life cycle (0018)');
   });
 }
 
+console.log('Donate page');
+await check('donate: pick an amount, switch to monthly, type your own, read the questions', async () => {
+  await go(g, '/donate');
+  const give = g.locator('#give a.btn.primary');
+  await g.locator('.amt', { hasText: '€50' }).click();
+  expect(await give.textContent() === 'Give €50', `button says ${await give.textContent()}`);
+  expect(await give.getAttribute('href') === 'https://pay.e2e.test/once', 'one-off link wrong');
+  expect(await g.getByText('On the secure payment page, enter €50.').count(), 'no hint to type the amount');
+  await g.getByRole('button', { name: 'Give monthly' }).click();
+  await g.locator('.amt', { hasText: '€5' }).first().click();
+  expect(await give.getAttribute('href') === 'https://pay.e2e.test/monthly-5', 'fixed monthly link not used');
+  expect(!(await g.getByText(/On the secure payment page/).count()), 'fixed link should not ask to type the amount');
+  await g.getByRole('button', { name: 'Other' }).click();
+  await g.getByLabel('Your amount (EUR)').fill('12');
+  expect(await give.textContent() === 'Give €12 a month', `custom amount: ${await give.textContent()}`);
+  expect(await g.getByText('HU42 1177 3016').count(), 'bank transfer box missing');
+  await g.getByText('Can I stop a monthly gift?').click();
+  expect(await g.getByText(/any time, with no questions/).isVisible(), 'question does not open');
+  expect(await g.locator('a[href="/transparency"]', { hasText: 'See our numbers' }).count(), 'no link to the numbers');
+});
 console.log('AI check (0024)');
 {
   const E = newUser('emil');

@@ -140,6 +140,8 @@ async function Launch({ sb }: { sb: any }) {
     { ok: env('CRON_SECRET'), what: 'Daily jobs secret', how: <>Set <code>CRON_SECRET</code> in Vercel so the daily news import and clean-up run.</> },
     { ok: env('SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'), what: 'Email sender (signing with only an email, error alerts)',
       how: <>For now, a Gmail address with an app password: set <code>SMTP_HOST</code>=smtp.gmail.com, <code>SMTP_PORT</code>=465, <code>SMTP_USER</code> and <code>SMTP_PASS</code> in Vercel. Put the same in Supabase → Authentication → Emails → SMTP, so login emails stop hitting the hourly limit. Once you have a domain, switch both to Resend or Brevo.</> },
+    { ok: !!(process.env.NEXT_PUBLIC_DONATE_URL || process.env.NEXT_PUBLIC_DONATE_MONTHLY_URL || process.env.NEXT_PUBLIC_DONATE_LINKS), what: 'Donation links',
+      how: <>Make Stripe Payment Links (one where the giver chooses the amount; a monthly one too if you like) and set <code>NEXT_PUBLIC_DONATE_URL</code> and <code>NEXT_PUBLIC_DONATE_MONTHLY_URL</code> in Vercel. Optional: amounts, currency, bank transfer and a contact email (see <code>.env.example</code>). Until then <Link href="/donate">Donate</Link> says &quot;opening soon&quot;.</> },
     { ok: env('ALERT_EMAIL'), what: 'Error alerts by email', how: <>Set <code>ALERT_EMAIL</code> in Vercel to the address that should hear when something breaks. See <Link href="/admin?tab=errors">Errors</Link>.</> },
     { ok: env('SUPABASE_SERVICE_ROLE_KEY'), what: 'Server key for Supabase', how: <>Set <code>SUPABASE_SERVICE_ROLE_KEY</code> in Vercel (Supabase → Project settings → API).</> },
     { ok: aiReady() && aiKeySet(), what: 'AI key (sorts the review queue, drafts team petitions)',
