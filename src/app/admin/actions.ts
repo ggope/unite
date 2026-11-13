@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { isLang, LANGS } from '@/lib/i18n/dict';
 import { EASY_TEXT, EASY_TITLE } from '@/lib/easy';
+import { tellAuthor } from '@/lib/decisionMail';
 
 const LANG_KEYS = Object.keys(LANGS) as (keyof typeof LANGS)[];
 
@@ -40,7 +41,8 @@ export async function review(decision: 'approve' | 'reject', f: FormData) {
   const approve = decision === 'approve';
   if (!approve && !s(f, 'note')) return done(NEED_REASON);
   const status = table === 'petitions' ? (approve ? 'live' : 'removed') : (approve ? 'approved' : 'rejected');
-  const { error } = await sb.from(table).update({ status, moderation_note: approve ? null : s(f, 'note') || null }).eq('id', s(f, 'id'));
+  const { data: changed, error } = await sb.from(table).update({ status, moderation_note: approve ? null : s(f, 'note') || null }).eq('id', s(f, 'id')).select('id');
+  if (!error && changed?.length) await tellAuthor(table === 'petitions' ? 'petition' : 'video', s(f, 'id'), approve ? 'live' : 'off', s(f, 'note'));
   await done(error);
 }
 
@@ -48,7 +50,9 @@ export async function petitionStatus(status: 'live' | 'closed' | 'removed', f: F
   const sb = await mod();
   if (!['live', 'closed', 'removed'].includes(status)) return;
   if (status === 'removed' && !s(f, 'note')) return done(NEED_REASON);
+  const { data: before } = await sb.from('petitions').select('status').eq('id', s(f, 'id')).maybeSingle();
   const { error } = await sb.from('petitions').update({ status, moderation_note: status === 'removed' ? s(f, 'note') || null : null }).eq('id', s(f, 'id'));
+  if (!error && before && before.status !== status && (status === 'removed' || before.status === 'pending')) await tellAuthor('petition', s(f, 'id'), status === 'removed' ? 'off' : 'live', s(f, 'note'));
   await done(error);
 }
 
@@ -141,6 +145,7 @@ export async function resolveReport(action: 'dismiss' | 'remove', f: FormData) {
       : petition ? await sb.from('petitions').update({ status: 'removed', moderation_note: note }).eq('id', petition)
       : await sb.rpc('clear_profile', { p_user: person, p_note: note });
     if (error) return done(error);
+    if (video || petition) await tellAuthor(video ? 'video' : 'petition', video || petition, 'off', note);
     // Removing the item settles every open report about it, not just this one.
     const q = sb.from('reports').update(resolved).eq('status', 'open');
     return done((await (video ? q.eq('video_id', video) : petition ? q.eq('petition_id', petition) : q.eq('profile_id', person).is('video_id', null).is('petition_id', null))).error);

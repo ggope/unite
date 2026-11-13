@@ -64,6 +64,12 @@ async function auth(req, res, url) {
     execFileSync('su', ['postgres', '-c', `psql -X -q -d ${process.env.DB || 'unite_e2e'} -c "delete from auth.users where id = '${id}'"`]);
     return send(res, 200, {});
   }
+  if (p.startsWith('/admin/users/') && req.method === 'GET') {                          // auth.admin.getUserById
+    const c = verify(bearer(req)); if (c?.role !== 'service_role') return send(res, 403, { msg: 'service role only' });
+    const id = p.split('/').pop(); if (!/^[0-9a-f-]{36}$/.test(id)) return send(res, 400, { msg: 'bad id' });
+    const email = execFileSync('su', ['postgres', '-c', `psql -X -At -d ${process.env.DB || 'unite_e2e'} -c "select email from auth.users where id = '${id}'"`], { encoding: 'utf8' }).trim();
+    return email ? send(res, 200, { id, email, aud: 'authenticated', role: 'authenticated' }) : send(res, 404, { msg: 'User not found' });
+  }
   if (p === '/otp') { const b = JSON.parse((await read(req)).toString() || '{}'); otps.push({ email: b.email, at: Date.now() }); return send(res, 200, {}); }
   if (p === '/.well-known/jwks.json') return send(res, 200, { keys: [] });
   if (p === '/settings') return send(res, 200, { external: { email: true }, disable_signup: false });

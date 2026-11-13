@@ -40,6 +40,10 @@ const seedId = one(`select id from petitions where status = 'live' order by titl
 await check('petition list, welcome page and news show petitions with totals', async () => {
   await go(g, '/petitions'); expect(await g.locator('text=End bottom trawling').count(), 'petition list is empty');
 });
+await check('search finds the start of a word', async () => {
+  await go(g, '/petitions?q=trawl'); expect(await g.locator('text=End bottom trawling').count(), 'part of a word finds nothing');
+  await go(g, '/petitions?q=' + encodeURIComponent('bottom traw')); expect(await g.locator('text=End bottom trawling').count(), 'two words, the last one cut short, find nothing');
+});
 await check('guest opens a petition and its report', async () => {
   let r = await go(g, `/p/${seedId}`); expect(r.status() === 200, `status ${r.status()}`); await noCrash(g);
   r = await go(g, `/p/${seedId}/report`); expect(r.status() === 200, `report status ${r.status()}`);
@@ -150,7 +154,12 @@ await check('admin approves the petition', async () => {
   await go(a, '/admin?tab=queue'); await noCrash(a);
   const card = a.locator('.panel', { hasText: 'Free drinking fountains' }).first();
   await card.getByRole('button', { name: /approve|make live|publish/i }).first().click(); await settle(a);
-  expect(one(`select status from petitions where id = '${pid}'`) === 'live', 'not live');
+  expect(await until(() => one(`select status from petitions where id = '${pid}'`) === 'live'), 'not live');
+  // the organiser hears it: a note under You and an email (0022)
+  expect(one(`select count(*) from notices where user_id = '${A.id}' and kind = 'petition_live' and petition_id = '${pid}'`) === '1', 'no note for the organiser');
+  const told = (await mailsTo(A.email)).filter((m) => m.text.includes('Free drinking fountains') && m.text.includes(`/p/${pid}`));
+  expect(told.length === 1, `organiser emails: ${told.length}`);
+  await go(a, '/you'); expect(await a.getByText(/is live\. Share it/).count(), 'the note is not shown under You');
 });
 await check('admin pins it as a big goal', async () => {
   await go(a, '/admin?tab=petitions&q=fountains');
@@ -402,6 +411,10 @@ await check('admin: reject a video with a reason the author sees', async () => {
   await card.locator('input[name=note]').fill('Faces of children are visible'); await card.getByRole('button', { name: 'Reject' }).click(); await a.waitForTimeout(1200);
   expect(one(`select status || '|' || moderation_note from videos where id = '${v2}'`) === 'rejected|Faces of children are visible', 'not rejected with note');
   await go(bb, '/you'); expect(await bb.locator('text=Faces of children are visible').count(), 'author does not see the reason');
+  // told by email too, with the way to ask for a second look (0022)
+  const told = (await mailsTo(B.email)).filter((m) => m.text.includes('Faces of children are visible'));
+  expect(told.length === 1 && told[0].text.includes(`/appeal?kind=video&id=${v2}`), `uploader emails: ${told.length}`);
+  expect(await bb.locator('.panel', { hasText: 'Faces of children are visible' }).getByRole('link', { name: /second look|appeal/i }).count(), 'no appeal link on the note');
 });
 await check('admin: make someone a moderator and back', async () => {
   await go(a, '/admin?tab=people&q=bela_e2e');
@@ -725,7 +738,7 @@ console.log('Petition life cycle (0018)');
     expect(one(`select ends_on from petitions where id = '${quiet}'`) === day, 'end date not saved');
   });
   await check('an author appeals a removal and a moderator reverses it', async () => {
-    await go(d, '/you'); await d.locator(`a[href="/appeal?kind=petition&id=${gone}"]`).click(); await settle(d);
+    await go(d, '/you'); await d.locator(`a[href="/appeal?kind=petition&id=${gone}"]`).first().click(); await settle(d);
     expect(await d.getByText('Looks like a duplicate').count(), 'decision not shown');
     await d.locator('#appeal-body').fill('It is not a duplicate: it asks a different ministry.'); await d.getByRole('button', { name: 'Send appeal' }).click();
     await d.waitForURL(/appealed=1/, { timeout: 8000 }); await d.getByText(/Your appeal was sent/).waitFor({ timeout: 8000 });
