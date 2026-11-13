@@ -806,6 +806,46 @@ console.log('AI check (0024)');
   });
 }
 
+console.log('Team videos');
+{
+  const pid = one(`select id from petitions where status = 'live' order by created_at limit 1`);
+  sql(`delete from team_videos where youtube_id = 'e2eClip_001'`);
+  sql(`insert into team_videos (source_id, youtube_id, title, lang, topic, petition_id, published_at) select 'un', 'e2eClip_001', 'E2E clip: why the seas need protecting', 'en', topic, id, now() from petitions where id = '${pid}'`);
+  const tv = await as(null);
+  const ytCalls = []; tv.on('request', (r) => { if (/youtube|ytimg/.test(r.url())) ytCalls.push(r.url()); });
+  await check('a team clip shows in the feed, marked as a UNIER team pick, and loads YouTube only after a tap', async () => {
+    await go(tv, '/');
+    for (let k = 0; k < 60 && !(await tv.locator('.slide .clip-team').count()); k++) {
+      await tv.locator('.scroller').evaluate((el) => el.scrollBy({ top: el.clientHeight })); await tv.waitForTimeout(250);
+    }
+    const slide = tv.locator('.slide', { has: tv.locator('.clip-team') }).first();
+    expect(await slide.count(), 'no team clip in the feed');
+    expect((await slide.locator('.clip-team').innerText()).trim().toLowerCase() === 'unier team pick', 'not marked as team content');
+    const text = await slide.evaluate((el) => el.textContent ?? '');
+    expect(text.includes('E2E clip: why the seas need protecting'), `clip title missing: ${text.slice(0, 200)}`);
+    expect(await slide.locator(`a.pcard[href="/p/${pid}"]`).count(), 'clip not under its petition');
+    expect(!ytCalls.length, `YouTube contacted before a tap: ${ytCalls[0]}`);
+    await slide.scrollIntoViewIfNeeded(); await tv.waitForTimeout(400);
+    await slide.getByRole('button', { name: /Play video/ }).click();
+    const src = await slide.locator('iframe').getAttribute('src');
+    expect(src?.startsWith('https://www.youtube-nocookie.com/embed/e2eClip_001'), `player ${src}`);
+  });
+  await check('the clip picture comes through UNIER, and only for live team clips', async () => {
+    expect((await tv.request.get(APP + '/api/clip/notAClip_01')).status() === 404, 'unknown id served');
+    expect((await tv.request.get(APP + '/api/clip/..%2F..%2Fx')).status() === 404, 'odd id served');
+  });
+  await check('a moderator sees team clips in Admin and hides one', async () => {
+    const m = await as(A);
+    await go(m, '/admin?tab=clips'); expect(await m.getByText('United Nations').count(), 'channels not listed');
+    const row = m.locator('.stack', { hasText: 'E2E clip: why the seas need protecting' }).first();
+    await row.getByRole('button', { name: 'Hide' }).click(); await settle(m);
+    for (let k = 0; k < 20 && one(`select status from team_videos where youtube_id = 'e2eClip_001'`) !== 'hidden'; k++) await m.waitForTimeout(250);
+    expect(one(`select status from team_videos where youtube_id = 'e2eClip_001'`) === 'hidden', 'clip not hidden');
+    await m.context().close();
+  });
+  await tv.context().close();
+}
+
 await b.close();
 if (errors.length) { console.log('\nBrowser/server errors:'); [...new Set(errors)].slice(0, 30).forEach((e) => console.log('  ' + e)); }
 console.log(failed() ? `\n${failed()} check(s) failed` : '\nAll end-to-end checks passed');

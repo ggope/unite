@@ -14,6 +14,7 @@ import { MyloArt } from './mylo/MyloArt';
 import { LinkBar } from './LinkBar';
 import { ShareButton } from './ShareButton';
 import { PosterCard } from './PosterCard';
+import { ClipSlide } from './ClipSlide';
 import type { NewsStory } from '@/lib/news/load';
 import { TOPICS } from '@/lib/topics';
 
@@ -186,6 +187,7 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
                 <PosterCard id={s.item.petition_id} topic={s.item.topic} title={s.item.petition_title} target={s.item.target ?? ''} ask={s.item.caption}
                   combined={s.item.combined} goal={s.item.goal} lastHour={s.item.last_hour} active={i === active} tone={i} />
               )}
+              {s.item.kind === 'clip' && s.item.youtube_id && <ClipSlide youtubeId={s.item.youtube_id} source={s.item.source_name ?? 'YouTube'} active={i === active} />}
               {s.item.video_url && (
                 <video src={s.item.video_url} poster={s.item.cover_url ?? undefined} muted playsInline autoPlay={autoplay && i === 0} preload={i <= active + 1 ? 'auto' : 'metadata'}
                   onLoadedMetadata={(e) => { e.currentTarget.currentTime = s.item.trim_start; }}
@@ -212,7 +214,7 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
                   onChange={(on) => on && learn(s.item.topic, 'sign')} />
                 <button className="rb" onClick={() => learn(s.item.topic, 'care')}><span className="c"><Icon name="heart" /></span>{t('feed.care')}</button>
                 <button className="rb" onClick={() => notInterested(i, s.item.topic)}><span className="c"><Icon name="eyeoff" /></span>{t('feed.less')}</button>
-                <ReportButton variant="reel" {...(s.item.kind === 'card' ? { petitionId: s.item.petition_id } : { videoId: s.item.id })} loggedIn={viewer.loggedIn} />
+                {s.item.kind !== 'clip' && <ReportButton variant="reel" {...(s.item.kind === 'card' ? { petitionId: s.item.petition_id } : { videoId: s.item.id })} loggedIn={viewer.loggedIn} />}
                 <ShareButton variant="reel" path={`/p/${s.item.petition_id}`} title={s.item.petition_title} onShare={() => learn(s.item.topic, 'share')} />
               </div>
             </div>

@@ -15,8 +15,9 @@ export type FeedItem = {
   goal: number; united_count: number; trim_start: number; trim_end: number; blur_faces: boolean;
   created_at: string; video_url: string | null; cover_url: string | null;
   link_url?: string | null; link_cta?: string | null;
-  kind?: 'video' | 'card'; target?: string;   // 'card': a petition with no video yet, shown as a poster
+  kind?: 'video' | 'card' | 'clip'; target?: string;   // 'card': a petition with no video yet, shown as a poster
   penalty?: number;   // UNIER team content ranks lower when Admin → Team content is set to less (0023)
+  youtube_id?: string; source_name?: string;           // 'clip': a UNIER team pick from a trusted channel (0025)
 };
 
 export function score(item: FeedItem, w: Weights, ctx: { followed: Set<string>; signed: Set<string>; seen: Record<string, number>; mine?: string | null }) {

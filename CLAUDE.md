@@ -44,8 +44,8 @@ Next.js 15 App Router, React 19, TypeScript, Supabase (Postgres, auth, storage),
 - Every new function: `revoke execute … from public, anon` unless anon truly needs it, then grant to the right role.
 - Add tests in `supabase/tests/*.sql` and list new migrations and test files in `supabase/tests/run.sh`.
 - Gug runs migrations by hand in the Supabase SQL editor. Copy each new migration to the shared project files `sql/` folder and add a line to the README "Updates after the first launch" list.
-- **Run so far by Gug: 0001 to 0013. Still to run: 0014, 0015, 0016, 0017, 0018, 0021, 0023, 0024** (Admin → Launch checklist shows the live state).
-- Numbers taken by open work: 0019 (kids), 0020 (quality), 0022 (decisions).
+- **Run so far by Gug: 0001 to 0013. Still to run: 0014, 0015, 0016, 0017, 0018, 0021, 0023, 0024, 0025 (team videos)** (Admin → Launch checklist shows the live state).
+- Numbers taken by open work: 0019 (kids), 0020 (quality), 0022 (decisions), 0025 (team videos).
 - Front end must keep working (empty, not crashing) when a newer migration has not been run yet.
 
 ## Test before every push
