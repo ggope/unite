@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
+import { nudgeAi } from '@/lib/ai/actions';
 import { useT } from '@/lib/i18n/client';
 import { SignButton, type Viewer } from '@/components/SignButton';
 
@@ -46,6 +47,7 @@ export function PostFlow({ userId, petitions, initial, viewer }: { userId: strin
       caption: caption.trim(), trim_start: ts, trim_end: te, blur_faces: blur, audience: aud });
     if (ins.error) { setStage(''); setErr(ins.error.message.includes('slow_down') ? t('err.slow') : ins.error.message.includes('row-level') ? t('post.errSign') : t('post.errSave')); return; }
     setPct(100); setStage('done');
+    nudgeAi().catch(() => {});   // the AI check reads the caption before a moderator watches it
   }
 
   if (stage === 'done') return (

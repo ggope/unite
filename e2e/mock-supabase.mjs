@@ -15,6 +15,17 @@ const PORT = Number(process.env.E2E_SUPABASE_PORT || 54321);
 const REST = process.env.E2E_POSTGREST || 'http://127.0.0.1:54322';
 const FILES = fs.mkdtempSync(path.join(os.tmpdir(), 'unite-e2e-storage-'));
 export const otps = [];   // email codes "sent", for tests to read
+// The AI check's stand-in for the Claude API (0024): answers by keywords in the content, and keeps what it was sent.
+const aiCalls = [];
+function moderationReply(body) {
+  const text = body.messages.map((m) => (typeof m.content === 'string' ? m.content : m.content.map((c) => c.text ?? '').join(''))).join('\n');
+  aiCalls.push(text);
+  const r = /WIN FREE CRYPTO/.test(text) ? { verdict: 'breaks_rules', risk: 'high', confidence: 0.99, rules: ['spam', 'scam'], summary: 'Crypto spam.', author_note: 'This looks like spam.' }
+    : /hunt them down/i.test(text) ? { verdict: 'breaks_rules', risk: 'urgent', confidence: 0.9, rules: ['threat'], summary: 'A threat against a person.', author_note: 'Threats are not allowed.' }
+    : /maybe borderline/i.test(text) ? { verdict: 'unsure', risk: 'medium', confidence: 0.5, rules: ['false_information'], summary: 'Claims need checking.', author_note: 'We could not confirm the facts in this petition.' }
+    : { verdict: 'ok', risk: 'low', confidence: 0.95, rules: [], summary: 'An ordinary petition.', author_note: '' };
+  return { id: 'msg_e2e', type: 'message', role: 'assistant', model: body.model, content: [{ type: 'text', text: JSON.stringify(r) }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } };
+}
 const mails = [];         // UNIER's own emails (SMTP stand-in), read back at GET /__mail
 
 const b64u = (b) => Buffer.from(b).toString('base64url');
@@ -53,7 +64,9 @@ async function proxy(req, res, url) {
 const claudeCalls = [];
 async function claude(req, res, url) {
   if (req.method === 'GET') return send(res, 200, claudeCalls);
-  const body = JSON.parse((await read(req)).toString() || '{}'); claudeCalls.push(body);
+  const body = JSON.parse((await read(req)).toString() || '{}');
+  if (/volunteer moderators of UNIER/.test(JSON.stringify(body.system ?? ''))) return send(res, 200, moderationReply(body));   // the AI check (0024), logged at /__anthropic
+  claudeCalls.push(body);
   const draft = { decision: 'draft', reason: 'Two outlets report that the plastics treaty talks stalled.', duplicate_of: '',
     title: 'Agree a strong global plastics treaty', target: 'Governments at the UN plastics talks', region: 'Worldwide',
     ask: 'Agree a binding treaty that cuts plastic production, not only waste, before the end of next year.',
@@ -124,6 +137,7 @@ export function start() {
       if (url.pathname === '/__mail' && req.method === 'POST') { mails.push(JSON.parse((await read(req)).toString())); return send(res, 200, {}); }
       if (url.pathname === '/__mail') return send(res, 200, mails.filter((m) => !url.searchParams.get('to') || m.to === url.searchParams.get('to')));
       if (url.pathname.startsWith('/__claude')) return await claude(req, res, url);
+      if (url.pathname === '/__anthropic') return send(res, 200, aiCalls);   // what the AI check was sent
       if (url.pathname.startsWith('/rest/v1')) return await proxy(req, res, url);
       if (url.pathname.startsWith('/auth/v1')) return await auth(req, res, url);
       if (url.pathname.startsWith('/storage/v1')) return await storage(req, res, url);

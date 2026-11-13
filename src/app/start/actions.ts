@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { GOALS, TOPIC_KEYS } from '@/lib/topics';
 import { getT } from '@/lib/i18n/server';
+import { nudgeAi } from '@/lib/ai/actions';
 
 export type StartState = { error?: string };
 
@@ -30,5 +31,6 @@ export async function createPetition(_: StartState, form: FormData): Promise<Sta
   if (error) return { error: error.message.includes('slow_down') ? t('err.slow') : error.message.includes('check') ? t('start.errLength') : t('start.errSave') };
   // the database counts the founder as the first signature
   if (!data) return { error: t('start.errSave') };
+  await nudgeAi();   // the AI check looks at it right after the answer is sent (0024)
   redirect(form.get('then') === 'video' ? `/post?petition=${data.id}` : `/p/${data.id}`);
 }
