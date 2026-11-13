@@ -411,7 +411,7 @@ async function Clips({ sb }: { sb: any }) {
     <div className="panel" style={{ gap: 12 }}><b>Clips ({clips?.length ?? 0})</b>
       {!clips?.length && <span className="hint">None yet. Press “Fetch new clips now”.</span>}
       {clips?.map((x: any) => (
-        <div key={x.id} className="stack" style={{ gap: 4, opacity: x.status === 'hidden' ? 0.45 : 1 }}>
+        <div key={x.id} className="stack clip-row" style={{ gap: 4, opacity: x.status === 'hidden' ? 0.45 : 1 }}>
           <a href={`https://www.youtube.com/watch?v=${x.youtube_id}`} target="_blank" rel="noopener nofollow"><b>{x.title}</b></a>
           <span className="hint">{x.video_sources?.name} · {x.topic} · {when(x.published_at)} · under “{x.petitions?.title ?? '?'}”{x.status === 'hidden' ? ' · hidden' : ''}</span>
           <form action={clipAction.bind(null, 'attach')} className="row"><input type="hidden" name="clip" value={x.id} />
