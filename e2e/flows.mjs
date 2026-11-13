@@ -1003,6 +1003,63 @@ console.log('More pages in the left bar');
   await gp.context().close();
 }
 
+console.log('Automatic translations (0026)');
+{
+  const E = newUser('ferenc');
+  const tp = one(`insert into petitions (created_by, organiser_name, title, target, region, ask, why, topic, goal, status, lang, tr)
+    values ('${E.id}', 'Ferenc', 'Shade trees on every school yard', 'City council', 'Hungary', 'Plant shade trees on every school yard before next summer.',
+            'Children play outside in record heat and the yards have no shade at all.', 'housing', 1000, 'live', 'en',
+            '{"hu": {"title": "Árnyékot adó fák minden iskolaudvarra", "ask": "Ültessenek fákat minden iskolaudvarra jövő nyárig."}}') returning id`);
+  await check('a petition is translated after the first view, labelled, and the original is one tap away (phone)', async () => {
+    const ctx = await b.newContext({ locale: 'de-DE', viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
+    await ctx.addCookies([{ name: 'lang', value: 'de', url: APP }]);
+    const ph = await ctx.newPage();
+    ph.on('response', (r) => { if (r.status() >= 500) errors.push(`${r.status()} ${r.url()}`); });
+    await ph.goto(APP + `/p/${tp}`);
+    expect(await ph.locator('h1', { hasText: 'Shade trees on every school yard' }).count(), 'first view should show the original');
+    for (let k = 0; k < 40 && one(`select coalesce(tr->'de'->>'auto', '') from petitions where id = '${tp}'`) !== 'true'; k++) await ph.waitForTimeout(250);
+    expect(one(`select tr->'de'->>'title' from petitions where id = '${tp}'`) === '[de] Shade trees on every school yard', 'German machine translation not saved');
+    expect(one(`select tr->'hu'->>'title' from petitions where id = '${tp}'`) === 'Árnyékot adó fák minden iskolaudvarra', "moderator's Hungarian replaced");
+    expect(one(`select tr->'fr'->>'why' from petitions where id = '${tp}'`).startsWith('[fr] Children play'), 'not translated into every language');
+    await ph.goto(APP + `/p/${tp}`);
+    expect(await ph.locator('h1', { hasText: '[de] Shade trees' }).count(), 'German reader does not see the translation');
+    const note = ph.locator('.mt-note');
+    expect((await note.innerText()).includes('Maschinell übersetzt'), 'no machine translation label');
+    const fits = await ph.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+    expect(fits, 'page scrolls sideways on a phone');
+    const box = await note.getByRole('link').boundingBox();
+    expect(box && box.height >= 44, `"Show original" too small to tap: ${box?.height}`);
+    await note.getByRole('link', { name: 'Original anzeigen' }).tap(); await ph.waitForURL(/orig=1/); await settle(ph);
+    expect(await ph.locator('h1[lang=en]', { hasText: 'Shade trees on every school yard' }).count(), 'original not shown (or not marked as English)');
+    await ph.locator('.mt-note').getByRole('link', { name: 'Übersetzung anzeigen' }).tap(); await ph.waitForURL((u) => !u.search.includes('orig')); await settle(ph);
+    expect(await ph.locator('h1', { hasText: '[de] Shade trees' }).count(), 'cannot switch back to the translation');
+    await ctx.close();
+  });
+  await check('people see their own language without a label; a person\'s translation is not labelled', async () => {
+    const hu = await b.newContext({ locale: 'hu-HU' }); await hu.addCookies([{ name: 'lang', value: 'hu', url: APP }]);
+    const hp = await hu.newPage(); await hp.goto(APP + `/p/${tp}`);
+    expect(await hp.locator('h1', { hasText: 'Árnyékot adó fák' }).count(), 'Hungarian translation not shown');
+    expect(!(await hp.locator('.mt-note').count()), "a moderator's translation is labelled as machine-made");
+    await hu.close();
+    await go(g, `/p/${tp}`); expect(!(await g.locator('.mt-note').count()), 'English reader of an English petition sees a label');
+  });
+  await check('changing the text drops machine translations; switching off stops new ones', async () => {
+    sql(`update petitions set ask = 'Plant shade trees on every school yard before next summer, starting with the hottest ones.' where id = '${tp}'`);
+    expect(one(`select (tr ? 'de')::text || (tr ? 'hu')::text from petitions where id = '${tp}'`) === 'falsetrue', 'old machine translation kept after an edit');
+    const m = await as(A);
+    await go(m, '/admin?tab=ai'); expect(await m.locator('#translations').count(), 'no translations panel in Admin');
+    await m.locator('#translations').getByRole('button', { name: 'Switch off' }).click(); await settle(m);
+    for (let k = 0; k < 20 && one(`select auto_translate::text from site_settings`) !== 'false'; k++) await m.waitForTimeout(250);
+    expect(one(`select auto_translate::text from site_settings`) === 'false', 'switch did not work');
+    const n0 = (await (await fetch('http://localhost:54321/__translate')).json()).length;
+    const es = await b.newContext({ locale: 'es-ES' }); const ep = await es.newPage(); await ep.goto(APP + `/p/${tp}`); await ep.waitForTimeout(1500); await es.close();
+    expect((await (await fetch('http://localhost:54321/__translate')).json()).length === n0, 'translated while switched off');
+    await go(m, '/admin?tab=ai'); await m.locator('#translations').getByRole('button', { name: 'Switch on' }).click(); await settle(m);
+    for (let k = 0; k < 20 && one(`select auto_translate::text from site_settings`) !== 'true'; k++) await m.waitForTimeout(250);
+    await m.context().close();
+  });
+}
+
 await b.close();
 if (errors.length) { console.log('\nBrowser/server errors:'); [...new Set(errors)].slice(0, 30).forEach((e) => console.log('  ' + e)); }
 console.log(failed() ? `\n${failed()} check(s) failed` : '\nAll end-to-end checks passed');

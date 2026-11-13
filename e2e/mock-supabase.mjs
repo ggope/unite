@@ -26,6 +26,16 @@ function moderationReply(body) {
     : { verdict: 'ok', risk: 'low', confidence: 0.95, rules: [], summary: 'An ordinary petition.', author_note: '' };
   return { id: 'msg_e2e', type: 'message', role: 'assistant', model: body.model, content: [{ type: 'text', text: JSON.stringify(r) }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } };
 }
+// Automatic translations (0026): "[de] " + the original, for every language asked for; kept for tests at /__translate.
+const translateCalls = [];
+function translateReply(body) {
+  const text = body.messages.map((m) => (typeof m.content === 'string' ? m.content : m.content.map((c) => c.text ?? '').join(''))).join('\n');
+  translateCalls.push(text);
+  const field = (f) => (text.match(new RegExp(`<${f}>\\n([\\s\\S]*?)\\n</${f}>`)) ?? [])[1] ?? '';
+  const langs = body.output_config?.format?.schema?.required ?? [];
+  const out = Object.fromEntries(langs.map((l) => [l, Object.fromEntries(['title', 'target', 'ask', 'why'].map((f) => [f, field(f) ? `[${l}] ${field(f)}` : '']))]));
+  return { id: 'msg_e2e', type: 'message', role: 'assistant', model: body.model, content: [{ type: 'text', text: JSON.stringify(out) }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } };
+}
 const mails = [];         // UNIER's own emails (SMTP stand-in), read back at GET /__mail
 
 const b64u = (b) => Buffer.from(b).toString('base64url');
@@ -65,6 +75,7 @@ const claudeCalls = [];
 async function claude(req, res, url) {
   if (req.method === 'GET') return send(res, 200, claudeCalls);
   const body = JSON.parse((await read(req)).toString() || '{}');
+  if (/You translate petitions for UNIER/.test(JSON.stringify(body.system ?? ''))) return send(res, 200, translateReply(body));   // 0026, logged at /__translate
   if (/volunteer moderators of UNIER/.test(JSON.stringify(body.system ?? ''))) return send(res, 200, moderationReply(body));   // the AI check (0024), logged at /__anthropic
   claudeCalls.push(body);
   const draft = { decision: 'draft', reason: 'Two outlets report that the plastics treaty talks stalled.', duplicate_of: '',
@@ -143,6 +154,7 @@ export function start() {
       if (url.pathname === '/__mail' && req.method === 'POST') { mails.push(JSON.parse((await read(req)).toString())); return send(res, 200, {}); }
       if (url.pathname === '/__mail') return send(res, 200, mails.filter((m) => !url.searchParams.get('to') || m.to === url.searchParams.get('to')));
       if (url.pathname.startsWith('/__claude')) return await claude(req, res, url);
+      if (url.pathname === '/__translate') return send(res, 200, translateCalls);   // what was sent for translation
       if (url.pathname === '/__anthropic') return send(res, 200, aiCalls);   // what the AI check was sent
       if (url.pathname.startsWith('/rest/v1')) return await proxy(req, res, url);
       if (url.pathname.startsWith('/auth/v1')) return await auth(req, res, url);
