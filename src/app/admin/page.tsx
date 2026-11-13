@@ -6,6 +6,7 @@ import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTra
 import { aiReady } from '@/lib/team/draft';
 import { aiKeySet, aiModel, aiDailyLimit } from '@/lib/ai/moderate';
 import { legalPlaceholders } from '@/lib/legal';
+import { mailReady } from '@/lib/mail/send';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;   // "Draft now" in Team content can take a few minutes; "Check waiting items now" asks the AI about up to 20 items
@@ -110,8 +111,9 @@ const MIGRATIONS: [string, string, string][] = [
   ['0015', 'share_codes', 'code'], ['0016', 'answer_links', 'petition_id'], ['0017', 'signatures', 'reason_key'],
   ['0018', 'appeals', 'id'], ['0019', 'petitions', 'easy'], ['0021', 'error_events', 'fingerprint'], ['0023', 'petition_sources', 'id'], ['0024', 'ai_reviews', 'id'], ['0025', 'team_videos', 'id'],
   ['0020', 'petition_counts', 'petition_id'],   // private table: "permission denied" means it exists
+  ['0027', 'mail_sent', 'day'],                 // private table too
 ];
-const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0019': '0019_kids', '0020': '0020_quality', '0021': '0021_email_sign', '0023': '0023_team_content', '0024': '0024_ai_moderation', '0025': '0025_team_videos' };
+const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0019': '0019_kids', '0020': '0020_quality', '0021': '0021_email_sign', '0023': '0023_team_content', '0024': '0024_ai_moderation', '0025': '0025_team_videos', '0027': '0027_email_updates' };
 const missing = (e: any) => !!e && /does not exist|PGRST20[45]|42703|42P01|schema cache/i.test(`${e.code} ${e.message}`);
 
 async function Launch({ sb }: { sb: any }) {
@@ -138,8 +140,10 @@ async function Launch({ sb }: { sb: any }) {
     { ok: env('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'), what: 'Bot check keys (Cloudflare Turnstile)',
       how: <>Make a free Turnstile widget at Cloudflare, add both keys in Vercel, then switch the check on under People.</> },
     { ok: env('CRON_SECRET'), what: 'Daily jobs secret', how: <>Set <code>CRON_SECRET</code> in Vercel so the daily news import and clean-up run.</> },
-    { ok: env('SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'), what: 'Email sender (signing with only an email, error alerts)',
+    { ok: env('SMTP_HOST', 'SMTP_USER', 'SMTP_PASS') || env('BREVO_API_KEY', 'MAIL_FROM') || env('RESEND_API_KEY', 'MAIL_FROM'), what: 'Email sender (signing with only an email, error alerts)',
       how: <>For now, a Gmail address with an app password: set <code>SMTP_HOST</code>=smtp.gmail.com, <code>SMTP_PORT</code>=465, <code>SMTP_USER</code> and <code>SMTP_PASS</code> in Vercel. Put the same in Supabase → Authentication → Emails → SMTP, so login emails stop hitting the hourly limit. Once you have a domain, switch both to Resend or Brevo.</> },
+    { ok: env('BREVO_API_KEY', 'MAIL_FROM') || env('RESEND_API_KEY', 'MAIL_FROM'), what: 'Email service for update emails (Brevo recommended)',
+      how: <>Gmail is fine to start but not for many update emails. With a domain: make a free Brevo account, verify the domain (Senders &amp; Domains), create an API key, and set <code>BREVO_API_KEY</code> and <code>MAIL_FROM</code> (&quot;UNIER &lt;hello@your-domain&gt;&quot;) in Vercel. Resend works too with <code>RESEND_API_KEY</code>.</> },
     { ok: !!(process.env.NEXT_PUBLIC_DONATE_URL || process.env.NEXT_PUBLIC_DONATE_MONTHLY_URL || process.env.NEXT_PUBLIC_DONATE_LINKS), what: 'Donation links',
       how: <>Make Stripe Payment Links (one where the giver chooses the amount; a monthly one too if you like) and set <code>NEXT_PUBLIC_DONATE_URL</code> and <code>NEXT_PUBLIC_DONATE_MONTHLY_URL</code> in Vercel. Optional: amounts, currency, bank transfer and a contact email (see <code>.env.example</code>). Until then <Link href="/donate">Donate</Link> says &quot;opening soon&quot;.</> },
     { ok: env('ALERT_EMAIL'), what: 'Error alerts by email', how: <>Set <code>ALERT_EMAIL</code> in Vercel to the address that should hear when something breaks. See <Link href="/admin?tab=errors">Errors</Link>.</> },
@@ -457,7 +461,7 @@ async function Errors({ sb }: { sb: any }) {
   if (missing(error)) return <p className="hint">Run <code>0021_email_sign.sql</code> to start keeping a log of errors.</p>;
   const open = (data ?? []).filter((e: any) => !e.resolved_at);
   const fixed = (data ?? []).filter((e: any) => e.resolved_at);
-  const ready = !!process.env.ALERT_EMAIL && !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  const ready = !!process.env.ALERT_EMAIL && mailReady();
   const Row = ({ e }: { e: any }) => (
     <div className="panel">
       <span className="hint">{e.source} · {e.count}× · last {when(e.last_seen)} · first {when(e.first_seen)}</span>

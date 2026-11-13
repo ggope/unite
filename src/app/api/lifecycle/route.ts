@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendPending } from '@/lib/push/send';
+import { notifyFollowers } from '@/lib/notify';
 import { runAiChecks } from '@/lib/ai/moderate';
 
 // Nightly (Vercel cron, "Authorization: Bearer $CRON_SECRET"): closes petitions after their end date,
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
   const { data, error } = await sb.rpc('run_lifecycle');
   if (error) { console.error('lifecycle failed', error.message); return NextResponse.json({ error: error.message }, { status: 500 }); }
-  const push = await sendPending(50).catch((e) => ({ error: String(e?.message ?? e) }));
+  const push = await notifyFollowers(50);
   const ai = await runAiChecks({ limit: 50, seconds: 200 }).catch((e) => ({ error: String(e?.message ?? e) }));   // anything the quick checks missed (0024)
   return NextResponse.json({ lifecycle: data, push, ai });
 }

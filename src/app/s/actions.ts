@@ -8,7 +8,7 @@ import { makeT, isLang, type Lang } from '@/lib/i18n/dict';
 import { CONSENT_VERSION, siteUrl } from '@/lib/topics';
 import { mailReady, sendMail, escapeHtml } from '@/lib/mail/send';
 import { reportProblem } from '@/lib/alert';
-import { pushReady, sendPending } from '@/lib/push/send';
+import { notifyFollowers } from '@/lib/notify';
 
 // Signing with only an email: no account, no password. The email holds a link; pressing "Confirm" on
 // that page counts the signature. The address itself is never stored (only a keyed hash, in the database).
@@ -34,7 +34,7 @@ async function humanOk(captcha: string | null) {
   return !!r?.success;
 }
 
-export async function requestEmailSign(input: { petitionId: string; email: string; lang: string; captcha: string | null }): Promise<EmailSignResult> {
+export async function requestEmailSign(input: { petitionId: string; email: string; lang: string; captcha: string | null; notify?: boolean }): Promise<EmailSignResult> {
   // Not set up yet (no mail account in Vercel): the button uses the older sign-in link instead.
   if (!mailReady() || !process.env.SUPABASE_SERVICE_ROLE_KEY) return { status: 'fallback' };
   const email = String(input.email ?? '').trim().toLowerCase().slice(0, 254);
@@ -56,6 +56,15 @@ export async function requestEmailSign(input: { petitionId: string; email: strin
   if (error) { await reportProblem({ source: 'server', message: `Email signing failed: ${error.message}`, path: '/s', key: 'email_sign_request' }); return { status: 'error' }; }
   if (data !== 'sent') return { status: data as EmailSignResult['status'] };
 
+  // "Email me when something happens" (0027): the address is kept, encrypted, only with this tick,
+  // and the news only starts once the link below is confirmed. Before 0027 has run, signing still works without it.
+  let notify = false;
+  if (input.notify === true) {
+    const r = await sb.rpc('email_sign_notify', { p_token_hash: hashToken(token), p_email: email, p_key: randomBytes(24).toString('base64url') });
+    notify = r.data === true;
+    if (r.error && !missingFn(r.error)) await reportProblem({ source: 'server', message: `Email updates opt-in failed: ${r.error.message}`, path: '/s', key: 'email_sign_notify' });
+  }
+
   const { data: p } = await sb.from('petitions').select('title').eq('id', input.petitionId).maybeSingle();
   const t = makeT(lang);
   const link = `${await origin()}/s/${token}`;
@@ -63,11 +72,11 @@ export async function requestEmailSign(input: { petitionId: string; email: strin
   const sent = await sendMail({
     to: email,
     subject: t('mail.subject', { title: title.slice(0, 80) }),
-    text: `${t('mail.hello')}\n\n${t('mail.body', { title })}\n\n${t('mail.button')}: ${link}\n\n${t('mail.later')}\n\n${t('mail.ignore')}\n\nUNIER`,
+    text: `${t('mail.hello')}\n\n${t('mail.body', { title })}\n\n${t('mail.button')}: ${link}\n\n${notify ? `${t('eupd.mailNote')}\n\n` : ''}${t('mail.later')}\n\n${t('mail.ignore')}\n\nUNIER`,
     html: `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:auto;padding:16px;color:#15130F">
       <p>${escapeHtml(t('mail.hello'))}</p><p>${escapeHtml(t('mail.body', { title }))}</p>
       <p style="margin:28px 0"><a href="${link}" style="background:#15130F;color:#F2EEE6;padding:14px 22px;border-radius:999px;text-decoration:none;font-weight:700;display:inline-block">${escapeHtml(t('mail.button'))}</a></p>
-      <p style="color:#5f5a52;font-size:14px">${escapeHtml(t('mail.later'))}</p><p style="color:#5f5a52;font-size:14px">${escapeHtml(t('mail.ignore'))}</p><p>UNIER</p></div>`,
+      ${notify ? `<p style="color:#5f5a52;font-size:14px">${escapeHtml(t('eupd.mailNote'))}</p>` : ''}<p style="color:#5f5a52;font-size:14px">${escapeHtml(t('mail.later'))}</p><p style="color:#5f5a52;font-size:14px">${escapeHtml(t('mail.ignore'))}</p><p>UNIER</p></div>`,
   });
   if (!sent.ok) {
     await sb.rpc('email_sign_withdraw', { p_token_hash: hashToken(token) });
@@ -82,7 +91,7 @@ export async function confirmEmailSign(fd: FormData) {
   const token = String(fd.get('token') ?? '').slice(0, 100);
   const { data, error } = await admin().rpc('email_sign_confirm', { p_token_hash: hashToken(token) });
   if (error) await reportProblem({ source: 'server', message: `Confirming an email signature failed: ${error.message}`, path: '/s', key: 'email_sign_confirm' });
-  if (!error && (data as any)?.status === 'confirmed' && pushReady()) await sendPending(20).catch(() => {});   // the goal may have been reached
+  if (!error && (data as any)?.status === 'confirmed') await notifyFollowers(20);   // the goal may have been reached
   redirect(`/s/${encodeURIComponent(token)}?${error ? 'err=1' : 'ok=1'}`);
 }
 
@@ -90,4 +99,11 @@ export async function withdrawEmailSign(fd: FormData) {
   const token = String(fd.get('token') ?? '').slice(0, 100);
   const { error } = await admin().rpc('email_sign_withdraw', { p_token_hash: hashToken(token) });
   redirect(`/s/${encodeURIComponent(token)}?${error ? 'err=1' : 'gone=1'}`);
+}
+
+// "Stop these emails", from the page the link in every update email opens. The signature stays.
+export async function stopEmailUpdates(fd: FormData) {
+  const key = String(fd.get('key') ?? '').slice(0, 100);
+  const { error } = await admin().rpc('email_unsubscribe', { p_key: key });
+  redirect(`/stop/${encodeURIComponent(key)}?${error ? 'err=1' : 'done=1'}`);
 }

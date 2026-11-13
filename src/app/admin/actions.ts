@@ -220,7 +220,7 @@ export async function decideAppeal(reverse: boolean, f: FormData) {
 export async function runLifecycle() {
   const sb = await mod();
   const { error } = await sb.rpc('run_lifecycle_now');
-  if (!error) { const { sendPending } = await import('@/lib/push/send'); await sendPending(50).catch(() => {}); }
+  if (!error) { const { notifyFollowers } = await import('@/lib/notify'); await notifyFollowers(50); }
   await done(error);
 }
 

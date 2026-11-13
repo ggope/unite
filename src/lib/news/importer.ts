@@ -1,4 +1,4 @@
-import { sendPending } from '@/lib/push/send';
+import { notifyFollowers } from '@/lib/notify';
 import { createClient } from '@supabase/supabase-js';
 import { parseFeed, shorten } from './parse';
 import { classify, tokens, sameStory } from './classify';
@@ -48,7 +48,7 @@ export async function runImport() {
   const clean = await sb.rpc('run_retention');
   report.push({ source: 'privacy clean-up', status: clean.error ? `error: ${clean.error.message}` : JSON.stringify(clean.data), added: 0 });
   // and anything a phone notification missed goes out now (0014_notify.sql)
-  try { const p = await sendPending(50); report.push({ source: 'notifications', status: JSON.stringify(p), added: 0 }); }
+  try { const p = await notifyFollowers(50); report.push({ source: 'notifications', status: JSON.stringify(p), added: 0 }); }
   catch (e: any) { report.push({ source: 'notifications', status: `error: ${e?.message ?? e}`, added: 0 }); }
   // and new clips from trusted channels for the feed (0025_team_videos.sql)
   try { const { runClipImport } = await import('../clips/importer'); report.push(...await runClipImport()); }

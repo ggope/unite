@@ -46,7 +46,7 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
   const [undo, setUndo] = useState<number | null>(null);
   const [why, setWhy] = useState(''); const [show, setShow] = useState(true); const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
-  const [email, setEmail] = useState(''); const [sent, setSent] = useState(''); const [sameDevice, setSameDevice] = useState(false);
+  const [email, setEmail] = useState(''); const [notify, setNotify] = useState(false); const [sent, setSent] = useState(''); const [sameDevice, setSameDevice] = useState(false);
 
   async function sign(reason?: string) {
     setBusy(true); setErr('');
@@ -101,7 +101,7 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
   async function guestSign() {
     setBusy(true); setErr('');
     const clean = email.trim().toLowerCase();
-    const r = await requestEmailSign({ petitionId, email: clean, lang, captcha }).catch(() => ({ status: 'fallback' as const }));
+    const r = await requestEmailSign({ petitionId, email: clean, lang, captcha, notify }).catch(() => ({ status: 'fallback' as const }));
     if (r.status !== 'fallback') {
       setBusy(false); setCaptcha(null); setTsKey((k) => k + 1);
       if (r.status === 'sent') setSent(clean);
@@ -148,6 +148,7 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
                 <div className="field"><label htmlFor={`em-${petitionId}`}>{t('login.email')}</label>
                   <input id={`em-${petitionId}`} type="email" required autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
                 <label className="check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>{t('guest.age')} {t('consent.text')} <a href="/privacy" target="_blank" rel="noopener">{t('consent.more')}</a></span></label>
+                <label className="check"><input type="checkbox" name="notify" checked={notify} onChange={(e) => setNotify(e.target.checked)} /><span>{t('guest.notify')}</span></label>
                 <Turnstile key={tsKey} lang={lang} onToken={setCaptcha} />
                 {err && <p className="error">{err}</p>}
                 <button className="btn primary big block" disabled={busy || !agree || !email.includes('@') || (!!TURNSTILE_KEY && !captcha)}>{busy ? t('sign.signing') : t('guest.send')}</button>
