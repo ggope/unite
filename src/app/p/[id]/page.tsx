@@ -8,6 +8,7 @@ import { getT } from '@/lib/i18n/server';
 import { fmtN, locale } from '@/lib/i18n/dict';
 import { SignButton } from '@/components/SignButton';
 import { FollowButton } from '@/components/FollowButton';
+import { SaveButton } from '@/components/SaveButton';
 import { PostUpdate, RemoveUpdate } from '@/components/PostUpdate';
 import { ReportButton } from '@/components/ReportButton';
 import { ShareButton } from '@/components/ShareButton';
@@ -61,6 +62,7 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
   const canUpdate = !!user && (p.status === 'live' || p.status === 'closed') && (isFounder || !!me?.is_moderator);
   const left = open ? daysLeft(p.ends_on) : null;
   const sil = silence(updates);
+  const { data: savedRow } = user ? await sb.from('saved_petitions').select('petition_id').eq('petition_id', id).maybeSingle() : { data: null };   // 0028
   const date = (d: string) => new Date(d).toLocaleDateString(locale(lang), { year: 'numeric', month: 'long', day: 'numeric' });
   const stat = (m: any) => (Array.isArray(m.petition_stats) ? m.petition_stats[0] : m.petition_stats)?.signatures ?? 0;
 
@@ -93,6 +95,7 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
         <div className="row">
           {open && <SignButton petitionId={p.id} title={p.title} signed={signed.has(p.id)} viewer={viewer} />}
           <FollowButton petitionId={p.id} following={followed.has(p.id)} loggedIn={viewer.loggedIn} />
+          {open && <SaveButton petitionId={p.id} saved={!!savedRow} loggedIn={viewer.loggedIn} />}
           <ShareButton path={`/p/${p.id}`} title={p.title} />
           <a className="btn ghost small" href={`/api/card/${p.id}`} target="_blank" rel="noopener">{t('sign.shareCard')}</a>
           {(p.status === 'live' || p.status === 'closed') && <Link className="btn ghost small" href={`/p/${p.id}/report`}>{t('p.report')}</Link>}
