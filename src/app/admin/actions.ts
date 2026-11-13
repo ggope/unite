@@ -200,3 +200,31 @@ export async function testAlert() {
   const r = await sendMail({ to: process.env.ALERT_EMAIL, subject: 'UNIER test alert', text: 'This is a test. Error alerts from UNIER will arrive like this.' });
   await done(r.ok ? null : { message: `Sending failed: ${r.error}` });
 }
+
+// UNIER team content (0023): one switch for team petitions and team videos.
+export async function setTeamContent(f: FormData) {
+  const sb = await mod();
+  const level = s(f, 'level');
+  if (!['auto', 'full', 'less', 'off'].includes(level)) return;
+  const { error } = await sb.from('site_settings').update({ team_content: level }).eq('id', true);
+  await done(error && { message: /team_content/.test(error.message) ? 'Run 0023_team_content.sql first (see Launch checklist).' : error.message });
+}
+
+// Starts the daily drafting by hand. Drafts land in the review queue.
+export async function draftNow() {
+  await mod();
+  const { runDrafts } = await import('@/lib/team/draft');
+  const r = await runDrafts({ force: true });
+  const summary = `${r.status}: ${r.drafted} drafted, ${r.duplicates} already covered, ${r.skipped} skipped, ${r.failed} failed`;
+  const u = new URL((await headers()).get('referer') ?? '/admin?tab=team', 'http://x');
+  u.searchParams.delete('err'); u.searchParams.set('ran', summary.slice(0, 160));
+  revalidatePath('/admin'); redirect(u.pathname + u.search);
+}
+
+// A moderator fixes a team draft before approving it.
+export async function editDraft(f: FormData) {
+  const sb = await mod();
+  const row = { title: s(f, 'title'), target: s(f, 'target'), region: s(f, 'region'), ask: s(f, 'ask'), why: s(f, 'why') };
+  const { error } = await sb.from('petitions').update(row).eq('id', s(f, 'id')).eq('origin', 'team').eq('status', 'pending');
+  await done(error && { message: error.message.includes('check') ? 'A field is too short or too long.' : error.message });
+}

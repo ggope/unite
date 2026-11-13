@@ -68,6 +68,7 @@ await check('signing with only an email: link, confirm, counted once, withdraw',
   await g.locator('.sheet input[type=email]').fill('Guest@e2e.test'); await g.locator('.sheet input[type=checkbox]').check();
   await g.getByRole('button', { name: /email|link|code/i }).last().click(); await g.waitForSelector('.sheet .error', { timeout: 5000 });
   await go(g, new URL(link).pathname + '?w=1'); await g.getByRole('button', { name: /withdraw/i }).click(); await settle(g);
+  for (let i = 0; i < 20 && total() !== before; i++) await g.waitForTimeout(250);   // the server action can finish after the network goes quiet
   expect(total() === before, 'withdraw did not remove it');
 });
 await check('a crashed page and a failing server call are logged and the owner is emailed once', async () => {
@@ -626,6 +627,57 @@ await check('admin takes the sample petitions down before launch', async () => {
   await go(a, '/admin?tab=launch'); expect(await a.getByText('No sample petitions left').count(), 'checklist not updated');
 });
 
+
+console.log('Team petitions from trusted sources (0023)');
+{
+  const story = one(`select gen_random_uuid()`);
+  sql(`insert into news_items (source_id, url, title, teaser, lang, topic, story_key, published_at) values
+    ('bbc', 'https://bbc.example/plastics-e2e', 'Plastics treaty talks end without a deal on ocean pollution', 'Negotiators failed to agree limits on plastic production.', 'en', 'oceans', '${story}', now() - interval '2 hours'),
+    ('guardian', 'https://guardian.example/plastics-e2e', 'Plastic pollution treaty stalls as countries block production cuts', 'A small group of countries blocked limits.', 'en', 'oceans', '${story}', now() - interval '1 hour')`);
+  // the helper looks at the biggest stories first; set aside any real news imported earlier in the run
+  sql(`insert into team_drafts (story_key, decision, reason) select distinct story_key, 'skipped', 'e2e' from news_items where story_key <> '${story}' on conflict (story_key) do nothing`);
+  let pid = null;
+  await check('the daily job drafts a petition from a story two outlets covered', async () => {
+    expect((await g.request.get(APP + '/api/team/draft')).status() === 401, 'job open to anyone');
+    const j = await (await g.request.get(APP + '/api/team/draft', { headers: { authorization: 'Bearer e2e' } })).json();
+    expect(j.report?.drafted >= 1, JSON.stringify(j));
+    pid = one(`select petition_id from team_drafts where story_key = '${story}' and decision = 'drafted'`);
+    expect(pid && one(`select status || ' ' || origin || ' ' || coalesce(created_by::text, 'nobody') from petitions where id = '${pid}'`) === 'pending team nobody', 'draft not pending from the team');
+    expect(one(`select count(*) from petition_sources where petition_id = '${pid}'`) === '2', 'sources not saved');
+    const calls = await (await g.request.get('http://localhost:54321/__claude')).json();
+    expect(calls.at(-1)?.messages?.[0]?.content?.includes('BBC News'), 'story not sent to the AI');
+    const again = await (await g.request.get(APP + '/api/team/draft', { headers: { authorization: 'Bearer e2e' } })).json();
+    expect(!again.report?.drafted, `same story drafted twice: ${JSON.stringify(again)}`);
+  });
+  await check('a moderator checks the sources, edits and approves the draft', async () => {
+    await go(a, '/admin?tab=queue'); await noCrash(a);
+    const card = a.locator('.panel', { hasText: 'Agree a strong global plastics treaty' });
+    expect(await card.getByText(/From the UNIER team · drafted by AI/).count(), 'no team label in the queue');
+    expect(await card.getByText(/Check which countries blocked/).count(), 'no note for the moderator');
+    expect(await card.locator('a[href="https://guardian.example/plastics-e2e"]').count(), 'sources not listed');
+    await card.getByText('Edit before approving').click();
+    await card.locator('input[name=title]').fill('Agree a strong plastics treaty this year'); await card.getByRole('button', { name: 'Save changes' }).click(); await settle(a);
+    expect(one(`select title from petitions where id = '${pid}'`) === 'Agree a strong plastics treaty this year', 'edit not saved');
+    await go(a, '/admin?tab=queue');
+    await a.locator('.panel', { hasText: 'Agree a strong plastics treaty this year' }).getByRole('button', { name: 'Approve' }).click(); await settle(a);
+    expect(one(`select status from petitions where id = '${pid}'`) === 'live', 'not approved');
+  });
+  await check('the petition says it is from the UNIER team and lists its sources', async () => {
+    await go(g, `/p/${pid}`); await noCrash(g);
+    expect(await g.getByText('From the UNIER team').count(), 'no team label');
+    expect(await g.locator('.team-sources a[href="https://bbc.example/plastics-e2e"]').count(), 'no sources list');
+  });
+  await check('admin switches team content off, and the job stops', async () => {
+    await go(a, '/admin?tab=team'); await noCrash(a);
+    expect(await a.getByText('Plastics treaty talks end without a deal on ocean pollution').count() + await a.getByText('Plastic pollution treaty stalls as countries block production cuts').count(), 'decision log empty');
+    await a.locator('input[name=level][value=off]').check(); await a.getByRole('button', { name: 'Save' }).click(); await settle(a);
+    expect(one(`select team_content_level()`) === 'off', 'switch not saved');
+    const j = await (await g.request.get(APP + '/api/team/draft', { headers: { authorization: 'Bearer e2e' } })).json();
+    expect(/switched off/.test(j.report?.status), JSON.stringify(j));
+    await go(g, '/'); await noCrash(g);
+    sql(`update site_settings set team_content = 'auto'`);
+  });
+}
 
 console.log('Petition life cycle (0018)');
 {
