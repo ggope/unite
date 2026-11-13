@@ -2,13 +2,14 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN, LANGS, type Lang } from '@/lib/i18n/dict';
-import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, importClips, clipAction, toggleVideoSource, removeSamples, decideAppeal, runLifecycle, resolveError, testAlert, setTeamContent, draftNow, editDraft } from './actions';
+import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, importClips, clipAction, toggleVideoSource, removeSamples, decideAppeal, runLifecycle, resolveError, testAlert, setTeamContent, draftNow, editDraft, setAiMode, runAiNow } from './actions';
 import { aiReady } from '@/lib/team/draft';
+import { aiKeySet, aiModel, aiDailyLimit } from '@/lib/ai/moderate';
 import { legalPlaceholders } from '@/lib/legal';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300;   // "Draft now" in Team content can take a few minutes
-const TABS = [['overview', 'Overview'], ['launch', 'Launch checklist'], ['queue', 'Review queue'], ['reports', 'Reports'], ['appeals', 'Appeals'], ['petitions', 'Petitions'], ['news', 'News'], ['team', 'Team content'], ['clips', 'Team videos'], ['people', 'People'], ['errors', 'Errors']] as const;
+export const maxDuration = 300;   // "Draft now" in Team content can take a few minutes; "Check waiting items now" asks the AI about up to 20 items
+const TABS = [['overview', 'Overview'], ['launch', 'Launch checklist'], ['queue', 'Review queue'], ['reports', 'Reports'], ['ai', 'AI check'], ['appeals', 'Appeals'], ['petitions', 'Petitions'], ['news', 'News'], ['team', 'Team content'], ['clips', 'Team videos'], ['people', 'People'], ['errors', 'Errors']] as const;
 type Tab = (typeof TABS)[number][0];
 const when = (d: string) => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const n = (x: number) => fmtN(x, 'en');
@@ -40,6 +41,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       {tab === 'launch' && <Launch sb={sb} />}
       {tab === 'queue' && <Queue sb={sb} />}
       {tab === 'reports' && <Reports sb={sb} />}
+      {tab === 'ai' && <AiCheck sb={sb} />}
       {tab === 'appeals' && <Appeals sb={sb} me={user.id} />}
       {tab === 'petitions' && <Petitions sb={sb} q={q} open={open} />}
       {tab === 'news' && <News sb={sb} />}
@@ -70,9 +72,9 @@ async function Overview({ st, sb }: { st: Record<string, number>; sb: any }) {
   </>);
 }
 
-const Decide = ({ kind, id }: { kind: string; id: string }) => (
+const Decide = ({ kind, id, note }: { kind: string; id: string; note?: string }) => (
   <form action={noop} className="row"><input type="hidden" name="kind" value={kind} /><input type="hidden" name="id" value={id} />
-    <input name="note" placeholder="Reason if not approved (the author sees this)" style={{ flex: 1, minWidth: 0 }} />
+    <input name="note" defaultValue={note ?? ''} placeholder="Reason if not approved (the author sees this)" style={{ flex: 1, minWidth: 0 }} />
     <button className="btn small primary" formAction={review.bind(null, 'approve')}>Approve</button><button className="btn small danger" formAction={review.bind(null, 'reject')}>Reject</button></form>
 );
 
@@ -82,6 +84,9 @@ async function Queue({ sb }: { sb: any }) {
     sb.from('videos').select('id, caption, storage_path, petition_id, created_at, blur_faces, audience, petitions(title)').eq('status', 'pending').order('created_at').limit(30),
   ]);
   const urls = vids?.length ? (await sb.storage.from('videos').createSignedUrls(vids.map((v: any) => v.storage_path), 3600)).data ?? [] : [];
+  const [ap, av] = await Promise.all([aiReviews(sb, 'petition_id', (pets ?? []).map((p: any) => p.id)), aiReviews(sb, 'video_id', (vids ?? []).map((v: any) => v.id))]);
+  urls.forEach((u: any, i: number) => { if (vids?.[i]) vids[i].url = u?.signedUrl; });   // keep each video's link when the list is re-ordered
+  byRisk(pets, ap); byRisk(vids, av);
   // team drafts (0023): the helper's note and its sources, so the facts can be checked before approving
   const teamIds = (pets ?? []).filter((p: any) => p.origin === 'team').map((p: any) => p.id);
   const [{ data: notes }, { data: srcs }] = teamIds.length ? await Promise.all([
@@ -89,10 +94,11 @@ async function Queue({ sb }: { sb: any }) {
     sb.from('petition_sources').select('petition_id, url, outlet, title').in('petition_id', teamIds),
   ]) : [{ data: [] }, { data: [] }];
   return (<>
+    <AiLine />
     <h2>Petitions ({pets?.length ?? 0})</h2>
-    {pets?.length ? pets.map((p: any) => <div className="panel" key={p.id}><b>{p.title}</b><span className="hint">{p.organiser_name} → {p.target} · {p.region} · {p.topic} · goal {n(p.goal)} · {when(p.created_at)}</span><p style={{ margin: 0 }}>{p.ask}</p><p className="hint" style={{ margin: 0 }}>{p.why}</p>{p.origin === 'team' ? <TeamDraft p={p} note={notes?.find((x: any) => x.petition_id === p.id)} sources={(srcs ?? []).filter((x: any) => x.petition_id === p.id)} /> : p.source_url && <a href={p.source_url} target="_blank" rel="noopener nofollow">Source</a>}{p.link_url && <span className="hint">Button link ({p.link_cta}): <a href={p.link_url} target="_blank" rel="noopener nofollow">{p.link_url}</a> · check it is safe and belongs to the organiser</span>}<Decide kind="petition" id={p.id} /></div>) : <p className="hint">Nothing waiting.</p>}
+    {pets?.length ? pets.map((p: any) => <div className="panel" key={p.id}><AiBadge r={ap.get(p.id)} /><b>{p.title}</b><span className="hint">{p.organiser_name} → {p.target} · {p.region} · {p.topic} · goal {n(p.goal)} · {when(p.created_at)}</span><p style={{ margin: 0 }}>{p.ask}</p><p className="hint" style={{ margin: 0 }}>{p.why}</p>{p.origin === 'team' ? <TeamDraft p={p} note={notes?.find((x: any) => x.petition_id === p.id)} sources={(srcs ?? []).filter((x: any) => x.petition_id === p.id)} /> : p.source_url && <a href={p.source_url} target="_blank" rel="noopener nofollow">Source</a>}{p.link_url && <span className="hint">Button link ({p.link_cta}): <a href={p.link_url} target="_blank" rel="noopener nofollow">{p.link_url}</a> · check it is safe and belongs to the organiser</span>}<Decide kind="petition" id={p.id} note={suggested(ap.get(p.id))} /></div>) : <p className="hint">Nothing waiting.</p>}
     <h2>Videos ({vids?.length ?? 0})</h2>
-    {vids?.length ? vids.map((v: any, i: number) => <div className="panel" key={v.id}><b>{v.caption}</b><span className="hint">For: {v.petitions?.title} · {v.audience === 'friends' ? 'friends only · ' : ''}{when(v.created_at)}</span>{v.blur_faces && <p className="error" style={{ margin: 0 }}>The uploader says other people can be recognised. Approve only if they clearly agreed to be filmed or cannot be identified.</p>}{urls[i]?.signedUrl && <video src={urls[i].signedUrl} controls muted playsInline style={{ width: '100%', maxHeight: 420, background: '#000', borderRadius: 10 }} />}<Decide kind="video" id={v.id} /></div>) : <p className="hint">Nothing waiting.</p>}
+    {vids?.length ? vids.map((v: any) => <div className="panel" key={v.id}><AiBadge r={av.get(v.id)} video /><b>{v.caption}</b><span className="hint">For: {v.petitions?.title} · {v.audience === 'friends' ? 'friends only · ' : ''}{when(v.created_at)}</span>{v.blur_faces && <p className="error" style={{ margin: 0 }}>The uploader says other people can be recognised. Approve only if they clearly agreed to be filmed or cannot be identified.</p>}{v.url && <video src={v.url} controls muted playsInline style={{ width: '100%', maxHeight: 420, background: '#000', borderRadius: 10 }} />}<Decide kind="video" id={v.id} note={suggested(av.get(v.id))} /></div>) : <p className="hint">Nothing waiting.</p>}
   </>);
 }
 
@@ -102,9 +108,9 @@ const MIGRATIONS: [string, string, string][] = [
   ['0002', 'invites', 'user_id'], ['0003', 'news_items', 'id'], ['0004', 'reports', 'resolved_at'], ['0005', 'petitions', 'official_url'],
   ['0006', 'profiles', 'bio'], ['0007', 'petitions', 'link_url'], ['0012', 'petitions', 'tr'], ['0014', 'notices', 'id'],
   ['0015', 'share_codes', 'code'], ['0016', 'answer_links', 'petition_id'], ['0017', 'signatures', 'reason_key'],
-  ['0018', 'appeals', 'id'], ['0021', 'error_events', 'fingerprint'], ['0023', 'petition_sources', 'id'], ['0025', 'team_videos', 'id'],
+  ['0018', 'appeals', 'id'], ['0021', 'error_events', 'fingerprint'], ['0023', 'petition_sources', 'id'], ['0024', 'ai_reviews', 'id'], ['0025', 'team_videos', 'id'],
 ];
-const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0021': '0021_email_sign', '0023': '0023_team_content', '0025': '0025_team_videos' };
+const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0021': '0021_email_sign', '0023': '0023_team_content', '0024': '0024_ai_moderation', '0025': '0025_team_videos' };
 const missing = (e: any) => !!e && /does not exist|PGRST20[45]|42703|42P01|schema cache/i.test(`${e.code} ${e.message}`);
 
 async function Launch({ sb }: { sb: any }) {
@@ -134,8 +140,9 @@ async function Launch({ sb }: { sb: any }) {
     { ok: env('SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'), what: 'Email sender (signing with only an email, error alerts)',
       how: <>For now, a Gmail address with an app password: set <code>SMTP_HOST</code>=smtp.gmail.com, <code>SMTP_PORT</code>=465, <code>SMTP_USER</code> and <code>SMTP_PASS</code> in Vercel. Put the same in Supabase → Authentication → Emails → SMTP, so login emails stop hitting the hourly limit. Once you have a domain, switch both to Resend or Brevo.</> },
     { ok: env('ALERT_EMAIL'), what: 'Error alerts by email', how: <>Set <code>ALERT_EMAIL</code> in Vercel to the address that should hear when something breaks. See <Link href="/admin?tab=errors">Errors</Link>.</> },
-    { ok: aiReady(), what: 'AI key for team petitions (optional)', how: <>Create a key at console.anthropic.com, add a monthly spending limit there, and set <code>ANTHROPIC_API_KEY</code> in Vercel. Without it, no petitions are drafted from the news. See <Link href="/admin?tab=team">Team content</Link>.</> },
     { ok: env('SUPABASE_SERVICE_ROLE_KEY'), what: 'Server key for Supabase', how: <>Set <code>SUPABASE_SERVICE_ROLE_KEY</code> in Vercel (Supabase → Project settings → API).</> },
+    { ok: aiReady() && aiKeySet(), what: 'AI key (sorts the review queue, drafts team petitions)',
+      how: <>Create a key at console.anthropic.com, add a monthly spending limit there, and set <code>ANTHROPIC_API_KEY</code> in Vercel. Then choose a mode under <Link href="/admin?tab=ai">AI check</Link> and <Link href="/admin?tab=team">Team content</Link>. Without it, everything waits for a person and no petitions are drafted from the news.</> },
     { ok: (mods?.length ?? 0) >= 2, what: `${mods?.length ?? 0} moderator${mods?.length === 1 ? '' : 's'}`, how: <>Two or more, so reports are answered when one of you is away. Add one under <Link href="/admin?tab=people">People</Link>.</> },
   ];
   const left = items.filter((x) => !x.ok).length;
@@ -155,13 +162,17 @@ async function Reports({ sb }: { sb: any }) {
   // A reported reason is read through a moderator-only function, which never says who wrote it.
   const said = new Map<string, any>(await Promise.all((reports ?? []).filter((r: any) => r.reason_key)
     .map(async (r: any) => [r.reason_key, (await sb.rpc('reported_reason', { p_key: r.reason_key })).data] as const)));
+  const ar = await aiReviews(sb, 'report_id', (reports ?? []).map((r: any) => r.id));
+  byRisk(reports, ar);
   const kind = (r: any) => r.reason_key ? 'Reason for signing' : r.update_id ? 'Official answer' : r.video_id ? 'Video' : r.petition_id ? 'Petition' : 'Person';
   return (<>
     <p className="hint" style={{ margin: 0 }}>Removing something sends your reason to its author. Dismiss keeps it online.</p>
+    <AiLine />
     {reports?.length ? reports.map((r: any) => {
       const why = r.reason_key ? said.get(r.reason_key) : null;
       return (
       <div className="panel" key={r.id}>
+        <AiBadge r={ar.get(String(r.id))} report />
         <span className="hint">{when(r.created_at)} · {kind(r)}</span>
         {r.reason_key ? <>{why?.petition_id && <Link href={`/p/${why.petition_id}`}>{why.title}</Link>}<b>“{why?.why ?? 'Already removed'}”</b>{why?.hidden && <span className="hint">Already hidden</span>}</>
           : r.update_id ? <>{r.answer?.petition_id && <Link href={`/p/${r.answer.petition_id}`}>See the petition</Link>}<b>{r.answer?.title ?? 'Already removed'}</b>{r.answer?.body && <span className="hint" style={{ whiteSpace: 'pre-line' }}>{r.answer.body}</span>}</>
@@ -170,7 +181,7 @@ async function Reports({ sb }: { sb: any }) {
             {r.profile_id && r.person?.bio && <span className="hint">Bio: “{r.person.bio}”</span>}</>}
         <p style={{ margin: 0 }}>Report: “{r.reason}”</p>
         <form action={noop} className="row"><input type="hidden" name="report_id" value={r.id} /><input type="hidden" name="video_id" value={r.video_id ?? ''} /><input type="hidden" name="petition_id" value={r.petition_id ?? ''} /><input type="hidden" name="profile_id" value={r.profile_id ?? ''} /><input type="hidden" name="reason_key" value={r.reason_key ?? ''} /><input type="hidden" name="update_id" value={r.update_id ?? ''} />
-          <input name="note" placeholder={r.update_id ? 'Why it was removed (kept in the log)' : 'Reason shown to the author if removed'} style={{ flex: 1, minWidth: 0 }} />
+          <input name="note" defaultValue={suggested(ar.get(String(r.id)))} placeholder={r.update_id ? 'Why it was removed (kept in the log)' : 'Reason shown to the author if removed'} style={{ flex: 1, minWidth: 0 }} />
           <button className="btn small" formAction={resolveReport.bind(null, 'dismiss')}>Dismiss</button><button className="btn small danger" formAction={resolveReport.bind(null, 'remove')}>{r.reason_key ? 'Hide reason' : r.profile_id && !r.video_id && !r.petition_id ? 'Clear name and bio' : 'Remove'}</button></form>
       </div>); }) : <p className="hint">No open reports.</p>}
   </>);
@@ -448,5 +459,79 @@ async function Errors({ sb }: { sb: any }) {
     {ready && <form action={testAlert}><button className="btn small">Send a test alert</button></form>}
     {open.length ? open.map((e: any) => <Row key={e.fingerprint} e={e} />) : <p className="hint">No open errors.</p>}
     {fixed.length > 0 && <details><summary className="hint">Marked as fixed ({fixed.length})</summary>{fixed.map((e: any) => <Row key={e.fingerprint} e={e} />)}</details>}
+  </>);
+}
+
+// ---------- AI check (0024) ----------
+// The latest AI opinion for each item, by id. Empty (no labels) before 0024 has run.
+async function aiReviews(sb: any, col: 'petition_id' | 'video_id' | 'report_id', ids: (string | number)[]): Promise<Map<string, any>> {
+  if (!ids.length) return new Map();
+  const { data } = await sb.from('ai_reviews').select(`${col}, verdict, risk, confidence, rules, summary, author_note, action, created_at`).in(col, ids).order('created_at');
+  return new Map((data ?? []).map((r: any) => [String(r[col]), r]));
+}
+const RISK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+// Most worrying first; items the AI has not seen yet keep their place among the medium ones.
+function byRisk(list: any[] | null, ai: Map<string, any>) {
+  list?.sort((a, b) => (RISK[ai.get(String(a.id))?.risk ?? 'medium'] - RISK[ai.get(String(b.id))?.risk ?? 'medium']) || (a.created_at < b.created_at ? -1 : 1));
+}
+// The AI's proposed reason for the author, ready in the box. The moderator can change it or approve anyway.
+const suggested = (r?: any) => (r && r.verdict !== 'ok' && r.author_note ? r.author_note : undefined);
+const RULE_NAMES: Record<string, string> = { spam: 'spam', scam: 'scam', hate: 'hate', harassment: 'harassment', threat: 'threat', violence: 'violence', sexual: 'sexual content', child_safety: 'child safety', self_harm: 'self-harm', private_info: 'private information', false_information: 'false information', impersonation: 'impersonation', illegal: 'illegal', manipulation: 'tries to instruct the AI', not_a_petition: 'not a petition', unsafe_link: 'unsafe link' };
+
+function AiBadge({ r, video, report }: { r?: any; video?: boolean; report?: boolean }) {
+  if (!r) return null;
+  const pct = `${Math.round(Number(r.confidence) * 100)}% sure`;
+  const rules = (r.rules ?? []).map((x: string) => RULE_NAMES[x] ?? x).join(', ');
+  const head = r.verdict === 'ok' ? (report ? 'AI: the report looks unfounded' : 'AI: looks fine')
+    : r.verdict === 'breaks_rules' ? (report ? `AI: the report looks right${rules ? ` (${rules})` : ''}` : `AI: may break the rules${rules ? ` (${rules})` : ''}`)
+    : `AI: a person should look${rules ? ` (${rules})` : ''}`;
+  return (
+    <div className={`ai-flag ai-${r.risk === 'urgent' ? 'urgent' : r.verdict}`} role="note">
+      <b>{r.risk === 'urgent' ? 'Urgent · ' : ''}{head}</b> <span className="hint">· {pct}{video ? ' · caption only, watch the video' : ''}</span>
+      {r.summary && <span className="hint" style={{ display: 'block' }}>{r.summary}</span>}
+    </div>
+  );
+}
+async function AiLine() {
+  return aiKeySet() ? null : <p className="hint" style={{ margin: 0 }}>The AI check is not set up, so nothing here is pre-sorted. See <Link href="/admin?tab=ai">AI check</Link>.</p>;
+}
+
+async function AiCheck({ sb }: { sb: any }) {
+  const [{ data: site, error }, { data: recent }, { count: today }, { data: stats }] = await Promise.all([
+    sb.from('site_settings').select('ai_moderation').maybeSingle(),
+    sb.from('ai_reviews').select('id, kind, verdict, risk, confidence, rules, summary, action, created_at, petition_id, petitions(title, status)').neq('action', 'none').order('created_at', { ascending: false }).limit(30),
+    sb.from('ai_reviews').select('id', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 864e5).toISOString()),
+    sb.rpc('ai_stats'),
+  ]);
+  if (missing(error) || !site || site.ai_moderation === undefined) return <p className="hint">Run <code>0024_ai_moderation.sql</code> in Supabase to use the AI check (see <Link href="/admin?tab=launch">Launch checklist</Link>).</p>;
+  const mode = site.ai_moderation as 'off' | 'suggest' | 'auto';
+  const key = aiKeySet();
+  const MODES = [
+    ['off', 'Off', 'No AI. Every item waits for a person, as before.'],
+    ['suggest', 'Suggest', 'The AI reads every new petition, video caption and report, labels it, sorts the most worrying first and drafts the reason for the author. People still decide everything.'],
+    ['auto', 'Auto', 'Like Suggest, and it also publishes petitions it is very sure are fine (no button link, not written by the UNIER team) and takes down clear spam and scams, telling the author it was automatic and that they can ask a person for a second look. Videos and reports always wait for a person.'],
+  ] as const;
+  const st = (stats ?? {}) as Record<string, number>;
+  return (<>
+    <div className="panel stack" style={{ gap: 8 }}>
+      <span className="label">How it works</span>
+      <span className="hint">Key: {key ? <>set ✓ · model <code>{aiModel()}</code></> : <>not set. Add <code>ANTHROPIC_API_KEY</code> in Vercel; until then the queue stays fully manual.</>} · Checks in the last 24 hours: {n(today ?? 0)} of {n(aiDailyLimit())} (<code>AI_DAILY_LIMIT</code>)</span>
+      <span className="hint">New items are checked a few seconds after they arrive, and again every night for anything missed. Urgent ones (threats, child safety, self-harm, private details) are emailed to <code>ALERT_EMAIL</code> straight away. The AI sees the text only, never who wrote a report or who signed.</span>
+      {MODES.map(([k, label, text]) => (
+        <form key={k} action={setAiMode.bind(null, k)} className="row between" style={{ gap: 8 }}>
+          <span style={{ flex: 1, minWidth: 0 }}><b>{label}{mode === k ? ' · on now' : ''}</b><span className="hint" style={{ display: 'block' }}>{text}</span></span>
+          {mode !== k && <button className="btn small">Use {label}</button>}
+        </form>))}
+      {key && mode !== 'off' && <form action={runAiNow}><button className="btn small">Check waiting items now</button></form>}
+    </div>
+    <div className="tiles">{([['Checked (30 days)', st.checked_30d], ['Published by the AI', st.approved_30d], ['Taken down by the AI', st.removed_30d], ['Sent to a person', st.to_people_30d]] as const).map(([k, v]) =>
+      <div className="tile" key={k}><span className="label">{k}</span><b className="num">{n(Number(v ?? 0))}</b></div>)}</div>
+    <div className="panel" style={{ gap: 6 }}><b>Decided by the AI, newest first</b>
+      <span className="hint">Spot-check these now and then. To undo, open the petition under <Link href="/admin?tab=petitions">Petitions</Link>; the author can also appeal.</span>
+      {recent?.length ? recent.map((r: any) => (
+        <span key={r.id}>{when(r.created_at)} · <b>{r.action === 'approved' ? 'published' : 'taken down'}</b> · {r.petition_id ? <Link href={`/p/${r.petition_id}`}>{r.petitions?.title ?? 'Petition'}</Link> : r.kind}
+          <span className="hint"> · now {r.petitions?.status ?? '–'} · {Math.round(Number(r.confidence) * 100)}% sure{r.summary ? ` · ${r.summary}` : ''}</span></span>))
+        : <span className="hint">{mode === 'auto' ? 'Nothing yet.' : 'Nothing: the AI only decides on its own in Auto mode.'}</span>}
+    </div>
   </>);
 }

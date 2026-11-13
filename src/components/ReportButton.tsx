@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
+import { nudgeAi } from '@/lib/ai/actions';
 import { useT } from '@/lib/i18n/client';
 import { Icon } from './Icon';
 
@@ -22,6 +23,7 @@ export function ReportButton({ videoId, petitionId, profileId, reasonKey, update
       : { video_id: videoId ?? null, petition_id: videoId ? null : petitionId ?? null, ...(profileId ? { profile_id: profileId } : {}) };
     const { error } = await supabaseBrowser().from('reports').insert({ reporter_id: s.session?.user.id, ...target, reason: `${why}${txt.trim() ? ': ' + txt.trim() : ''}`.slice(0, 500) });
     setState(error ? 'err' : 'done');
+    if (!error) nudgeAi().catch(() => {});   // the AI check sorts it for the moderators
   }
   return (
     <>
