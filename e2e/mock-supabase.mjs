@@ -15,6 +15,17 @@ const PORT = Number(process.env.E2E_SUPABASE_PORT || 54321);
 const REST = process.env.E2E_POSTGREST || 'http://127.0.0.1:54322';
 const FILES = fs.mkdtempSync(path.join(os.tmpdir(), 'unite-e2e-storage-'));
 export const otps = [];   // email codes "sent", for tests to read
+// The AI check's stand-in for the Claude API (0024): answers by keywords in the content, and keeps what it was sent.
+const aiCalls = [];
+function claude(body) {
+  const text = body.messages.map((m) => (typeof m.content === 'string' ? m.content : m.content.map((c) => c.text ?? '').join(''))).join('\n');
+  aiCalls.push(text);
+  const r = /WIN FREE CRYPTO/.test(text) ? { verdict: 'breaks_rules', risk: 'high', confidence: 0.99, rules: ['spam', 'scam'], summary: 'Crypto spam.', author_note: 'This looks like spam.' }
+    : /hunt them down/i.test(text) ? { verdict: 'breaks_rules', risk: 'urgent', confidence: 0.9, rules: ['threat'], summary: 'A threat against a person.', author_note: 'Threats are not allowed.' }
+    : /maybe borderline/i.test(text) ? { verdict: 'unsure', risk: 'medium', confidence: 0.5, rules: ['false_information'], summary: 'Claims need checking.', author_note: 'We could not confirm the facts in this petition.' }
+    : { verdict: 'ok', risk: 'low', confidence: 0.95, rules: [], summary: 'An ordinary petition.', author_note: '' };
+  return { id: 'msg_e2e', type: 'message', role: 'assistant', model: body.model, content: [{ type: 'text', text: JSON.stringify(r) }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } };
+}
 const mails = [];         // UNIER's own emails (SMTP stand-in), read back at GET /__mail
 
 const b64u = (b) => Buffer.from(b).toString('base64url');
@@ -109,6 +120,8 @@ export function start() {
     try {
       if (url.pathname === '/__mail' && req.method === 'POST') { mails.push(JSON.parse((await read(req)).toString())); return send(res, 200, {}); }
       if (url.pathname === '/__mail') return send(res, 200, mails.filter((m) => !url.searchParams.get('to') || m.to === url.searchParams.get('to')));
+      if (url.pathname === '/__anthropic/v1/messages' && req.method === 'POST') return send(res, 200, claude(JSON.parse((await read(req)).toString())));
+      if (url.pathname === '/__anthropic') return send(res, 200, aiCalls);
       if (url.pathname.startsWith('/rest/v1')) return await proxy(req, res, url);
       if (url.pathname.startsWith('/auth/v1')) return await auth(req, res, url);
       if (url.pathname.startsWith('/storage/v1')) return await storage(req, res, url);

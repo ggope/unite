@@ -682,6 +682,70 @@ console.log('Petition life cycle (0018)');
   });
 }
 
+console.log('AI check (0024)');
+{
+  const E = newUser('emil');
+  const mk = (title, ask) => one(`insert into petitions (created_by, organiser_name, title, target, region, ask, why, topic, goal, status)
+    values ('${E.id}', 'Emil', '${title}', 'City council', 'Hungary', '${ask}', 'Because it matters to everyone who lives here.', 'housing', 1000, 'pending') returning id`);
+  // Everything already waiting counts as seen, so this run looks only at what the check below adds.
+  sql(`insert into ai_reviews (kind, petition_id, verdict, summary) select 'petition', id, 'unsure', 'seen' from petitions p where status = 'pending' and not exists (select 1 from ai_reviews r where r.petition_id = p.id);
+       insert into ai_reviews (kind, video_id, verdict, summary) select 'video', id, 'unsure', 'seen' from videos v where status = 'pending' and not exists (select 1 from ai_reviews r where r.video_id = v.id);
+       insert into ai_reviews (kind, report_id, verdict, summary) select 'report', id, 'unsure', 'seen' from reports x where status = 'open' and not exists (select 1 from ai_reviews r where r.report_id = x.id);`);
+  const fine = mk('More benches in the city park please', 'Please put twenty new benches in the city park this year.');
+  const spam = mk('WIN FREE CRYPTO with this one trick now', 'WIN FREE CRYPTO by sending us your wallet key today.');
+  const unsure = mk('Close the old bridge before it falls', 'Please close the old bridge, it is maybe borderline unsafe.');
+  const target = one(`select id from petitions where status = 'live' order by created_at limit 1`);
+  const rep = one(`insert into reports (reporter_id, petition_id, reason) values ('${B.id}', '${target}', 'They will hunt them down') returning id`);
+  const before = (await (await fetch('http://localhost:54321/__anthropic')).json()).length;
+
+  await check('admin switches the AI check to Auto and runs it', async () => {
+    await go(a, '/admin?tab=ai'); await noCrash(a);
+    expect(await a.getByText('Suggest · on now').count(), 'default mode is not Suggest');
+    await a.getByRole('button', { name: 'Use Auto' }).click(); await settle(a);
+    expect(one(`select ai_moderation from site_settings`) === 'auto', 'mode not saved');
+    await go(a, '/admin?tab=ai'); await a.getByRole('button', { name: 'Check waiting items now' }).click(); await settle(a);
+    for (let i = 0; i < 40 && one(`select count(*) from ai_reviews where petition_id in ('${fine}', '${spam}', '${unsure}') or report_id = ${rep}`) !== '4'; i++) await a.waitForTimeout(250);   // the action may still be running
+    expect(one(`select status from petitions where id = '${fine}'`) === 'live', 'clearly fine petition not published');
+    expect(one(`select status from petitions where id = '${spam}'`) === 'removed', 'spam not taken down');
+    expect(/decided automatically/.test(one(`select moderation_note from petitions where id = '${spam}'`) ?? ''), 'author not told it was automatic');
+    expect(one(`select status from petitions where id = '${unsure}'`) === 'pending', 'unsure petition did not wait for a person');
+    expect(one(`select risk from ai_reviews where report_id = ${rep}`) === 'urgent', 'report not checked');
+    expect(one(`select status from reports where id = ${rep}`) === 'open', 'the AI closed a report on its own');
+  });
+  await check('the AI sees content only, never emails', async () => {
+    const sent = (await (await fetch('http://localhost:54321/__anthropic')).json()).slice(before).join('\n');
+    expect(sent.includes('More benches') && sent.includes('hunt them down'), 'content not sent');
+    expect(!/@e2e\.test/.test(sent), 'an email address reached the AI');
+  });
+  await check('urgent reports are emailed to the owner at once', async () => {
+    let got = false; for (let i = 0; i < 20 && !got; i++) { got = (await mailsTo('owner@e2e.test')).some((m) => /urgent report/.test(m.subject)); if (!got) await a.waitForTimeout(250); }
+    expect(got, 'no urgent email');
+  });
+  await check('the queue shows what the AI thinks, with the reason drafted', async () => {
+    await go(a, '/admin?tab=queue'); await noCrash(a);
+    const card = a.locator('.panel', { hasText: 'Close the old bridge' });
+    expect(await card.getByText(/AI: a person should look/).count(), 'no AI label in the queue');
+    expect((await card.locator('input[name=note]').inputValue()) === 'We could not confirm the facts in this petition.', 'reason not drafted');
+    await go(a, '/admin?tab=reports');
+    expect(await a.locator('.panel', { hasText: 'hunt them down' }).getByText(/Urgent/).count(), 'no urgent label on the report');
+    expect((await a.locator('.panel .ai-flag').first().innerText()).includes('Urgent'), 'urgent report is not first');
+  });
+  await check('AI decisions are listed for spot checks and counted in public', async () => {
+    await go(a, '/admin?tab=ai');
+    expect(await a.getByText('More benches in the city park please').count() && await a.getByText('WIN FREE CRYPTO with this one trick now').count(), 'decisions not listed');
+    await go(g, '/transparency'); expect(await g.getByText('published by the AI').count(), 'no AI numbers on transparency');
+  });
+  await check('switching the AI check off stops it', async () => {
+    await go(a, '/admin?tab=ai'); await a.getByRole('button', { name: 'Use Off' }).click(); await settle(a);
+    const n0 = one(`select count(*) from ai_reviews`);
+    mk('A new petition while the AI is off', 'Please do the thing while the AI check is switched off.');
+    await go(a, '/admin?tab=ai'); expect(!(await a.getByRole('button', { name: 'Check waiting items now' }).count()), 'run button shown while off');
+    expect(one(`select count(*) from ai_reviews`) === n0, 'AI ran while off');
+    await a.getByRole('button', { name: 'Use Suggest' }).click(); await settle(a);
+    expect(one(`select ai_moderation from site_settings`) === 'suggest', 'mode not restored');
+  });
+}
+
 await b.close();
 if (errors.length) { console.log('\nBrowser/server errors:'); [...new Set(errors)].slice(0, 30).forEach((e) => console.log('  ' + e)); }
 console.log(failed() ? `\n${failed()} check(s) failed` : '\nAll end-to-end checks passed');

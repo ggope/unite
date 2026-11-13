@@ -200,3 +200,19 @@ export async function testAlert() {
   const r = await sendMail({ to: process.env.ALERT_EMAIL, subject: 'UNIER test alert', text: 'This is a test. Error alerts from UNIER will arrive like this.' });
   await done(r.ok ? null : { message: `Sending failed: ${r.error}` });
 }
+
+// AI check (0024): off, suggest (labels only) or auto (also handles the clearest petitions).
+export async function setAiMode(mode: 'off' | 'suggest' | 'auto') {
+  const sb = await mod();
+  if (!['off', 'suggest', 'auto'].includes(mode)) return;
+  await done((await sb.from('site_settings').update({ ai_moderation: mode }).eq('id', true)).error);
+}
+// AI check: looks at everything still waiting now, instead of waiting for the next new item or the nightly run.
+export async function runAiNow() {
+  await mod();
+  const { aiReady, runAiChecks } = await import('@/lib/ai/moderate');
+  if (!aiReady()) return done({ message: 'Add ANTHROPIC_API_KEY (and SUPABASE_SERVICE_ROLE_KEY) in Vercel first.' });
+  const r = await runAiChecks({ limit: 20, seconds: 50 });
+  await done(r.skipped === 'daily_limit' ? { message: 'The daily AI limit is reached (AI_DAILY_LIMIT).' } : r.skipped === 'off' ? { message: 'The AI check is switched off.' }
+    : r.skipped === 'run_0024' ? { message: 'Run 0024_ai_moderation.sql first.' } : r.errors ? { message: `${r.errors} check(s) failed. See Errors.` } : null);
+}

@@ -515,3 +515,10 @@ main:focus{outline:none}
 .appeal-what{border-left:8px solid var(--warn)}
 .appeal-reversed{color:var(--ok);font-weight:700}
 .appeal-upheld{font-weight:700}
+
+/* AI check labels in the admin queues (0024) */
+.ai-flag{border-left:6px solid var(--edge);background:var(--sunk);border-radius:8px;padding:6px 10px;font-size:14px}
+.ai-ok{border-left-color:var(--ok);background:var(--ok-soft)}
+.ai-unsure{border-left-color:var(--accent);background:var(--accent-soft)}
+.ai-breaks_rules,.ai-urgent{border-left-color:var(--warn);background:var(--warn-soft)}
+.ai-urgent{outline:2px solid var(--warn)}
