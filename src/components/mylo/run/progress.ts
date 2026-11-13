@@ -6,7 +6,7 @@ export const OUTFITS = ['none', 'cap', 'scarf', 'glasses', 'flowers', 'cape', 'c
 export type Outfit = (typeof OUTFITS)[number];
 export const PRICE: Record<Outfit, number> = { none: 0, cap: 40, scarf: 100, glasses: 180, flowers: 300, cape: 450, crown: 700 };
 
-export const KINDS = ['hearts', 'score', 'worlds', 'combo', 'double', 'roll', 'power', 'litter', 'near', 'games'] as const;
+export const KINDS = ['hearts', 'score', 'worlds', 'combo', 'jump', 'roll', 'power', 'litter', 'near', 'games'] as const;
 export type MKind = (typeof KINDS)[number];
 // run: counts inside one round only; otherwise it adds up across rounds
 const DEFS: Record<MKind, { run: boolean; steps: number[] }> = {
@@ -14,7 +14,7 @@ const DEFS: Record<MKind, { run: boolean; steps: number[] }> = {
   score: { run: true, steps: [250, 450, 700, 1000, 1500, 2200] },
   worlds: { run: true, steps: [2, 3, 4] },
   combo: { run: true, steps: [3, 4, 5] },
-  double: { run: false, steps: [5, 15, 30, 60] },
+  jump: { run: false, steps: [5, 15, 30, 60] },
   roll: { run: false, steps: [2, 6, 15, 30] },
   power: { run: false, steps: [2, 5, 10, 20] },
   litter: { run: false, steps: [8, 20, 40, 80] },
@@ -86,7 +86,7 @@ export function track(p: Progress, run: RunStats, e: GameEvent | { t: 'score'; s
   if (e.t === 'heart') { run.hearts++; run.combo = Math.max(run.combo, e.combo); }
   else if (e.t === 'score') run.score = e.score;
   else if (e.t === 'world') run.worlds = e.visited;
-  else if (e.t === 'double') add.double = 1;
+  else if (e.t === 'jump') add.jump = 1;
   else if (e.t === 'roll') add.roll = 1;
   else if (e.t === 'power') add.power = 1;
   else if (e.t === 'litter') add.litter = 1;

@@ -34,7 +34,7 @@ Next.js 15 App Router, React 19, TypeScript, Supabase (Postgres, auth, storage),
 - `src/lib/i18n/dict.ts`: all interface text in **en, hu, de, es, fr**. Every dict is `Record<Key, string>`, so a new key must be added to **all five**. Convention: insert new keys just before `'a11y.skip'` in each dict (a small Python script works well).
 - `src/lib/legal.tsx`: privacy/terms/imprint drafts with `<Ph>` placeholders still to fill (operator name, address, email). A lawyer should check them.
 - `src/components/mylo/`: Mylo art (`art.ts`), the picture book (`MyloBook.tsx`, `scenes.ts`), line art for colouring pages (`lineart.ts`).
-- `/mylo/play`: "Mylo's Run", a small endless-runner game (`src/components/mylo/MyloRun.tsx`, canvas, no database). Engine, drawing and progress live in `src/components/mylo/run/` (double jump, roll, four worlds, power-ups, missions, outfits, daily challenge with a seeded course). Progress only in localStorage `mylo-run`; after a round it points to one real petition near its goal.
+- `/mylo/play`: "Mylo's Run", a small endless-runner game (`src/components/mylo/MyloRun.tsx`, canvas, no database). Seen from behind Mylo on a 3-lane path (swipe left/right, up to jump, down to slide). Engine, drawing, sprite and progress live in `src/components/mylo/run/` (four worlds, power-ups, missions, outfits, daily challenge with a seeded course). Progress only in localStorage `mylo-run`; after a round it points to one real petition near its goal.
 - `src/lib/logo.tsx`: the "Mylo caught in the U" logo used for icons, OG images and the rail.
 - Admin is at `/admin` (moderators only), with tabs including **Launch checklist**.
 

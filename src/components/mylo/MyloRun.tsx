@@ -3,8 +3,9 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@/lib/i18n/client';
 import type { Key } from '@/lib/i18n/langs';
-import { H, WORLDS, hashStr, newGame, press as pressG, release as releaseG, rollDown, rollUp, step, type Game, type GameEvent, type Mod } from './run/engine';
-import { drawFrame, myloSprite, type Labels } from './run/draw';
+import { WORLDS, hashStr, move, newGame, slideHold, step, type Game, type GameEvent } from './run/engine';
+import { H, drawFrame, type Labels } from './run/draw';
+import { myloSprite } from './run/sprite';
 import { OUTFITS, PRICE, buy, dailyMod, finishRun, freshRun, level, load, reward, save, startRun, today, track, type Mission, type Outfit, type Progress, type RunStats } from './run/progress';
 
 // "Mylo's Run": a small endless runner for bored moments, playable with one thumb.
@@ -30,7 +31,7 @@ export function MyloRun({ signHref, signTitle }: { signHref: string; signTitle?:
   const [mode, setModeState] = useState<Mode>('endless');
   const [result, setResult] = useState<Result | null>(null);
   const [live, setLive] = useState('');
-  const swipe = useRef<{ id: number; y: number; done: boolean } | null>(null);
+  const swipe = useRef<{ id: number; x: number; y: number; at: number; done: boolean } | null>(null);
 
   const p = prog.current;
   const setPhase = useCallback((ph: Game['phase']) => { g.current.phase = ph; setPhaseState(ph); }, []);
@@ -64,7 +65,7 @@ export function MyloRun({ signHref, signTitle }: { signHref: string; signTitle?:
     if (ph === 'ready') { start(); return; }
     if (ph === 'over') { if (performance.now() - g.current.hitAt > 700) start(); return; }
     if (ph === 'pause') { resume(); return; }
-    pressG(g.current);
+    move(g.current, 'up');
   }, [start, resume]);
 
   // keyboard: Space / Up / W jump (again in the air for a double jump), Down / S roll, P or Escape pause
@@ -78,18 +79,18 @@ export function MyloRun({ signHref, signTitle }: { signHref: string; signTitle?:
     const down = (e: KeyboardEvent) => {
       if (typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key, ph = g.current.phase, onStage = document.activeElement === wrap.current;
+      const dir = k === 'ArrowLeft' || k === 'a' || k === 'A' ? 'left' : k === 'ArrowRight' || k === 'd' || k === 'D' ? 'right' : null;
       if (k === ' ' || k === 'ArrowUp' || k === 'w' || k === 'W' || (k === 'Enter' && onStage && ph !== 'run')) {
         e.preventDefault(); if (!e.repeat) press();
+      } else if (dir) {
+        if (ph === 'run') { e.preventDefault(); if (!e.repeat) move(g.current, dir); }
       } else if (k === 'ArrowDown' || k === 's' || k === 'S') {
-        if (ph === 'run') { e.preventDefault(); if (!e.repeat) rollDown(g.current, true); }
+        if (ph === 'run') { e.preventDefault(); if (!e.repeat) { move(g.current, 'down'); slideHold(g.current, true); } }
       } else if (k === 'p' || k === 'P' || k === 'Escape') {
         if (ph === 'run') { e.preventDefault(); pause(); } else if (ph === 'pause' && k !== 'Escape') resume();
       }
     };
-    const up = (e: KeyboardEvent) => {
-      if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') releaseG(g.current);
-      if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') rollUp(g.current);
-    };
+    const up = (e: KeyboardEvent) => { if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') slideHold(g.current, false); };
     const hide = () => { if (document.hidden) pause(); };
     window.addEventListener('keydown', down); window.addEventListener('keyup', up);
     window.addEventListener('blur', pause); document.addEventListener('visibilitychange', hide);
@@ -105,7 +106,7 @@ export function MyloRun({ signHref, signTitle }: { signHref: string; signTitle?:
     if (!box || !c) return;
     const fit = () => {
       const cssW = box.clientWidth;
-      const cssH = Math.round(Math.max(210, Math.min(300, cssW * 0.5, window.innerHeight * 0.55)));
+      const cssH = Math.round(Math.max(280, Math.min(480, cssW * 1.05, window.innerHeight * 0.62)));
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       c.style.height = cssH + 'px';
       c.width = Math.round(cssW * dpr); c.height = Math.round(cssH * dpr);
@@ -125,7 +126,7 @@ export function MyloRun({ signHref, signTitle }: { signHref: string; signTitle?:
     const labels: Labels = {
       best: t('game.best'),
       worlds: WORLDS.map((w) => t(`game.w.${w}` as Key)),
-      tips: { high: t('game.tip.high'), low: t('game.tip.low'), power: t('game.tip.power') },
+      tips: { lanes: t('game.tip.lanes'), low: t('game.tip.low'), cloud: t('game.tip.cloud'), block: t('game.tip.block'), power: t('game.tip.power') },
     };
     const onEvent = (e: GameEvent | { t: 'score'; score: number }) => {
       const gm = g.current, pr = prog.current; if (!pr) return;
@@ -153,9 +154,9 @@ export function MyloRun({ signHref, signTitle }: { signHref: string; signTitle?:
     const frame = (now: number) => {
       let dt = (now - last) / 1000; last = now;
       if (dt > 0.25) dt = 0;   // back from a pause or a hidden tab
-      const gm = g.current, { W } = view.current;
+      const gm = g.current;
       // small fixed steps keep fast speeds from skipping through thin obstacles
-      while (dt > 0) { const s = Math.min(dt, 1 / 120); step(gm, s, W, onEvent); dt -= s; }
+      while (dt > 0) { const s = Math.min(dt, 1 / 120); step(gm, s, onEvent); dt -= s; }
       if (gm.phase === 'run' && gm.score - scoreSeen >= 10) { scoreSeen = gm.score; onEvent({ t: 'score', score: gm.score }); }
       const pr = prog.current;
       const daily = modeRef.current === 'daily';
@@ -166,22 +167,28 @@ export function MyloRun({ signHref, signTitle }: { signHref: string; signTitle?:
     return () => cancelAnimationFrame(raf);
   }, [t, setPhase, mText]);
 
-  // touch: tap to jump, swipe down to roll
+  // touch: swipe left, right, up or down; a quick tap jumps too
   const onDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('button,a')) return;
     e.preventDefault(); wrap.current?.focus({ preventScroll: true });
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-    swipe.current = { id: e.pointerId, y: e.clientY, done: false };
-    const was = g.current.phase;
-    press();
-    if (was === 'run' && e.pointerType !== 'mouse') g.current.touchJump = 0.2;
+    if (g.current.phase !== 'run') { press(); swipe.current = null; return; }
+    swipe.current = { id: e.pointerId, x: e.clientX, y: e.clientY, at: performance.now(), done: false };
   };
   const onMove = (e: React.PointerEvent) => {
     const s = swipe.current;
     if (!s || s.id !== e.pointerId || s.done) return;
-    if (e.clientY - s.y > 26) { s.done = true; releaseG(g.current); rollDown(g.current, false); }
+    const dx = e.clientX - s.x, dy = e.clientY - s.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 22) return;
+    s.done = true;
+    if (Math.abs(dx) > Math.abs(dy)) move(g.current, dx < 0 ? 'left' : 'right');
+    else move(g.current, dy < 0 ? 'up' : 'down');
   };
-  const onUp = (e: React.PointerEvent) => { if (swipe.current?.id === e.pointerId) swipe.current = null; releaseG(g.current); };
+  const onUp = (e: React.PointerEvent) => {
+    const s = swipe.current;
+    if (s && s.id === e.pointerId && !s.done && performance.now() - s.at < 300) move(g.current, 'up');
+    swipe.current = null;
+  };
 
   const mod = dailyMod(today());
   const dailyBest = p?.daily.day === today() ? p.daily.best : 0;
