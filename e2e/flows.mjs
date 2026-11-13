@@ -44,6 +44,13 @@ await check('guest opens a petition and its report', async () => {
   let r = await go(g, `/p/${seedId}`); expect(r.status() === 200, `status ${r.status()}`); await noCrash(g);
   r = await go(g, `/p/${seedId}/report`); expect(r.status() === 200, `report status ${r.status()}`);
 });
+await check('sign-in links only ever lead back into UNIER', async () => {
+  for (const bad of ['/%5Cevil.example', '//evil.example', '/%09/evil.example']) {
+    const r = await g.request.get(APP + '/auth/callback?next=' + bad, { maxRedirects: 0 });
+    const to = r.headers()['location'] ?? '';
+    expect(new URL(to, APP).host === new URL(APP).host && to.includes('next=%2F') && !to.includes('evil'), `${bad} -> ${to}`);
+  }
+});
 await check('guest sign asks for email and sends a code', async () => {
   await go(g, `/p/${seedId}`);
   await g.getByRole('button', { name: /^Sign/ }).first().click();
@@ -62,6 +69,7 @@ await check('signing with only an email: link, confirm, counted once, withdraw',
   await go(g, new URL(link).pathname); expect(total() === before, 'counted before pressing Confirm');
   await g.getByRole('button', { name: /confirm/i }).click(); await settle(g);
   await g.waitForSelector('.esign .ok', { timeout: 5000 }); expect(total() === before + 1, 'not counted after Confirm');
+  expect(await g.locator('.esign').getByRole('button', { name: /share/i }).count(), 'no share button right after confirming');
   await go(g, new URL(link).pathname); await g.getByRole('button', { name: /confirm/i }).count().then((n) => expect(n === 0, 'confirm shown twice'));
   // signing again with the same email says it already counts
   await go(g, `/p/${seedId}`); await g.getByRole('button', { name: /^Sign/ }).first().click();
@@ -124,10 +132,15 @@ await check('start a petition', async () => {
   await a.fill('[name=ask]', 'Install and maintain free drinking water fountains in every public park by next summer.');
   await a.fill('[name=why]', 'Summers are getting hotter and bottled water is expensive and wasteful for families and kids.');
   await a.fill('[name=organiser_name]', 'Anna Kovács');
-  await a.fill('[name=link_url]', 'https://example.org/fountains');
+  await a.fill('[name=link_url]', 'http://example.org/fountains');   // not https: the server says so, and nothing typed is lost
   await a.selectOption('[name=topic]', 'health').catch(async () => a.locator('[name=topic][value=health]').check());
   await a.selectOption('[name=goal]', '10000').catch(async () => a.locator('[name=goal][value="10000"]').check());
   await a.locator('[name=facts]').check();
+  await a.locator('form button[type=submit], form button:not([type])').last().click();
+  await a.waitForSelector('form .error', { timeout: 8000 });
+  expect(await a.inputValue('[name=title]') === 'Free drinking fountains in every Budapest park', 'the form was emptied after an error');
+  expect((await a.inputValue('[name=why]')).startsWith('Summers are getting hotter'), 'the reason was emptied after an error');
+  await a.fill('[name=link_url]', 'https://example.org/fountains');
   await a.locator('form button[type=submit], form button:not([type])').last().click();
   await a.waitForURL(/\/p\/[0-9a-f-]{36}/, { timeout: 10000 });
   pid = a.url().match(/\/p\/([0-9a-f-]{36})/)[1];
@@ -250,6 +263,15 @@ await check('news import runs with the cron secret', async () => {
   expect(r.status() < 500, `status ${r.status()} ${await r.text()}`);
   const clean = (await r.json()).report?.find((x) => x.source === 'privacy clean-up');
   expect(clean && !clean.status.startsWith('error'), `daily privacy clean-up did not run: ${JSON.stringify(clean)}`);
+});
+
+await check('moderators get a morning email when something waits for review', async () => {
+  const pending = one(`insert into petitions (title, target, region, ask, why, topic, goal, organiser_name, status) values ('Digest check petition waiting', 'Someone', 'EU', 'Please review this test petition soon.', 'It checks the morning email to moderators.', 'health', 1000, 'E2E', 'pending') returning id`);
+  const r = await g.request.get(APP + '/api/news/import', { headers: { authorization: 'Bearer e2e' } });
+  const d = (await r.json()).digest; expect(d && d.petitions >= 1, `digest: ${JSON.stringify(d)}`);
+  const m = (await mailsTo('owner@e2e.test')).filter((x) => x.subject.startsWith('UNIER: ') && x.text.includes('Waiting for a moderator'));
+  expect(m.length >= 1 && /new petition/.test(m.at(-1).text), 'no digest email');
+  sql(`delete from petitions where id = '${pending}'`);
 });
 
 console.log('Posters and translations');

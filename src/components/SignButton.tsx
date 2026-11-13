@@ -147,7 +147,7 @@ export function SignButton({ petitionId, title, signed: initial, viewer, variant
               <form className="stack" style={{ gap: 12 }} onSubmit={(e) => { e.preventDefault(); guestSign(); }}>
                 <div className="field"><label htmlFor={`em-${petitionId}`}>{t('login.email')}</label>
                   <input id={`em-${petitionId}`} type="email" required autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-                <label className="check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>{t('consent.text')} <a href="/privacy" target="_blank" rel="noopener">{t('consent.more')}</a></span></label>
+                <label className="check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>{t('guest.age')} {t('consent.text')} <a href="/privacy" target="_blank" rel="noopener">{t('consent.more')}</a></span></label>
                 <Turnstile key={tsKey} lang={lang} onToken={setCaptcha} />
                 {err && <p className="error">{err}</p>}
                 <button className="btn primary big block" disabled={busy || !agree || !email.includes('@') || (!!TURNSTILE_KEY && !captcha)}>{busy ? t('sign.signing') : t('guest.send')}</button>

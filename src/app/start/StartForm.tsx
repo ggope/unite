@@ -3,6 +3,7 @@ import { useActionState, useState } from 'react';
 import { createPetition, type StartState } from './actions';
 import { TOPIC_KEYS, GOALS } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
+import { keepForm } from '@/lib/keepForm';
 import { fmtN } from '@/lib/i18n/langs';
 import { CTAS } from '@/components/LinkBar';
 import { Similar } from './Similar';
@@ -41,7 +42,7 @@ export function StartForm({ then, source, topic }: { then: 'video' | 'page'; sou
     setD({ title: v('title'), target: v('target'), ask: v('ask'), why: v('why'), source: v('source_url'), ends: v('ends_on') });
   };
   return (
-    <form action={action} className="panel" style={{ gap: 16 }} onInput={(e) => read(e.currentTarget)} onChange={(e) => read(e.currentTarget)}>
+    <form onSubmit={keepForm(action)} className="panel" style={{ gap: 16 }} onInput={(e) => read(e.currentTarget)} onChange={(e) => read(e.currentTarget)}>
       <input type="hidden" name="then" value={then} />
       <div className="field"><label htmlFor="title">{t('start.tTitle')}</label><input id="title" name="title" required minLength={10} maxLength={90} placeholder={t('start.tTitlePh')} /><span className="hint">{t('start.tTitleHint')}</span></div>
       <div className="field"><label htmlFor="target">{t('start.target')}</label><input id="target" name="target" required placeholder={t('start.targetPh')} /></div>

@@ -6,13 +6,14 @@ import type { Lang } from './i18n/dict';
 export const Ph = ({ children }: { children: React.ReactNode }) => <span className="ph">{children}</span>;
 type Doc = { title: string; updated: string; body: React.ReactNode };
 
-const privacyEn: Doc = { title: 'Privacy policy', updated: 'Last updated: 12 November 2026', body: <>
+const privacyEn: Doc = { title: 'Privacy policy', updated: 'Last updated: 13 November 2026', body: <>
   <h2>Who we are</h2>
   <p>UNIER is run by <Ph>operator name</Ph>, <Ph>address</Ph> (“we”). We decide how your data is used. Questions or requests: <Ph>privacy email</Ph>.</p>
   <h2>What we collect, and why</h2>
   <ul>
     <li><b>Your account:</b> email address, password (stored only in scrambled form), and an optional handle and name. We need these to run your account (GDPR Art. 6(1)(b)). If you choose Google sign-in, Google confirms your email address to us; Google’s own policy covers your Google account.</li>
     <li><b>Your signatures and reasons:</b> a signature shows a political opinion, which the law treats as sensitive. We only record signatures with your explicit consent (Art. 9(2)(a)), and we keep a record of when you gave or withdrew it, to be able to prove it. Signatures are private: nobody else can see them unless you switch that on, and petition targets and organisers only receive totals. With each signature we keep the approximate country of your internet connection, only to show totals per country in the petition’s delivery report; countries with fewer than 10 signers are grouped together. A reason is shown only if you choose. You can withdraw any signature, or your consent, at any time under You. Withdrawing consent deletes all your signatures.</li>
+    <li><b>Signing with only your email (no account):</b> we send one email with a link, and the signature counts only when you press Confirm on that page. We do not keep your email address: we keep only a scrambled fingerprint of it (a keyed hash), so the same person counts once and can withdraw later with the same link. With it we keep the petition, the language, the consent text you agreed to, your approximate country, and a scrambled fingerprint of your internet address while the link is waiting (for the limit against abuse; removed when you confirm). Links nobody confirms are deleted after 3 days. Same consent as above (Art. 9(2)(a)); if you later make an account with the same email, the signature moves into it.</li>
     <li><b>Official petitions elsewhere:</b> some petitions link to an official petition on another site (for example the European Citizens’ Initiative). Signing there is separate: that site collects your data under its own policy.</li>
     <li><b>Follows, settings and friends:</b> to show you updates and run the features you use (Art. 6(1)(b)). Friends see your signatures only if you switch that on. Friend requests nobody answers are deleted after 90 days. Your invite link holds a random code; making a new one stops the old link working.</li>
     <li><b>Share links:</b> when you share a petition while signed in, the link carries a random code. If someone signs through it, their signature records that it came through your link (Art. 6(1)(f), our legitimate interest in showing people the effect of sharing). You only ever see totals from 3 signatures up, never who signed. The code is deleted with your account; the export of your data says whether a share link brought you.</li>
@@ -39,7 +40,7 @@ const privacyEn: Doc = { title: 'Privacy policy', updated: 'Last updated: 12 Nov
     <li>Vercel: website hosting, servers in Frankfurt. Vercel is a US company and is bound by the EU Standard Contractual Clauses and the EU-US Data Privacy Framework.</li>
     <li>Cloudflare: the bot check (Turnstile), only when switched on. Cloudflare is a US company bound by the EU Standard Contractual Clauses and the EU-US Data Privacy Framework.</li>
     <li>Phone notifications go through your phone’s own push service (Apple, Google or Mozilla), encrypted so they cannot read the content.</li>
-    <li><Ph>email provider</Ph>: sending login and update emails.</li>
+    <li><Ph>email provider</Ph>: sending login, signing and update emails.</li>
     <li>Google: only if you choose Google sign-in.</li>
   </ul>
   <p>To show the news we read the public news feeds of outlets such as the BBC, The Guardian, Telex and HVG. We send them nothing about you. We never sell your data and never show ads based on it.</p>
@@ -61,13 +62,14 @@ const privacyEn: Doc = { title: 'Privacy policy', updated: 'Last updated: 12 Nov
   <p>If we change this policy in a way that matters, we will tell you in the app before it applies.</p>
 </> };
 
-const privacyHu: Doc = { title: 'Adatvédelmi tájékoztató', updated: 'Utolsó módosítás: 2026. november 12.', body: <>
+const privacyHu: Doc = { title: 'Adatvédelmi tájékoztató', updated: 'Utolsó módosítás: 2026. november 13.', body: <>
   <h2>Kik vagyunk</h2>
   <p>Az UNIER-t <Ph>üzemeltető neve</Ph>, <Ph>cím</Ph> üzemelteti („mi”). Mi döntünk arról, hogyan használjuk az adataidat. Kérdések, kérések: <Ph>adatvédelmi e-mail</Ph>.</p>
   <h2>Mit gyűjtünk és miért</h2>
   <ul>
     <li><b>A fiókod:</b> e-mail-cím, jelszó (csak titkosított formában tároljuk), valamint nem kötelező felhasználónév és név. Ezek a fiókod működtetéséhez kellenek (GDPR 6. cikk (1) b)). Ha Google-fiókkal lépsz be, a Google megerősíti nekünk az e-mail-címedet; a Google-fiókodra a Google saját szabályai vonatkoznak.</li>
     <li><b>Aláírásaid és indokaid:</b> az aláírás politikai véleményt fejez ki, amit a jog különleges adatként kezel. Csak a kifejezett hozzájárulásoddal rögzítjük (9. cikk (2) a)), és nyilvántartjuk, mikor adtad meg vagy vontad vissza, hogy ezt igazolni tudjuk. Az aláírások privátak: más nem látja őket, hacsak be nem kapcsolod, a petíciók címzettjei és szervezői csak összesített számokat kapnak. Minden aláírás mellé eltároljuk az internetkapcsolatod hozzávetőleges országát, kizárólag az átadási jelentés országonkénti összesítéséhez; a 10 aláírónál kisebb országokat összevonjuk. Az indokod csak akkor jelenik meg, ha te így döntesz. Bármelyik aláírást vagy a hozzájárulásodat bármikor visszavonhatod a Profil oldalon. A hozzájárulás visszavonása minden aláírásodat törli.</li>
+    <li><b>Aláírás csak e-mail-címmel (fiók nélkül):</b> egy e-mailt küldünk egy linkkel, és az aláírás csak akkor számít, ha azon az oldalon megnyomod a Megerősítés gombot. Az e-mail-címedet nem őrizzük meg: csak egy titkosított ujjlenyomatát (kulcsolt hash-t), hogy ugyanaz az ember egyszer számítson, és később ugyanazzal a linkkel visszavonhassa. Mellette tároljuk a petíciót, a nyelvet, az elfogadott hozzájárulási szöveget, a hozzávetőleges országodat, és amíg a link megerősítésre vár, az internetcímed titkosított ujjlenyomatát (a visszaélések elleni korláthoz; megerősítéskor töröljük). A meg nem erősített linkeket 3 nap után töröljük. Ugyanaz a hozzájárulás, mint fent (9. cikk (2) a)); ha később ugyanazzal az e-mail-címmel fiókot nyitsz, az aláírás átkerül bele.</li>
     <li><b>Hivatalos petíciók máshol:</b> egyes petíciók egy másik oldalon futó hivatalos petícióra mutatnak (például az európai polgári kezdeményezésre). Az ottani aláírás külön dolog: azt az oldal a saját szabályai szerint kezeli.</li>
     <li><b>Követések, beállítások, ismerősök:</b> hogy megkapd a frissítéseket, és működjenek a használt funkciók (6. cikk (1) b)). Az ismerőseid csak akkor látják az aláírásaidat, ha ezt bekapcsolod. A megválaszolatlan ismerősnek jelöléseket 90 nap után töröljük. A meghívó linked egy véletlen kódot tartalmaz; ha újat kérsz, a régi link megszűnik.</li>
     <li><b>Megosztási linkek:</b> ha bejelentkezve osztasz meg egy petíciót, a link egy véletlen kódot tartalmaz. Ha valaki ezen keresztül ír alá, az aláírásánál rögzítjük, hogy a te linkeden jött (GDPR 6. cikk (1) f), jogos érdekünk megmutatni a megosztás hatását). Csak összesítést látsz, 3 aláírástól kezdve, azt soha, hogy ki írt alá. A kód a fiókoddal együtt törlődik; az adataid exportja jelzi, hogy megosztási link hozott-e.</li>
@@ -94,7 +96,7 @@ const privacyHu: Doc = { title: 'Adatvédelmi tájékoztató', updated: 'Utolsó
     <li>Vercel: a weboldal tárhelye, frankfurti szerverekkel. A Vercel amerikai cég, az EU általános szerződési feltételei és az EU–USA adatvédelmi keretrendszer kötik.</li>
     <li>Cloudflare: a robotellenőrzés (Turnstile), csak ha be van kapcsolva. A Cloudflare amerikai cég, az EU általános szerződési feltételei és az EU–USA adatvédelmi keretrendszer kötik.</li>
     <li>A telefonos értesítések a telefonod saját értesítési szolgáltatásán (Apple, Google vagy Mozilla) mennek át, titkosítva, így a tartalmukat nem láthatják.</li>
-    <li><Ph>e-mail-szolgáltató</Ph>: belépési és értesítő e-mailek küldése.</li>
+    <li><Ph>e-mail-szolgáltató</Ph>: belépési, aláírási és értesítő e-mailek küldése.</li>
     <li>Google: csak ha Google-fiókkal lépsz be.</li>
   </ul>
   <p>A hírekhez olyan hírportálok nyilvános hírcsatornáit olvassuk, mint a BBC, a The Guardian, a Telex vagy a HVG. Rólad semmit nem küldünk nekik. Az adataidat soha nem adjuk el, és nem használjuk hirdetésekhez.</p>
@@ -116,11 +118,11 @@ const privacyHu: Doc = { title: 'Adatvédelmi tájékoztató', updated: 'Utolsó
   <p>Ha lényegesen módosítjuk ezt a tájékoztatót, előre szólunk az alkalmazásban.</p>
 </> };
 
-const termsEn: Doc = { title: 'Terms of use', updated: 'Last updated: 12 November 2026', body: <>
+const termsEn: Doc = { title: 'Terms of use', updated: 'Last updated: 13 November 2026', body: <>
   <h2>What UNIER is</h2>
   <p>UNIER shows short videos about real issues, each linked to a petition you can sign. These terms apply when you use it. See also the <Link href="/privacy">privacy policy</Link>.</p>
   <h2>Who can use it</h2>
-  <p>Anyone can watch. To sign, post or start a petition you need an account, and you must be at least 16. One account per person, so every signature counts once. You can delete your account at any time under You.</p>
+  <p>Anyone can watch. To sign you need an account or a confirmed email address; to post or start a petition you need an account. Either way you must be at least 16. One person, one signature per petition: one account per person, and an email address counts once. You can delete your account at any time under You.</p>
   <h2>Petitions</h2>
   <ul>
     <li>A petition must be truthful, lawful and ask for something specific. Organisers are responsible for what they write.</li>
@@ -155,11 +157,11 @@ const termsEn: Doc = { title: 'Terms of use', updated: 'Last updated: 12 Novembe
   <p>Hungarian law applies. If we change these terms in a way that matters, we tell you in the app first.</p>
 </> };
 
-const termsHu: Doc = { title: 'Felhasználási feltételek', updated: 'Utolsó módosítás: 2026. november 12.', body: <>
+const termsHu: Doc = { title: 'Felhasználási feltételek', updated: 'Utolsó módosítás: 2026. november 13.', body: <>
   <h2>Mi az UNIER</h2>
   <p>Az UNIER rövid videókat mutat valódi ügyekről, mindegyikhez tartozik egy aláírható petíció. Ezek a feltételek vonatkoznak a használatára. Lásd még az <Link href="/privacy">adatvédelmi tájékoztatót</Link>.</p>
   <h2>Ki használhatja</h2>
-  <p>Nézni bárki nézhet. Aláíráshoz, feltöltéshez vagy petíció indításához fiók kell, és legalább 16 évesnek kell lenned. Egy ember, egy fiók, így minden aláírás csak egyszer számít. A fiókodat bármikor törölheted a Profil oldalon.</p>
+  <p>Nézni bárki nézhet. Aláíráshoz fiók vagy megerősített e-mail-cím kell, feltöltéshez és petíció indításához fiók. Mindkét esetben legalább 16 évesnek kell lenned. Egy ember, petíciónként egy aláírás: egy embernek egy fiókja lehet, és egy e-mail-cím egyszer számít. A fiókodat bármikor törölheted a Profil oldalon.</p>
   <h2>Petíciók</h2>
   <ul>
     <li>A petíció legyen igaz, jogszerű, és kérjen valami konkrétat. A szervező felel azért, amit ír.</li>
