@@ -14,6 +14,8 @@ import { ShareButton } from '@/components/ShareButton';
 import { LinkBar } from '@/components/LinkBar';
 import { AnswerLink } from '@/components/AnswerLink';
 import { localize } from '@/lib/petitionText';
+import { easyOf } from '@/lib/easy';
+import { MyloArt } from '@/components/mylo/MyloArt';
 import { headers } from 'next/headers';
 import { daysLeft, isEnded, silence, targetAnchor } from '@/lib/lifecycle';
 
@@ -40,7 +42,8 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
   const { data: raw } = await sb.from('petitions').select('*').eq('id', id).maybeSingle();
   if (!raw) notFound();
   const p = localize(raw, lang);
-  const [{ data: st }, { data: members }, { data: updates }, { data: videos }, friends, { data: me }, { data: news }] = await Promise.all([
+  const easy = easyOf(raw, lang);   // the easy-read version for kids (0019)
+  const [{ data: st }, { data: members }, { data: updates }, { data: videos }, friends, { data: me }, { data: news }, { data: reasons }] = await Promise.all([
     sb.from('petition_stats').select('*').eq('id', id).maybeSingle(),
     p.cluster_id ? sb.from('petitions').select('id, title, organiser_name, origin, petition_stats(signatures)').eq('cluster_id', p.cluster_id) : Promise.resolve({ data: [] as any[] }),
     sb.from('petition_updates').select('*').eq('petition_id', id).order('created_at', { ascending: false }),
@@ -48,8 +51,8 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
     user ? sb.rpc('friends_who_signed', { p_petition: id }) : Promise.resolve({ data: [] as any[] }),
     user ? sb.from('profiles').select('is_moderator').eq('id', user.id).maybeSingle() : Promise.resolve({ data: null as any }),
     sb.from('news_items').select('id, url, title, published_at, news_sources(name)').eq('petition_id', id).order('published_at', { ascending: false }).limit(10),
+    sb.rpc('public_reasons', { p_petition: id, p_limit: 8 }),   // empty until 0016 has run; the report flag needs 0017
   ]);
-  const { data: reasons } = await sb.rpc('public_reasons', { p_petition: id, p_limit: 8 });   // empty until 0016 has run; the report flag needs 0017
   const { data: sources } = p.origin === 'team' ? await sb.from('petition_sources').select('url, outlet, title, published_at').eq('petition_id', id).order('published_at', { ascending: false }) : { data: null };   // 0023
   const combined = Number(st?.combined ?? 0);
   const isFounder = user && p.created_by === user.id;
@@ -71,9 +74,20 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
       <h1>{p.title}</h1>
       {p.origin === 'team' && <span className="team-tag">{t('team.by')}</span>}
       <p className="muted" style={{ margin: 0 }}>{t('p.to', { target: p.target })}</p>
+      {easy && (
+        <aside className="easy-box" lang={lang} aria-labelledby="easy-h">
+          <MyloArt mood="happy" size={56} id="easy" label="" />
+          <div className="stack" style={{ gap: 4 }}>
+            <span className="label" id="easy-h">{t('p.easy')}</span>
+            <b>{easy.title}</b>
+            <span>{easy.text}</span>
+            <Link className="hint" href="/kids">{t('p.easyKids')} →</Link>
+          </div>
+        </aside>
+      )}
       <div className="panel">
         <div><span className="bignum">{fmt(combined)}</span> <span className="muted">{Number(st?.united_count) > 1 ? t('p.acrossUnited') : t('p.signatures')}</span></div>
-        <span className="prog" style={{ height: 14 }}><i style={{ width: `${Math.min(100, combined / p.goal * 100)}%` }} /></span>
+        <span className="prog" style={{ height: 14 }} role="progressbar" aria-label={t('p.goal', { n: fmt(p.goal) })} aria-valuemin={0} aria-valuemax={p.goal} aria-valuenow={Math.min(combined, p.goal)} aria-valuetext={`${fmt(combined)} / ${fmt(p.goal)}`}><i style={{ width: `${Math.min(100, combined / p.goal * 100)}%` }} /></span>
         <span className="hint">{t('p.goal', { n: fmt(p.goal) })} · {t('p.lastHour', { n: fmt(Number(st?.last_hour ?? 0)) })}{left != null ? ` · ${left === 0 ? t('life.lastDay') : left === 1 ? t('life.tomorrow', { d: date(p.ends_on) }) : t('life.daysLeft', { n: left, d: date(p.ends_on) })}` : ''}</span>
         {!!friends.data?.length && <span className="hint">{(() => { const names = friends.data.map((f: any) => f.display_name || '@' + f.handle).slice(0, 3).join(', '); return friends.data.length > 3 ? t('p.friendsMore', { names, n: friends.data.length - 3 }) : t('p.friendsSigned', { names }); })()}</span>}
         <div className="row">

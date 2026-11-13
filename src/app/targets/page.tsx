@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { supabaseServer } from '@/lib/supabase/server';
+import { publicRpc, publicPetitions } from '@/lib/supabase/public';
 import { getT } from '@/lib/i18n/server';
 import { fmtN } from '@/lib/i18n/dict';
 import { localize } from '@/lib/petitionText';
@@ -11,10 +11,10 @@ export async function generateMetadata(): Promise<Metadata> { const { t } = awai
 
 // Who listens: every target, what reached them, and how long they have been silent.
 export default async function Targets() {
-  const [sb, { lang, t }] = await Promise.all([supabaseServer(), getT()]);
-  const { data: rows } = await sb.rpc('accountability');
-  const ids = [...new Set((rows ?? []).flatMap((r: any) => (r.ids ?? []).slice(0, 3)))];
-  const { data: ps } = ids.length ? await sb.from('petitions').select('id, title, target, lang, tr').in('id', ids) : { data: [] };
+  const { lang, t } = await getT();   // first: it reads the language cookie, so the build never caches build-time numbers
+  const rows = await publicRpc('accountability') as any[] | null;
+  const ids = [...new Set((rows ?? []).flatMap((r: any) => (r.ids ?? []).slice(0, 3) as string[]))];
+  const ps = ids.length ? await publicPetitions(ids) : [];
   const byId = new Map((ps ?? []).map((p: any) => [p.id, localize(p, lang)]));
   return (
     <div className="stack">

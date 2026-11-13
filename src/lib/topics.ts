@@ -17,4 +17,12 @@ export const CONSENT_TEXT =
   'Only total counts are shared with petition targets, never my email. I can withdraw any signature, or this consent, at any time.';
 export const ROLE_LABEL = { founder: 'Petition Founder', supporter: 'Petition Supporter' } as const;
 export const fmt = (n: number) => Number(n || 0).toLocaleString('en-US');
-export const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+// The site's public address. Until an own domain is set (NEXT_PUBLIC_SITE_URL), Vercel's production address is used,
+// so share cards and link previews never point at localhost.
+export const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL
+  || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '')
+  || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '')
+  || 'http://localhost:3000').replace(/\/$/, '');
+
+// Where to go after signing in: only a path on this site. "/\\evil.com" or "/\t/evil.com" would leave the site.
+export const safeNext = (next?: string | null) => (next && /^\/(?![\/\\])[^\\\s]*$/.test(next) ? next : '/');

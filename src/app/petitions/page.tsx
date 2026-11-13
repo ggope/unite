@@ -31,7 +31,9 @@ export default async function Petitions({ searchParams }: { searchParams: Promis
   }
   let query = sb.from('petitions').select('id, title, target, topic, goal, cluster_id, created_at, lang, tr, petition_stats(signatures, combined, united_count)').eq('status', 'live').limit(50);
   if (near) query = query.in('id', near.length ? near : ['00000000-0000-0000-0000-000000000000']);
-  if (q.trim()) query = query.textSearch('search', q.trim().split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter(Boolean).join(' & '), { config: 'simple' });
+  // every word may be the start of a longer one: "climat" finds "climate", "lakhat" finds "lakhatás"
+  const words = q.trim().split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter(Boolean);
+  if (words.length) query = query.textSearch('search', words.map((w) => `${w}:*`).join(' & '), { config: 'simple' });
   if (topic && topic in TOPICS) query = query.eq('topic', topic);
   const { data } = await query.order('created_at', { ascending: false });
   // one row per united group

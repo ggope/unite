@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { publicRpc } from '@/lib/supabase/public';
 import { supabaseServer } from '@/lib/supabase/server';
 import { getT } from '@/lib/i18n/server';
 import { fmtN, type Key } from '@/lib/i18n/dict';
@@ -10,8 +11,8 @@ export async function generateMetadata(): Promise<Metadata> { const { t } = awai
 
 // The rules and the numbers, in public. Everything here is counted live from the database.
 export default async function Transparency() {
-  const [sb, { lang, t }] = await Promise.all([supabaseServer(), getT()]);
-  const [{ data: s }, { data: ap }, { data: ai }] = await Promise.all([sb.rpc('transparency_stats'), sb.rpc('appeal_stats'), sb.rpc('ai_stats')]);   // appeals need 0018, the AI check 0024
+  const [{ lang, t }, sb] = await Promise.all([getT(), supabaseServer()]);   // getT first reads the language cookie, so the build never caches build-time numbers
+  const [s, { data: ap }, { data: ai }] = await Promise.all([publicRpc('transparency_stats', 600) as Promise<Record<string, any> | null>, sb.rpc('appeal_stats'), sb.rpc('ai_stats')]);   // appeals need 0018, the AI check 0024
   const n = (k: string) => fmtN(Number(s?.[k] ?? 0), lang);
   const tile = (k: string, label: Key) => <div className="tstat" key={k}><b className="num">{n(k)}</b><span>{t(label)}</span></div>;
   return (

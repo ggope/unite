@@ -29,7 +29,7 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
   ]);
   const { data: impact } = await sb.rpc('my_impact');
   // notices name their petition from 0018 on; before that, the plain list still works
-  let { data: notices, error: nErr }: { data: any[] | null; error: any } = await sb.from('notices').select('id, kind, body, petition_id, petitions(title)').order('created_at', { ascending: false });
+  let { data: notices, error: nErr }: { data: any[] | null; error: any } = await sb.from('notices').select('id, kind, body, petition_id, ref_key, petitions(title)').order('created_at', { ascending: false });
   if (nErr) ({ data: notices } = await sb.from('notices').select('id, kind, body').order('created_at', { ascending: false }));
   const { data: appeals } = await sb.from('appeals').select('id, kind, status, decision, reply, created_at, decided_at, petition_id').order('created_at', { ascending: false }).limit(20);
   const { data: reqs } = await sb.from('friend_requests').select('from_id, profiles!friend_requests_from_id_fkey(handle, display_name)').eq('to_id', user.id);
@@ -47,14 +47,19 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
       {(notices ?? []).map((n: any) => {
         const reason = (n.body ?? '').replace(/[.!?]+$/, ''), title = n.petitions?.title ?? '';
         const text = n.kind === 'reason_hidden' ? t('notice.reasonHidden', { reason }) : n.kind === 'deliver_nudge' ? t('notice.deliver', { title })
-          : n.kind === 'appeal_upheld' ? t('notice.appealUpheld', { reason }) : n.kind === 'appeal_reversed' ? t('notice.appealReversed', { reason }) : t('notice.cleared', { reason });
-        const appealKind = n.kind === 'reason_hidden' ? 'reason' : n.kind === 'profile_cleared' ? 'profile' : null;
+          : n.kind === 'appeal_upheld' ? t('notice.appealUpheld', { reason }) : n.kind === 'appeal_reversed' ? t('notice.appealReversed', { reason })
+          : n.kind === 'petition_live' ? t('notice.petLive', { title }) : n.kind === 'petition_removed' ? t('notice.petRemoved', { title, reason })
+          : n.kind === 'video_live' ? t('notice.vidLive', { title }) : n.kind === 'video_rejected' ? t('notice.vidRejected', { title, reason }) : t('notice.cleared', { reason });
+        // a takedown can be appealed: hidden reasons and cleared profiles by the notice, petitions and videos by their own id (0022)
+        const appeal = n.kind === 'reason_hidden' ? `kind=reason&id=${n.id}` : n.kind === 'profile_cleared' ? `kind=profile&id=${n.id}`
+          : n.kind === 'petition_removed' && n.petition_id ? `kind=petition&id=${n.petition_id}` : n.kind === 'video_rejected' && n.ref_key ? `kind=video&id=${n.ref_key}` : null;
         return (
           <form key={n.id} action={dismissNotice} className="panel row between" role="status">
             <input type="hidden" name="id" value={n.id} />
             <span style={{ flex: 1, minWidth: 0 }}>{text}</span>
             {n.kind === 'deliver_nudge' && n.petition_id && <Link className="btn small primary" href={`/p/${n.petition_id}/report`}>{t('p.report')}</Link>}
-            {appealKind && <Link className="btn small ghost" href={`/appeal?kind=${appealKind}&id=${n.id}`}>{t('appeal.ask')}</Link>}
+            {n.kind === 'petition_live' && n.petition_id && <Link className="btn small primary" href={`/p/${n.petition_id}`}>{t('mail.decideSee')}</Link>}
+            {appeal && <Link className="btn small ghost" href={`/appeal?${appeal}`}>{t('appeal.ask')}</Link>}
             <button className="btn small">{t('notice.dismiss')}</button>
           </form>);
       })}

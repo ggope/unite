@@ -3,7 +3,11 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
-import { isLang } from '@/lib/i18n/dict';
+import { isLang, LANGS } from '@/lib/i18n/dict';
+import { EASY_TEXT, EASY_TITLE } from '@/lib/easy';
+import { tellAuthor } from '@/lib/decisionMail';
+
+const LANG_KEYS = Object.keys(LANGS) as (keyof typeof LANGS)[];
 
 async function mod() {
   const { sb, user } = await currentUser();
@@ -18,7 +22,7 @@ async function done(error?: { message: string } | null) {
   const u = new URL((await headers()).get('referer') ?? '/admin', 'http://x');
   if (!error && !u.searchParams.has('err')) return;
   if (error) u.searchParams.set('err', error.message.slice(0, 120)); else u.searchParams.delete('err');
-  redirect(u.pathname + u.search);
+  redirect((u.pathname.startsWith('/admin') ? u.pathname : '/admin') + u.search);   // never off-site, whatever the Referer says
 }
 const s = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
 // Accepts a petition id or a pasted link to one.
@@ -37,7 +41,8 @@ export async function review(decision: 'approve' | 'reject', f: FormData) {
   const approve = decision === 'approve';
   if (!approve && !s(f, 'note')) return done(NEED_REASON);
   const status = table === 'petitions' ? (approve ? 'live' : 'removed') : (approve ? 'approved' : 'rejected');
-  const { error } = await sb.from(table).update({ status, moderation_note: approve ? null : s(f, 'note') || null }).eq('id', s(f, 'id'));
+  const { data: changed, error } = await sb.from(table).update({ status, moderation_note: approve ? null : s(f, 'note') || null }).eq('id', s(f, 'id')).select('id');
+  if (!error && changed?.length) await tellAuthor(table === 'petitions' ? 'petition' : 'video', s(f, 'id'), approve ? 'live' : 'off', s(f, 'note'));
   await done(error);
 }
 
@@ -45,7 +50,9 @@ export async function petitionStatus(status: 'live' | 'closed' | 'removed', f: F
   const sb = await mod();
   if (!['live', 'closed', 'removed'].includes(status)) return;
   if (status === 'removed' && !s(f, 'note')) return done(NEED_REASON);
+  const { data: before } = await sb.from('petitions').select('status').eq('id', s(f, 'id')).maybeSingle();
   const { error } = await sb.from('petitions').update({ status, moderation_note: status === 'removed' ? s(f, 'note') || null : null }).eq('id', s(f, 'id'));
+  if (!error && before && before.status !== status && (status === 'removed' || before.status === 'pending')) await tellAuthor('petition', s(f, 'id'), status === 'removed' ? 'off' : 'live', s(f, 'note'));
   await done(error);
 }
 
@@ -76,6 +83,18 @@ export async function setTranslation(f: FormData) {
   const tr = { ...((p?.tr as Record<string, unknown>) ?? {}) };
   if (Object.keys(t).length) tr[to] = t; else delete tr[to];
   await done((await sb.from('petitions').update({ tr }).eq('id', s(f, 'id'))).error);
+}
+// The easy-read version for kids (0019), all languages in one form. Saving it empty takes the petition out of the kids corner.
+export async function setEasy(f: FormData) {
+  const sb = await mod();
+  const easy: Record<string, { title: string; text: string }> = {};
+  for (const l of LANG_KEYS) {
+    const title = s(f, `title_${l}`).slice(0, EASY_TITLE), text = s(f, `text_${l}`).slice(0, EASY_TEXT);
+    if (title && text) easy[l] = { title, text };
+    else if (title || text) return done({ message: `${l.toUpperCase()}: write both the kids' title and the text, or leave both empty.` });
+  }
+  revalidatePath('/kids');
+  await done((await sb.from('petitions').update({ easy }).eq('id', s(f, 'id'))).error);
 }
 export async function setOriginalLang(f: FormData) {
   const sb = await mod();
@@ -126,6 +145,7 @@ export async function resolveReport(action: 'dismiss' | 'remove', f: FormData) {
       : petition ? await sb.from('petitions').update({ status: 'removed', moderation_note: note }).eq('id', petition)
       : await sb.rpc('clear_profile', { p_user: person, p_note: note });
     if (error) return done(error);
+    if (video || petition) await tellAuthor(video ? 'video' : 'petition', video || petition, 'off', note);
     // Removing the item settles every open report about it, not just this one.
     const q = sb.from('reports').update(resolved).eq('status', 'open');
     return done((await (video ? q.eq('video_id', video) : petition ? q.eq('petition_id', petition) : q.eq('profile_id', person).is('video_id', null).is('petition_id', null))).error);
