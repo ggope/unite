@@ -201,7 +201,11 @@ await check('post a video for the petition', async () => {
 });
 await check('admin approves the video and it reaches the feed', async () => {
   await go(a, '/admin?tab=queue');
-  await a.locator('.panel', { hasText: 'Our park has no water' }).first().getByRole('button', { name: /approve/i }).first().click(); await settle(a);
+  // A click can get lost while the page is still settling; approving again is harmless.
+  for (let t = 0; t < 3 && one(`select status from videos where id = '${vid}'`) !== 'approved'; t++) {
+    await a.locator('.panel', { hasText: 'Our park has no water' }).first().getByRole('button', { name: /approve/i }).first().click(); await settle(a);
+    for (let i = 0; i < 20 && one(`select status from videos where id = '${vid}'`) !== 'approved'; i++) await a.waitForTimeout(250);
+  }
   expect(one(`select status from videos where id = '${vid}'`) === 'approved', 'not approved');
   await go(g, '/'); expect(await g.locator('video').count(), 'no video in feed');
 });
@@ -366,7 +370,11 @@ await check('admin: official link, organiser link, unite and separate', async ()
 await check('admin: declining without a reason is refused', async () => {
   const v3 = one(`insert into videos (petition_id, uploader_id, storage_path, caption, trim_start, trim_end) values ('${pid}', '${B.id}', '${B.id}/y.webm', 'Clip without a reason', 0, 5) returning id`);
   await go(a, '/admin?tab=queue');
-  await a.locator('.panel', { hasText: 'Clip without a reason' }).first().getByRole('button', { name: 'Reject' }).click(); await a.waitForTimeout(1200);
+  // A click can get lost while the page is still settling; pressing Reject again is harmless here.
+  for (let i = 0; i < 3 && !(await a.locator('text=Write the reason first').count()); i++) {
+    await a.locator('.panel', { hasText: 'Clip without a reason' }).first().getByRole('button', { name: 'Reject' }).click();
+    await a.locator('text=Write the reason first').first().waitFor({ timeout: 5000 }).catch(() => {});
+  }
   expect(one(`select status from videos where id = '${v3}'`) === 'pending', 'declined without a reason');
   expect(await a.locator('text=Write the reason first').count(), 'no message asking for a reason');
   sql(`delete from videos where id = '${v3}'`);
