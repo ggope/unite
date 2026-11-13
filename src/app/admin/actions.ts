@@ -166,11 +166,11 @@ export async function clipAction(op: 'attach' | 'hide' | 'show', f: FormData) {
   const sb = await mod();
   const patch = op === 'attach' ? { petition_id: pid(s(f, 'petition_id')) } : { status: op === 'hide' ? 'hidden' : 'live' };
   if (op === 'attach' && !patch.petition_id) return done({ message: 'Pick a petition first.' });
-  await done((await sb.from('team_videos').update(patch).eq('id', s(f, 'id'))).error);
+  await done((await sb.from('team_videos').update(patch).eq('id', s(f, 'clip'))).error);
 }
 export async function toggleVideoSource(f: FormData) {
   const sb = await mod();
-  await done((await sb.from('video_sources').update({ active: s(f, 'active') === 'true' }).eq('id', s(f, 'id'))).error);
+  await done((await sb.from('video_sources').update({ active: s(f, 'active') === 'true' }).eq('id', s(f, 'source'))).error);
 }
 
 export async function setHumanCheck(f: FormData) {

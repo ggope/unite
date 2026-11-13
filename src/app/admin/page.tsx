@@ -379,7 +379,7 @@ async function Clips({ sb }: { sb: any }) {
       {' '}How many show follows the team content switch{level ? <> (now: <b>{level}</b>)</> : ''}: <i>less</i> shows a few and ranks them below people’s videos, <i>off</i> hides them.</p>
     <form action={importClips} className="row"><button className="btn primary">Fetch new clips now</button><span className="hint">Also runs on its own every morning, with the news.</span></form>
     <div className="panel" style={{ gap: 6 }}><b>Channels</b>
-      {sources?.map((x: any) => <form key={x.id} action={toggleVideoSource} className="row between"><input type="hidden" name="id" value={x.id} /><input type="hidden" name="active" value={String(!x.active)} />
+      {sources?.map((x: any) => <form key={x.id} action={toggleVideoSource} className="row between"><input type="hidden" name="source" value={x.id} /><input type="hidden" name="active" value={String(!x.active)} />
         <span style={{ flex: 1, minWidth: 0 }}>{x.active ? '' : '⏸ '}{x.name} <span className="hint">({x.lang}) · {x.last_fetched_at ? `${when(x.last_fetched_at)} · ${x.last_status} · +${x.last_count}` : 'never fetched'}</span></span>
         <button className="btn ghost small">{x.active ? 'Pause' : 'Resume'}</button></form>)}
     </div>
@@ -389,7 +389,7 @@ async function Clips({ sb }: { sb: any }) {
         <div key={x.id} className="stack" style={{ gap: 4, opacity: x.status === 'hidden' ? 0.45 : 1 }}>
           <a href={`https://www.youtube.com/watch?v=${x.youtube_id}`} target="_blank" rel="noopener nofollow"><b>{x.title}</b></a>
           <span className="hint">{x.video_sources?.name} · {x.topic} · {when(x.published_at)} · under “{x.petitions?.title ?? '?'}”{x.status === 'hidden' ? ' · hidden' : ''}</span>
-          <form action={clipAction.bind(null, 'attach')} className="row"><input type="hidden" name="id" value={x.id} />
+          <form action={clipAction.bind(null, 'attach')} className="row"><input type="hidden" name="clip" value={x.id} />
             <input name="petition_id" list="live-petitions" defaultValue={x.petition_id ?? ''} placeholder="Move to a petition (type a title)" aria-label="Petition for this clip" style={{ flex: 1, minWidth: 0 }} />
             <button className="btn small">Move</button>
             {x.status === 'hidden' ? <button className="btn small" formAction={clipAction.bind(null, 'show')}>Show again</button>

@@ -766,8 +766,7 @@ console.log('Team videos');
     const m = await as(A);
     await go(m, '/admin?tab=clips'); expect(await m.getByText('United Nations').count(), 'channels not listed');
     const row = m.locator('.stack', { hasText: 'E2E clip: why the seas need protecting' }).first();
-    // the form's hidden "id" input shadows form.id, which trips Playwright's own selector helper; press it directly
-    await row.getByRole('button', { name: 'Hide' }).evaluate((el) => el.click()); await settle(m);
+    await row.getByRole('button', { name: 'Hide' }).click(); await settle(m);
     for (let k = 0; k < 20 && one(`select status from team_videos where youtube_id = 'e2eClip_001'`) !== 'hidden'; k++) await m.waitForTimeout(250);
     expect(one(`select status from team_videos where youtube_id = 'e2eClip_001'`) === 'hidden', 'clip not hidden');
     await m.context().close();
