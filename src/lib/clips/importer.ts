@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { parseFeed, shorten } from '../news/parse';
 import { classify, tokens } from '../news/classify';
-import { teamLevel } from './level';
+import { teamLevel } from '../team/level';
 
 // Team videos: reads each trusted channel's public YouTube feed, keeps clips about a UNIER cause,
 // and pairs each one with the live petition it fits best. Only the id, title and date are stored;

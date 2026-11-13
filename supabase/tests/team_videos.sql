@@ -9,6 +9,7 @@ insert into public.team_videos (source_id, youtube_id, title, lang, topic, petit
   select 'dw', 'zzzDEF_12-3', 'A hidden clip', 'en', 'oceans', id, now(), 'hidden' from public.petitions where title like 'Protected seas%';
 
 -- 1. guests see live clips and the sources, never hidden clips
+select set_config('request.jwt.claim.sub', '', false);
 set role anon;
 do $$ begin if (select count(*) from public.team_videos) <> 1 then raise exception 'guest sees hidden clips'; end if; end $$;
 do $$ begin if (select count(*) from public.video_sources) < 6 then raise exception 'sources not seeded'; end if; end $$;

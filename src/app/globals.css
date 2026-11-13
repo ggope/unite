@@ -515,6 +515,10 @@ main:focus{outline:none}
 .appeal-what{border-left:8px solid var(--warn)}
 .appeal-reversed{color:var(--ok);font-weight:700}
 .appeal-upheld{font-weight:700}
+/* UNIER team content (0023): petitions drafted by the team, with their sources */
+.team-tag{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;border:2px solid var(--edge);background:var(--sunk);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800;color:var(--ink)}
+.team-sources{display:grid;gap:6px;margin:0;padding-left:18px}
+.team-sources li{font-size:14px}
 /* UNIER team picks (0025): a clip from a trusted channel above the petition sticker */
 .clip{position:absolute;inset:0;z-index:0;background:#111;display:flex;flex-direction:column;align-items:stretch;padding-top:84px;gap:8px}
 .clip::before{content:"";position:absolute;inset:-20px;background:var(--thumb) center/cover;filter:blur(18px) brightness(.45);z-index:0}
