@@ -522,3 +522,7 @@ main:focus{outline:none}
 .ai-unsure{border-left-color:var(--accent);background:var(--accent-soft)}
 .ai-breaks_rules,.ai-urgent{border-left-color:var(--warn);background:var(--warn-soft)}
 .ai-urgent{outline:2px solid var(--warn)}
+/* UNIER team content (0023): petitions drafted by the team, with their sources */
+.team-tag{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;border:2px solid var(--edge);background:var(--sunk);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800;color:var(--ink)}
+.team-sources{display:grid;gap:6px;margin:0;padding-left:18px}
+.team-sources li{font-size:14px}

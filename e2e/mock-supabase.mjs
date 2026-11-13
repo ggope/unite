@@ -17,7 +17,7 @@ const FILES = fs.mkdtempSync(path.join(os.tmpdir(), 'unite-e2e-storage-'));
 export const otps = [];   // email codes "sent", for tests to read
 // The AI check's stand-in for the Claude API (0024): answers by keywords in the content, and keeps what it was sent.
 const aiCalls = [];
-function claude(body) {
+function moderationReply(body) {
   const text = body.messages.map((m) => (typeof m.content === 'string' ? m.content : m.content.map((c) => c.text ?? '').join(''))).join('\n');
   aiCalls.push(text);
   const r = /WIN FREE CRYPTO/.test(text) ? { verdict: 'breaks_rules', risk: 'high', confidence: 0.99, rules: ['spam', 'scam'], summary: 'Crypto spam.', author_note: 'This looks like spam.' }
@@ -58,6 +58,22 @@ async function proxy(req, res, url) {
   const out = Buffer.from(await r.arrayBuffer());
   const h = {}; r.headers.forEach((v, k) => { if (!['content-encoding', 'transfer-encoding', 'connection'].includes(k)) h[k] = v; });
   res.writeHead(r.status, h); res.end(out);
+}
+
+// A stand-in for the Claude API (ANTHROPIC_BASE_URL points here): every story becomes the same petition draft.
+const claudeCalls = [];
+async function claude(req, res, url) {
+  if (req.method === 'GET') return send(res, 200, claudeCalls);
+  const body = JSON.parse((await read(req)).toString() || '{}');
+  if (/volunteer moderators of UNIER/.test(JSON.stringify(body.system ?? ''))) return send(res, 200, moderationReply(body));   // the AI check (0024), logged at /__anthropic
+  claudeCalls.push(body);
+  const draft = { decision: 'draft', reason: 'Two outlets report that the plastics treaty talks stalled.', duplicate_of: '',
+    title: 'Agree a strong global plastics treaty', target: 'Governments at the UN plastics talks', region: 'Worldwide',
+    ask: 'Agree a binding treaty that cuts plastic production, not only waste, before the end of next year.',
+    why: 'According to BBC News, the latest round of talks ended without a deal. The Guardian reports that a small group of countries blocked limits on production. Plastic waste keeps growing every year, and recycling alone cannot keep up.',
+    topic: 'oceans', goal: 1000000, note_for_moderator: 'Check which countries blocked the deal before approving.' };
+  return send(res, 200, { id: 'msg_e2e', type: 'message', role: 'assistant', model: body.model, content: [{ type: 'text', text: JSON.stringify(draft) }],
+    stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 10, output_tokens: 10 } }, { 'request-id': 'req_e2e' });
 }
 
 async function auth(req, res, url) {
@@ -120,8 +136,8 @@ export function start() {
     try {
       if (url.pathname === '/__mail' && req.method === 'POST') { mails.push(JSON.parse((await read(req)).toString())); return send(res, 200, {}); }
       if (url.pathname === '/__mail') return send(res, 200, mails.filter((m) => !url.searchParams.get('to') || m.to === url.searchParams.get('to')));
-      if (url.pathname === '/__anthropic/v1/messages' && req.method === 'POST') return send(res, 200, claude(JSON.parse((await read(req)).toString())));
-      if (url.pathname === '/__anthropic') return send(res, 200, aiCalls);
+      if (url.pathname.startsWith('/__claude')) return await claude(req, res, url);
+      if (url.pathname === '/__anthropic') return send(res, 200, aiCalls);   // what the AI check was sent
       if (url.pathname.startsWith('/rest/v1')) return await proxy(req, res, url);
       if (url.pathname.startsWith('/auth/v1')) return await auth(req, res, url);
       if (url.pathname.startsWith('/storage/v1')) return await storage(req, res, url);

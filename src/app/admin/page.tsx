@@ -2,18 +2,19 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN, LANGS, type Lang } from '@/lib/i18n/dict';
-import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, removeSamples, decideAppeal, runLifecycle, resolveError, testAlert, setAiMode, runAiNow } from './actions';
+import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, removeSamples, decideAppeal, runLifecycle, resolveError, testAlert, setTeamContent, draftNow, editDraft, setAiMode, runAiNow } from './actions';
+import { aiReady } from '@/lib/team/draft';
 import { aiKeySet, aiModel, aiDailyLimit } from '@/lib/ai/moderate';
 import { legalPlaceholders } from '@/lib/legal';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 120;   // "Check waiting items now" asks the AI about up to 20 items
-const TABS = [['overview', 'Overview'], ['launch', 'Launch checklist'], ['queue', 'Review queue'], ['reports', 'Reports'], ['ai', 'AI check'], ['appeals', 'Appeals'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People'], ['errors', 'Errors']] as const;
+export const maxDuration = 300;   // "Draft now" in Team content can take a few minutes; "Check waiting items now" asks the AI about up to 20 items
+const TABS = [['overview', 'Overview'], ['launch', 'Launch checklist'], ['queue', 'Review queue'], ['reports', 'Reports'], ['ai', 'AI check'], ['appeals', 'Appeals'], ['petitions', 'Petitions'], ['news', 'News'], ['team', 'Team content'], ['people', 'People'], ['errors', 'Errors']] as const;
 type Tab = (typeof TABS)[number][0];
 const when = (d: string) => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const n = (x: number) => fmtN(x, 'en');
 
-export default async function Admin({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string; err?: string; tr?: string }> }) {
+export default async function Admin({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string; err?: string; tr?: string; ran?: string }> }) {
   const { sb, user } = await currentUser();
   if (!user) redirect('/login?next=/admin');
   const { data: me } = await sb.from('profiles').select('is_moderator').eq('id', user.id).single();
@@ -22,7 +23,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       <p>You are signed in as <b>{user.email}</b>, but this account is not a moderator yet. Make it one in the Supabase SQL editor, then reload this page.</p>
       <Link className="btn" href="/">← Back to UNIER</Link></div>
   );
-  const { tab: raw = 'overview', q = '', err, tr: open = '' } = await searchParams;
+  const { tab: raw = 'overview', q = '', err, tr: open = '', ran } = await searchParams;
   const tab = (TABS.some(([k]) => k === raw) ? raw : 'overview') as Tab;
   const { data: stats } = await sb.rpc('admin_stats');
   const st = (stats ?? {}) as Record<string, number>;
@@ -44,6 +45,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       {tab === 'appeals' && <Appeals sb={sb} me={user.id} />}
       {tab === 'petitions' && <Petitions sb={sb} q={q} open={open} />}
       {tab === 'news' && <News sb={sb} />}
+      {tab === 'team' && <Team sb={sb} ran={ran} />}
       {tab === 'people' && <People sb={sb} q={q} me={user.id} />}
       {tab === 'errors' && <Errors sb={sb} />}
     </div>
@@ -84,10 +86,16 @@ async function Queue({ sb }: { sb: any }) {
   const [ap, av] = await Promise.all([aiReviews(sb, 'petition_id', (pets ?? []).map((p: any) => p.id)), aiReviews(sb, 'video_id', (vids ?? []).map((v: any) => v.id))]);
   urls.forEach((u: any, i: number) => { if (vids?.[i]) vids[i].url = u?.signedUrl; });   // keep each video's link when the list is re-ordered
   byRisk(pets, ap); byRisk(vids, av);
+  // team drafts (0023): the helper's note and its sources, so the facts can be checked before approving
+  const teamIds = (pets ?? []).filter((p: any) => p.origin === 'team').map((p: any) => p.id);
+  const [{ data: notes }, { data: srcs }] = teamIds.length ? await Promise.all([
+    sb.from('team_drafts').select('petition_id, note, reason').in('petition_id', teamIds),
+    sb.from('petition_sources').select('petition_id, url, outlet, title').in('petition_id', teamIds),
+  ]) : [{ data: [] }, { data: [] }];
   return (<>
     <AiLine />
     <h2>Petitions ({pets?.length ?? 0})</h2>
-    {pets?.length ? pets.map((p: any) => <div className="panel" key={p.id}><AiBadge r={ap.get(p.id)} /><b>{p.title}</b><span className="hint">{p.organiser_name} → {p.target} · {p.region} · {p.topic} · goal {n(p.goal)} · {when(p.created_at)}</span><p style={{ margin: 0 }}>{p.ask}</p><p className="hint" style={{ margin: 0 }}>{p.why}</p>{p.source_url && <a href={p.source_url} target="_blank" rel="noopener nofollow">Source</a>}{p.link_url && <span className="hint">Button link ({p.link_cta}): <a href={p.link_url} target="_blank" rel="noopener nofollow">{p.link_url}</a> · check it is safe and belongs to the organiser</span>}<Decide kind="petition" id={p.id} note={suggested(ap.get(p.id))} /></div>) : <p className="hint">Nothing waiting.</p>}
+    {pets?.length ? pets.map((p: any) => <div className="panel" key={p.id}><AiBadge r={ap.get(p.id)} /><b>{p.title}</b><span className="hint">{p.organiser_name} → {p.target} · {p.region} · {p.topic} · goal {n(p.goal)} · {when(p.created_at)}</span><p style={{ margin: 0 }}>{p.ask}</p><p className="hint" style={{ margin: 0 }}>{p.why}</p>{p.origin === 'team' ? <TeamDraft p={p} note={notes?.find((x: any) => x.petition_id === p.id)} sources={(srcs ?? []).filter((x: any) => x.petition_id === p.id)} /> : p.source_url && <a href={p.source_url} target="_blank" rel="noopener nofollow">Source</a>}{p.link_url && <span className="hint">Button link ({p.link_cta}): <a href={p.link_url} target="_blank" rel="noopener nofollow">{p.link_url}</a> · check it is safe and belongs to the organiser</span>}<Decide kind="petition" id={p.id} note={suggested(ap.get(p.id))} /></div>) : <p className="hint">Nothing waiting.</p>}
     <h2>Videos ({vids?.length ?? 0})</h2>
     {vids?.length ? vids.map((v: any) => <div className="panel" key={v.id}><AiBadge r={av.get(v.id)} video /><b>{v.caption}</b><span className="hint">For: {v.petitions?.title} · {v.audience === 'friends' ? 'friends only · ' : ''}{when(v.created_at)}</span>{v.blur_faces && <p className="error" style={{ margin: 0 }}>The uploader says other people can be recognised. Approve only if they clearly agreed to be filmed or cannot be identified.</p>}{v.url && <video src={v.url} controls muted playsInline style={{ width: '100%', maxHeight: 420, background: '#000', borderRadius: 10 }} />}<Decide kind="video" id={v.id} note={suggested(av.get(v.id))} /></div>) : <p className="hint">Nothing waiting.</p>}
   </>);
@@ -99,9 +107,9 @@ const MIGRATIONS: [string, string, string][] = [
   ['0002', 'invites', 'user_id'], ['0003', 'news_items', 'id'], ['0004', 'reports', 'resolved_at'], ['0005', 'petitions', 'official_url'],
   ['0006', 'profiles', 'bio'], ['0007', 'petitions', 'link_url'], ['0012', 'petitions', 'tr'], ['0014', 'notices', 'id'],
   ['0015', 'share_codes', 'code'], ['0016', 'answer_links', 'petition_id'], ['0017', 'signatures', 'reason_key'],
-  ['0018', 'appeals', 'id'], ['0021', 'error_events', 'fingerprint'], ['0024', 'ai_reviews', 'id'],
+  ['0018', 'appeals', 'id'], ['0021', 'error_events', 'fingerprint'], ['0023', 'petition_sources', 'id'], ['0024', 'ai_reviews', 'id'],
 ];
-const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0021': '0021_email_sign', '0024': '0024_ai_moderation' };
+const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0021': '0021_email_sign', '0023': '0023_team_content', '0024': '0024_ai_moderation' };
 const missing = (e: any) => !!e && /does not exist|PGRST20[45]|42703|42P01|schema cache/i.test(`${e.code} ${e.message}`);
 
 async function Launch({ sb }: { sb: any }) {
@@ -132,8 +140,8 @@ async function Launch({ sb }: { sb: any }) {
       how: <>For now, a Gmail address with an app password: set <code>SMTP_HOST</code>=smtp.gmail.com, <code>SMTP_PORT</code>=465, <code>SMTP_USER</code> and <code>SMTP_PASS</code> in Vercel. Put the same in Supabase → Authentication → Emails → SMTP, so login emails stop hitting the hourly limit. Once you have a domain, switch both to Resend or Brevo.</> },
     { ok: env('ALERT_EMAIL'), what: 'Error alerts by email', how: <>Set <code>ALERT_EMAIL</code> in Vercel to the address that should hear when something breaks. See <Link href="/admin?tab=errors">Errors</Link>.</> },
     { ok: env('SUPABASE_SERVICE_ROLE_KEY'), what: 'Server key for Supabase', how: <>Set <code>SUPABASE_SERVICE_ROLE_KEY</code> in Vercel (Supabase → Project settings → API).</> },
-    { ok: aiKeySet(), what: 'AI check key (sorts the review queue for you)',
-      how: <>Make an API key at console.anthropic.com, add it in Vercel as <code>ANTHROPIC_API_KEY</code>, then choose a mode under <Link href="/admin?tab=ai">AI check</Link>. Without it, everything waits for a person as before.</> },
+    { ok: aiReady() && aiKeySet(), what: 'AI key (sorts the review queue, drafts team petitions)',
+      how: <>Create a key at console.anthropic.com, add a monthly spending limit there, and set <code>ANTHROPIC_API_KEY</code> in Vercel. Then choose a mode under <Link href="/admin?tab=ai">AI check</Link> and <Link href="/admin?tab=team">Team content</Link>. Without it, everything waits for a person and no petitions are drafted from the news.</> },
     { ok: (mods?.length ?? 0) >= 2, what: `${mods?.length ?? 0} moderator${mods?.length === 1 ? '' : 's'}`, how: <>Two or more, so reports are answered when one of you is away. Add one under <Link href="/admin?tab=people">People</Link>.</> },
   ];
   const left = items.filter((x) => !x.ok).length;
@@ -310,6 +318,60 @@ async function News({ sb }: { sb: any }) {
         </div>))}
     </div>
   </>);
+}
+
+// Team content (0023): how much the UNIER team makes and shows, and what the drafting helper decided.
+const LEVELS: [string, string, string][] = [
+  ['auto', 'Automatic', 'Full while people start fewer than 30 petitions a month, then less on its own.'],
+  ['full', 'Full', 'Up to 3 drafts a day from the news; team petitions and videos rank like any other.'],
+  ['less', 'Less', '1 draft a day; team content ranks lower in the feed so people\'s own petitions come first.'],
+  ['off', 'Off', 'No new drafts or team videos, and team content leaves the feed. Links and signatures keep working.'],
+];
+async function Team({ sb, ran }: { sb: any; ran?: string }) {
+  const [{ data: site, error }, { data: level }, { data: log }, { count: waiting }, { count: live }, { count: people }] = await Promise.all([
+    sb.from('site_settings').select('team_content').maybeSingle(),
+    sb.rpc('team_content_level'),
+    sb.from('team_drafts').select('id, headline, decision, reason, petition_id, created_at').order('created_at', { ascending: false }).limit(25),
+    sb.from('petitions').select('id', { count: 'exact', head: true }).eq('origin', 'team').eq('status', 'pending'),
+    sb.from('petitions').select('id', { count: 'exact', head: true }).eq('origin', 'team').eq('status', 'live'),
+    sb.from('petitions').select('id', { count: 'exact', head: true }).neq('origin', 'team').in('status', ['live', 'closed']).gte('created_at', new Date(Date.now() - 30 * 864e5).toISOString()),
+  ]);
+  if (error) return <p className="hint">Team content needs the database update 0023_team_content.sql (see Launch checklist).</p>;
+  const now = site?.team_content ?? 'auto';
+  const label: Record<string, string> = { drafted: 'Drafted', skipped: 'Skipped', duplicate: 'Already covered', failed: 'Failed' };
+  return (<>
+    <p className="hint" style={{ margin: 0 }}>Until enough people start their own petitions and post videos, the UNIER team fills the gap. An AI helper reads the biggest stories from the trusted sources under News each morning and drafts petitions with their sources. Every draft waits in the <Link href="/admin?tab=queue">Review queue</Link>: check the facts, edit, then approve or reject. Team petitions are labelled &ldquo;From the UNIER team&rdquo; everywhere.</p>
+    <form action={setTeamContent} className="panel" style={{ gap: 8 }}><b>How much team content</b>
+      {LEVELS.map(([k, name, what]) => <label key={k} className="row" style={{ alignItems: 'flex-start', gap: 8 }}><input type="radio" name="level" value={k} defaultChecked={now === k} /><span><b>{name}</b>{k === 'auto' && now === 'auto' ? ` (now: ${level ?? 'full'})` : ''}<br /><span className="hint">{what}</span></span></label>)}
+      <span className="hint">People-made petitions in the last 30 days: {n(people ?? 0)} (automatic switches to less at 30).</span>
+      <button className="btn small primary" style={{ alignSelf: 'flex-start' }}>Save</button>
+    </form>
+    <div className="tiles"><div className="tile"><span className="label">Waiting for review</span><b className="num">{n(waiting ?? 0)}</b></div><div className="tile"><span className="label">Live team petitions</span><b className="num">{n(live ?? 0)}</b></div></div>
+    {!aiReady() && <p className="note" style={{ margin: 0 }}>No AI key yet, so nothing is drafted. Set <code>ANTHROPIC_API_KEY</code> in Vercel (see Launch checklist).</p>}
+    <form action={draftNow} className="row"><button className="btn">Draft now</button><span className="hint">Also runs on its own every morning at 6:30 (Hungarian time), after the news import.</span></form>
+    {ran && <p className="note" role="status" style={{ margin: 0 }}>{ran}</p>}
+    <div className="panel" style={{ gap: 8 }}><b>What the helper decided</b>
+      {log?.length ? log.map((d: any) => <span key={d.id} className="hint">{when(d.created_at)} · <b>{label[d.decision]}</b> · {d.petition_id ? <Link href={`/p/${d.petition_id}`}>{d.headline}</Link> : d.headline}{d.reason ? ` · ${d.reason}` : ''}</span>) : <p className="hint" style={{ margin: 0 }}>Nothing yet.</p>}
+    </div>
+  </>);
+}
+
+// A team draft in the review queue: why the helper picked it, what to check, its sources, and an edit form.
+function TeamDraft({ p, note, sources }: { p: any; note?: any; sources: any[] }) {
+  return (<div className="stack" style={{ gap: 6 }}>
+    <span className="team-tag">From the UNIER team · drafted by AI · check the facts</span>
+    {note?.note && <p className="note" style={{ margin: 0 }}>To check: {note.note}</p>}
+    {sources.length > 0 && <span className="hint">Sources: {sources.map((x: any, i: number) => <span key={x.url}>{i ? ' · ' : ''}<a href={x.url} target="_blank" rel="noopener nofollow">{x.outlet}</a></span>)}</span>}
+    <details><summary>Edit before approving</summary>
+      <form action={editDraft} className="stack" style={{ gap: 6 }}><input type="hidden" name="id" value={p.id} />
+        <label>Title <input name="title" defaultValue={p.title} maxLength={90} required /></label>
+        <label>To <input name="target" defaultValue={p.target} maxLength={120} required /></label>
+        <label>Where <input name="region" defaultValue={p.region} maxLength={80} required /></label>
+        <label>The ask <textarea name="ask" defaultValue={p.ask} rows={3} maxLength={2000} required /></label>
+        <label>Why <textarea name="why" defaultValue={p.why} rows={6} maxLength={5000} required /></label>
+        <button className="btn small" style={{ alignSelf: 'flex-start' }}>Save changes</button></form>
+    </details>
+  </div>);
 }
 
 // One shared list of live petitions for every "unite" and "attach" box (typing a title suggests the match).
