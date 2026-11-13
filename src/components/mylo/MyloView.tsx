@@ -34,6 +34,12 @@ export async function MyloView({ m, viewer, signed }: { m: MyloToday; viewer: Vi
       </section>
 
 
+      <Link className="mrun-cta" href="/mylo/play">
+        <MyloArt mood="cheering" size={56} id="play" label="" />
+        <span><b>{t('game.title')}</b><span className="hint">{t('game.cta')}</span></span>
+        <span className="btn primary small" aria-hidden="true">{t('game.start')} →</span>
+      </Link>
+
       <section className="stack" style={{ gap: 10 }}>
         <h2>{t('mylo.why')}</h2>
         <div className="why">

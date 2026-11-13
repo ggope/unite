@@ -936,6 +936,40 @@ console.log('Team videos');
   await tv.context().close();
 }
 
+console.log("Mylo's Run (game)");
+for (const [label, opts] of [['desktop', { viewport: { width: 1280, height: 900 } }], ['phone', { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true }]]) {
+  await check(`the Mylo game starts, scores, ends and keeps the best score (${label})`, async () => {
+    const ctx = await b.newContext(opts);
+    await ctx.addInitScript(() => { try { localStorage.setItem('mylo-intro', '1'); } catch {} });
+    const p = await ctx.newPage(); p.on('pageerror', (e) => errors.push(`game ${label}: ${e.message}`));
+    await go(p, '/mylo/play'); await noCrash(p);
+    expect(await p.getByRole('heading', { name: "Mylo's Run" }).count(), 'no title');
+    const box = await p.locator('.mrun-stage canvas').boundingBox();
+    expect(box && box.width > 300 && box.height >= 200 && box.width <= (label === 'phone' ? 390 : 1280), `canvas size ${JSON.stringify(box)}`);
+    expect(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'page scrolls sideways');
+    if (label === 'phone') await p.locator('.mrun-stage').tap({ position: { x: 30, y: 30 } });
+    else await p.getByRole('button', { name: 'Start' }).click();
+    await p.waitForSelector('.mrun-pausebtn', { timeout: 3000 });
+    if (label === 'desktop') { await p.keyboard.down('Space'); await p.waitForTimeout(200); await p.keyboard.up('Space'); }
+    // pause and resume
+    await p.getByRole('button', { name: 'Pause the game' }).click();
+    expect(await p.getByText('Paused').count(), 'did not pause');
+    await p.getByRole('button', { name: 'Keep going' }).click();
+    // no jumping: a thorn ends the round soon
+    await p.getByRole('button', { name: 'Play again' }).waitFor({ timeout: 20000 });
+    const best = Number(await p.evaluate(() => localStorage.getItem('mylo-run-best')));
+    expect(best > 0, `best not saved: ${best}`);
+    expect(await p.getByRole('link', { name: /Sign one for real/ }).count(), 'no nudge to sign');
+    expect((await p.locator('.mrun-live').textContent())?.includes('Game over'), 'result not announced');
+    await ctx.close();
+  });
+}
+await check('the game is in the side menu and on Mylo\'s page', async () => {
+  await go(g, '/mylo');
+  expect(await g.locator('.rail a[href="/mylo/play"]').count(), 'no sidebar link');
+  expect(await g.locator('main a.mrun-cta[href="/mylo/play"], a.mrun-cta[href="/mylo/play"]').count(), 'no link on Mylo page');
+});
+
 await b.close();
 if (errors.length) { console.log('\nBrowser/server errors:'); [...new Set(errors)].slice(0, 30).forEach((e) => console.log('  ' + e)); }
 console.log(failed() ? `\n${failed()} check(s) failed` : '\nAll end-to-end checks passed');
