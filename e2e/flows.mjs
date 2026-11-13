@@ -68,6 +68,7 @@ await check('signing with only an email: link, confirm, counted once, withdraw',
   await g.locator('.sheet input[type=email]').fill('Guest@e2e.test'); await g.locator('.sheet input[type=checkbox]').check();
   await g.getByRole('button', { name: /email|link|code/i }).last().click(); await g.waitForSelector('.sheet .error', { timeout: 5000 });
   await go(g, new URL(link).pathname + '?w=1'); await g.getByRole('button', { name: /withdraw/i }).click(); await settle(g);
+  for (let i = 0; i < 20 && total() !== before; i++) await g.waitForTimeout(250);   // the server action can finish after the network goes quiet
   expect(total() === before, 'withdraw did not remove it');
 });
 await check('a crashed page and a failing server call are logged and the owner is emailed once', async () => {
@@ -633,6 +634,8 @@ console.log('Team petitions from trusted sources (0023)');
   sql(`insert into news_items (source_id, url, title, teaser, lang, topic, story_key, published_at) values
     ('bbc', 'https://bbc.example/plastics-e2e', 'Plastics treaty talks end without a deal on ocean pollution', 'Negotiators failed to agree limits on plastic production.', 'en', 'oceans', '${story}', now() - interval '2 hours'),
     ('guardian', 'https://guardian.example/plastics-e2e', 'Plastic pollution treaty stalls as countries block production cuts', 'A small group of countries blocked limits.', 'en', 'oceans', '${story}', now() - interval '1 hour')`);
+  // the helper looks at the biggest stories first; set aside any real news imported earlier in the run
+  sql(`insert into team_drafts (story_key, decision, reason) select distinct story_key, 'skipped', 'e2e' from news_items where story_key <> '${story}' on conflict (story_key) do nothing`);
   let pid = null;
   await check('the daily job drafts a petition from a story two outlets covered', async () => {
     expect((await g.request.get(APP + '/api/team/draft')).status() === 401, 'job open to anyone');
