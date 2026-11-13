@@ -39,6 +39,7 @@ const privacyEn: Doc = { title: 'Privacy policy', updated: 'Last updated: 13 Nov
     <li>Supabase: database, login and video storage, in the EU (Frankfurt).</li>
     <li>Vercel: website hosting, servers in Frankfurt. Vercel is a US company and is bound by the EU Standard Contractual Clauses and the EU-US Data Privacy Framework.</li>
     <li>Cloudflare: the bot check (Turnstile), only when switched on. Cloudflare is a US company bound by the EU Standard Contractual Clauses and the EU-US Data Privacy Framework.</li>
+    <li>Anthropic: an AI check (Claude) that helps our moderators sort new petitions, video captions and reports, only when switched on. It receives the text of the item only, never your email, account or who signed or reported, and does not use it to train its models. Anthropic is a US company bound by the EU Standard Contractual Clauses.</li>
     <li>Phone notifications go through your phone’s own push service (Apple, Google or Mozilla), encrypted so they cannot read the content.</li>
     <li><Ph>email provider</Ph>: sending login, signing and update emails.</li>
     <li>Google: only if you choose Google sign-in.</li>
@@ -95,6 +96,7 @@ const privacyHu: Doc = { title: 'Adatvédelmi tájékoztató', updated: 'Utolsó
     <li>Supabase: adatbázis, bejelentkezés és videótárolás az EU-ban (Frankfurt).</li>
     <li>Vercel: a weboldal tárhelye, frankfurti szerverekkel. A Vercel amerikai cég, az EU általános szerződési feltételei és az EU–USA adatvédelmi keretrendszer kötik.</li>
     <li>Cloudflare: a robotellenőrzés (Turnstile), csak ha be van kapcsolva. A Cloudflare amerikai cég, az EU általános szerződési feltételei és az EU–USA adatvédelmi keretrendszer kötik.</li>
+    <li>Anthropic: MI-ellenőrzés (Claude), amely segít a moderátorainknak átnézni az új petíciókat, videóleírásokat és bejelentéseket, csak ha be van kapcsolva. Csak a tartalom szövegét kapja meg, soha az e-mail-címedet, a fiókodat, vagy azt, hogy ki írt alá vagy ki jelentett be, és nem tanítja vele a modelljeit. Az Anthropic amerikai cég, az EU általános szerződési feltételei kötik.</li>
     <li>A telefonos értesítések a telefonod saját értesítési szolgáltatásán (Apple, Google vagy Mozilla) mennek át, titkosítva, így a tartalmukat nem láthatják.</li>
     <li><Ph>e-mail-szolgáltató</Ph>: belépési, aláírási és értesítő e-mailek küldése.</li>
     <li>Google: csak ha Google-fiókkal lépsz be.</li>
@@ -147,6 +149,7 @@ const termsEn: Doc = { title: 'Terms of use', updated: 'Last updated: 13 Novembe
   <h2>Reporting and moderation</h2>
   <ul>
     <li>You can report any video, petition, profile or message, including content you believe is illegal. Tell us what it is and why; reports are reviewed by a person.</li>
+    <li>An AI check helps our few moderators: it reads new petitions, video captions and reports and sorts them, so the most urgent are seen first. It may publish a petition that clearly follows the rules, or take down clear spam or scams. Whenever it decides on its own, we say so, and you can ask for a second look, which a person decides. Videos and reports are always decided by a person.</li>
     <li>If we remove, hide or limit something of yours, or your account, we tell you what we decided, which rule it was based on, and why.</li>
     <li>If you disagree, write to <Ph>contact email</Ph> within 6 months. Someone who did not make the first decision looks at it again and answers you. You can also turn to a certified out-of-court dispute body or a court.</li>
     <li>We may suspend, after a warning, accounts that often post clearly illegal content or often send clearly unfounded reports.</li>
@@ -186,6 +189,7 @@ const termsHu: Doc = { title: 'Felhasználási feltételek', updated: 'Utolsó m
   <h2>Bejelentés és moderálás</h2>
   <ul>
     <li>Bármelyik videót, petíciót, profilt vagy üzenetet bejelentheted, azt is, amit jogellenesnek tartasz. Írd meg, mi az és miért; a bejelentéseket ember nézi át.</li>
+    <li>Kevés moderátorunknak egy MI-ellenőrzés segít: elolvassa az új petíciókat, videóleírásokat és bejelentéseket, és sorba rendezi őket, hogy a legsürgősebbek kerüljenek előre. Közzétehet egy petíciót, amely egyértelműen betartja a szabályokat, vagy levehet egyértelmű kéretlen reklámot vagy csalást. Ha magától dönt, ezt megmondjuk, és kérheted az újbóli felülvizsgálatot, amelyről ember dönt. Videókról és bejelentésekről mindig ember dönt.</li>
     <li>Ha eltávolítjuk, elrejtjük vagy korlátozzuk valamelyik tartalmadat vagy a fiókodat, megmondjuk, mit döntöttünk, melyik szabály alapján és miért.</li>
     <li>Ha nem értesz egyet, 6 hónapon belül írj ide: <Ph>kapcsolati e-mail</Ph>. Olyasvalaki nézi át újra, aki nem vett részt az első döntésben, és válaszol neked. Fordulhatsz tanúsított peren kívüli vitarendező testülethez vagy bírósághoz is.</li>
     <li>Figyelmeztetés után felfüggeszthetjük azokat a fiókokat, amelyek gyakran tesznek közzé nyilvánvalóan jogellenes tartalmat, vagy gyakran küldenek nyilvánvalóan alaptalan bejelentést.</li>

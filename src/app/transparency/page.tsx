@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> { const { t } = awai
 // The rules and the numbers, in public. Everything here is counted live from the database.
 export default async function Transparency() {
   const [{ lang, t }, sb] = await Promise.all([getT(), supabaseServer()]);   // getT first reads the language cookie, so the build never caches build-time numbers
-  const [s, { data: ap }] = await Promise.all([publicRpc('transparency_stats', 600) as Promise<Record<string, any> | null>, sb.rpc('appeal_stats')]);   // appeals need 0018
+  const [s, { data: ap }, { data: ai }] = await Promise.all([publicRpc('transparency_stats', 600) as Promise<Record<string, any> | null>, sb.rpc('appeal_stats'), sb.rpc('ai_stats')]);   // appeals need 0018, the AI check 0024
   const n = (k: string) => fmtN(Number(s?.[k] ?? 0), lang);
   const tile = (k: string, label: Key) => <div className="tstat" key={k}><b className="num">{n(k)}</b><span>{t(label)}</span></div>;
   return (
@@ -30,7 +30,10 @@ export default async function Transparency() {
         <p className="hint" style={{ margin: 0 }}>{t('tr.reasons')}</p>
         {ap && <><div className="tgrid">{([['filed_12m', 'tr.aFiled'], ['reversed_12m', 'tr.aReversed'], ['upheld_12m', 'tr.aUpheld'], ['open', 'tr.aOpen']] as const).map(([k, label]) =>
           <div className="tstat" key={k}><b className="num">{fmtN(Number(ap[k] ?? 0), lang)}</b><span>{t(label)}</span></div>)}</div>
-          <p className="hint" style={{ margin: 0 }}>{t('tr.appeals')}{ap.median_days != null ? ` ${t('tr.aMedian', { d: String(ap.median_days) })}` : ''}</p></>}</section>
+          <p className="hint" style={{ margin: 0 }}>{t('tr.appeals')}{ap.median_days != null ? ` ${t('tr.aMedian', { d: String(ap.median_days) })}` : ''}</p></>}
+        {ai && ai.mode !== 'off' && Number(ai.checked_30d) > 0 && <><div className="tgrid">{([['checked_30d', 'tr.aiChecked'], ['approved_30d', 'tr.aiApproved'], ['removed_30d', 'tr.aiRemoved'], ['to_people_30d', 'tr.aiPeople']] as const).map(([k, label]) =>
+          <div className="tstat" key={k}><b className="num">{fmtN(Number(ai[k] ?? 0), lang)}</b><span>{t(label)}</span></div>)}</div>
+          <p className="hint" style={{ margin: 0 }}>{t('tr.aiText')}</p></>}</section>
 
       <section className="panel tsec"><h2>{t('tr.feed')}</h2>
         <ul>{(['tr.f1', 'tr.f2', 'tr.f3', 'tr.f4', 'tr.f5'] as Key[]).map((k) => <li key={k}>{t(k)}</li>)}</ul>
