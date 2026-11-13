@@ -18,6 +18,7 @@ export default async function StoryPage() {
       <p className="muted" style={{ margin: 0, textAlign: 'center' }}>{t('story.sub')}</p>
       <MyloBook inline />
       <Link href="/mylo/story/print" style={{ textAlign: 'center' }}>{t('print.link')}</Link>
+      <Link href="/kids" style={{ textAlign: 'center' }}>{t('kids.nav')} · {t('kids.teachers')}</Link>
     </div>
   );
 }

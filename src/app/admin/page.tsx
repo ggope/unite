@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN, LANGS, type Lang } from '@/lib/i18n/dict';
-import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, removeSamples, decideAppeal, runLifecycle, resolveError, testAlert } from './actions';
+import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, setEasy, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, removeSamples, decideAppeal, runLifecycle, resolveError, testAlert } from './actions';
 import { legalPlaceholders } from '@/lib/legal';
 
 export const dynamic = 'force-dynamic';
@@ -92,10 +92,10 @@ const MIGRATIONS: [string, string, string][] = [
   ['0002', 'invites', 'user_id'], ['0003', 'news_items', 'id'], ['0004', 'reports', 'resolved_at'], ['0005', 'petitions', 'official_url'],
   ['0006', 'profiles', 'bio'], ['0007', 'petitions', 'link_url'], ['0012', 'petitions', 'tr'], ['0014', 'notices', 'id'],
   ['0015', 'share_codes', 'code'], ['0016', 'answer_links', 'petition_id'], ['0017', 'signatures', 'reason_key'],
-  ['0018', 'appeals', 'id'], ['0021', 'error_events', 'fingerprint'],
+  ['0018', 'appeals', 'id'], ['0019', 'petitions', 'easy'], ['0021', 'error_events', 'fingerprint'],
   ['0020', 'petition_counts', 'petition_id'],   // private table: "permission denied" means it exists
 ];
-const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0020': '0020_quality', '0021': '0021_email_sign' };
+const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0019': '0019_kids', '0020': '0020_quality', '0021': '0021_email_sign' };
 const missing = (e: any) => !!e && /does not exist|PGRST20[45]|42703|42P01|schema cache/i.test(`${e.code} ${e.message}`);
 
 async function Launch({ sb }: { sb: any }) {
@@ -210,7 +210,9 @@ function Translation({ p, open, q }: { p: any; open: boolean; q: string }) {
   const href = (tr: string) => `/admin?tab=petitions${q ? `&q=${encodeURIComponent(q)}` : ''}${tr ? `&tr=${tr}` : ''}`;
   const status = others.map((l) => `${l.toUpperCase()} ${count(l) === 4 ? '✓' : count(l) ? `${count(l)}/4` : '–'}`).join(' · ');
   // The forms only render for the petition being translated, so the page stays light.
-  if (!open) return <div className="row between"><span className="hint">Written in {LANGS[orig]} · {status}</span><a className="btn small" href={href(p.id)}>Translations</a></div>;
+  const easy = (p.easy ?? {}) as Record<string, { title?: string; text?: string }>;
+  const kids = (Object.keys(LANGS) as Lang[]).filter((l) => easy[l]?.title && easy[l]?.text);
+  if (!open) return <div className="row between"><span className="hint">Written in {LANGS[orig]} · {status} · Kids: {kids.length ? kids.map((l) => l.toUpperCase()).join(' ') : '–'}</span><a className="btn small" href={href(p.id)}>Translations</a></div>;
   return (
     <section className="stack" style={{ gap: 8 }} id={`tr-${p.id}`}>
       <div className="row between"><b>Translations</b><a className="btn ghost small" href={href('')}>Done</a></div>
@@ -233,6 +235,17 @@ function Translation({ p, open, q }: { p: any; open: boolean; q: string }) {
           </form>
         );
       })}
+      {'easy' in p && <form action={setEasy} className="stack" id={`easy-${p.id}`}>
+        <b>Easy-read for kids</b>
+        <span className="hint">A short title and two or three plain sentences a 7 year old understands. With text in any language, the petition shows in the kids corner (/kids) and gets an easy-read box. Leave everything empty to take it out.</span>
+        <input type="hidden" name="id" value={p.id} />
+        {(Object.keys(LANGS) as Lang[]).map((l) => (
+          <div key={l} className="stack" style={{ gap: 4 }} lang={l}>
+            <input name={`title_${l}`} maxLength={70} defaultValue={easy[l]?.title ?? ''} placeholder={`Kids' title (${l})`} aria-label={`Kids' title (${LANGS[l]})`} />
+            <textarea name={`text_${l}`} maxLength={400} rows={2} defaultValue={easy[l]?.text ?? ''} placeholder={`In simple words (${l})`} aria-label={`In simple words (${LANGS[l]})`} />
+          </div>))}
+        <button className="btn small">Save easy-read</button>
+      </form>}
     </section>
   );
 }

@@ -10,7 +10,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const site = (process.env.NEXT_PUBLIC_SITE_URL || `https://${h.get('host')}`).replace(/\/$/, '');
   const { data } = await (await supabaseServer()).from('petitions').select('id, created_at, status')
     .in('status', ['live', 'closed']).order('created_at', { ascending: false }).limit(5000);
-  const pages = ['', '/petitions', '/wins', '/targets', '/mylo', '/mylo/story', '/transparency', '/donate', '/privacy', '/terms', '/imprint'];
+  const pages = ['', '/petitions', '/wins', '/targets', '/mylo', '/mylo/story', '/kids', '/kids/teachers', '/transparency', '/donate', '/privacy', '/terms', '/imprint'];
   return [
     ...pages.map((p) => ({ url: `${site}${p}`, changeFrequency: 'daily' as const, priority: p === '' ? 1 : 0.6 })),
     ...(data ?? []).flatMap((p: any) => [
