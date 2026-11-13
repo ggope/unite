@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { APP, sql, one, newUser, login, check, expect, failed } from './lib.mjs';
+import { APP, sql, one, newUser, login, check, expect, failed, until } from './lib.mjs';
 const { chromium } = createRequire(import.meta.url)('playwright');
 
 const b = await chromium.launch();
@@ -358,11 +358,11 @@ await check('moderator clears a profile and the person is told why', async () =>
   await go(a, '/admin?tab=reports');
   await a.locator('.panel', { hasText: 'offensive name' }).first().locator('input[name=note]').fill('Your name insulted people');
   await a.locator('.panel', { hasText: 'offensive name' }).first().getByRole('button', { name: /clear name and bio/i }).click(); await settle(a);
-  expect(one(`select display_name from profiles where id = '${C.id}'`) === null, 'not cleared');
+  expect(await until(() => one(`select display_name from profiles where id = '${C.id}'`) === null), 'not cleared');
   const c = await as(C); await go(c, '/you');
   expect(await c.getByText('Your name insulted people').count(), 'person not told why');
   await c.getByRole('button', { name: /^OK$/ }).first().click(); await settle(c);
-  expect(one(`select count(*) from notices where user_id = '${C.id}'`) === '0', 'notice not dismissed');
+  expect(await until(() => one(`select count(*) from notices where user_id = '${C.id}'`) === '0'), 'notice not dismissed');
   await c.context().close();
 });
 await check('notifications: an update is queued for followers, sender is off without keys', async () => {
@@ -458,7 +458,7 @@ console.log('Your data');
 await check('withdraw a signature from You', async () => {
   await go(bb, '/you');
   await bb.locator('form', { has: bb.locator(`input[value="${pid}"]`) }).getByRole('button').first().click(); await settle(bb);
-  expect(one(`select count(*) from signatures where user_id = '${B.id}' and petition_id = '${pid}'`) === '0', 'not withdrawn');
+  expect(await until(() => one(`select count(*) from signatures where user_id = '${B.id}' and petition_id = '${pid}'`) === '0'), 'not withdrawn');
 });
 await check('export my data, complete', async () => {
   const r = await bb.request.get(APP + '/api/account/export'); expect(r.status() === 200, `status ${r.status()}`);
