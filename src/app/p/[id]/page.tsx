@@ -90,16 +90,22 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
         <span className="prog" style={{ height: 14 }} role="progressbar" aria-label={t('p.goal', { n: fmt(p.goal) })} aria-valuemin={0} aria-valuemax={p.goal} aria-valuenow={Math.min(combined, p.goal)} aria-valuetext={`${fmt(combined)} / ${fmt(p.goal)}`}><i style={{ width: `${Math.min(100, combined / p.goal * 100)}%` }} /></span>
         <span className="hint">{t('p.goal', { n: fmt(p.goal) })} · {t('p.lastHour', { n: fmt(Number(st?.last_hour ?? 0)) })}{left != null ? ` · ${left === 0 ? t('life.lastDay') : left === 1 ? t('life.tomorrow', { d: date(p.ends_on) }) : t('life.daysLeft', { n: left, d: date(p.ends_on) })}` : ''}</span>
         {!!friends.data?.length && <span className="hint">{(() => { const names = friends.data.map((f: any) => f.display_name || '@' + f.handle).slice(0, 3).join(', '); return friends.data.length > 3 ? t('p.friendsMore', { names, n: friends.data.length - 3 }) : t('p.friendsSigned', { names }); })()}</span>}
-        <div className="row">
-          {open && <SignButton petitionId={p.id} title={p.title} signed={signed.has(p.id)} viewer={viewer} />}
+        {/* one clear main action; the rest is folded under "More" */}
+        {open && <div className="sign-main"><SignButton petitionId={p.id} title={p.title} signed={signed.has(p.id)} viewer={viewer} /></div>}
+        <div className="row p-actions">
           <FollowButton petitionId={p.id} following={followed.has(p.id)} loggedIn={viewer.loggedIn} />
           <ShareButton path={`/p/${p.id}`} title={p.title} />
-          <a className="btn ghost small" href={`/api/card/${p.id}`} target="_blank" rel="noopener">{t('sign.shareCard')}</a>
-          {(p.status === 'live' || p.status === 'closed') && <Link className="btn ghost small" href={`/p/${p.id}/report`}>{t('p.report')}</Link>}
-          {!isFounder && (p.status === 'live' || p.status === 'closed') && <ReportButton petitionId={p.id} loggedIn={viewer.loggedIn} />}
-          {(isFounder || signed.has(p.id)) && open && <Link className="btn ghost small" href={`/post?petition=${p.id}`}>{t('common.postVideo')}</Link>}
           {(isFounder || !!me?.is_moderator) && <Link className="btn small" href={`/p/${p.id}/dashboard`}>{t('dash.open')}</Link>}
         </div>
+        <details className="more-actions">
+          <summary className="btn ghost small">{t('p.more')}</summary>
+          <div className="row">
+            {(isFounder || signed.has(p.id)) && open && <Link className="btn ghost small" href={`/post?petition=${p.id}`}>{t('common.postVideo')}</Link>}
+            <a className="btn ghost small" href={`/api/card/${p.id}`} target="_blank" rel="noopener">{t('sign.shareCard')}</a>
+            {(p.status === 'live' || p.status === 'closed') && <Link className="btn ghost small" href={`/p/${p.id}/report`}>{t('p.report')}</Link>}
+            {!isFounder && (p.status === 'live' || p.status === 'closed') && <ReportButton petitionId={p.id} loggedIn={viewer.loggedIn} />}
+          </div>
+        </details>
       </div>
       {ended && <section className="panel life-closed" role="status"><b>{t('life.closed', { d: date(p.closed_at ?? p.ends_on ?? p.created_at), n: fmt(combined) })}</b>
         {!sil.delivered && <span className="hint">{isFounder ? t('life.deliverYou', { target: p.target }) : t('life.deliverNext', { target: p.target })}</span>}
@@ -110,11 +116,6 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
         <Link href={`/targets#${targetAnchor(raw.target)}`}>{t('sil.board')} →</Link></section>}
       {sil.answeredAfter != null && <p className="hint" style={{ margin: 0 }}>{sil.answeredAfter === 0 ? t('sil.answeredSameDay', { target: p.target }) : sil.answeredAfter === 1 ? t('sil.answeredNextDay', { target: p.target }) : t('sil.answeredAfter', { n: sil.answeredAfter, target: p.target })}</p>}
       {p.link_url && <LinkBar url={p.link_url} cta={p.link_cta} />}
-      {(p.status === 'live' || p.status === 'closed') && (
-        <details className="panel embed"><summary>{t('embed.title')}</summary>
-          <p className="hint" style={{ margin: 0 }}>{t('embed.hint')}</p>
-          <textarea readOnly rows={3} aria-label={t('embed.title')} value={`<iframe src="${origin}/embed/${p.id}?lang=${lang}" width="100%" height="250" style="border:0;max-width:480px" title="${p.title.replace(/"/g, '&quot;')} · UNIER" loading="lazy"></iframe>`} />
-        </details>)}
       {p.official_url && p.status === 'live' && (
         <section className="panel official"><b>{t('off.title')}</b><p className="muted" style={{ margin: 0 }}>{t('off.text')}</p>
           <a className="btn small" href={p.official_url} target="_blank" rel="noopener nofollow">{t('off.go')} ↗</a></section>
@@ -141,6 +142,11 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
         {news.map((n: any) => <div key={n.id}><a href={n.url} target="_blank" rel="noopener nofollow"><b>{n.title}</b></a><div className="hint">{n.news_sources?.name} · {new Date(n.published_at).toLocaleDateString(locale(lang))}</div></div>)}</section>}
       {!!videos?.length && <section className="stack" style={{ gap: 8 }}><h2>{t('p.videos')}</h2>
         {videos.map((v: any) => <div key={v.id}><b>{v.caption}</b><div className="hint">{v.uploader_handle ? <Link href={`/u/${v.uploader_handle}`}>@{v.uploader_handle}</Link> : null} <span className={`role ${v.role}`}>({t(`role.${v.role as 'founder' | 'supporter'}`)})</span></div></div>)}</section>}
+      {(p.status === 'live' || p.status === 'closed') && (
+        <details className="panel embed"><summary>{t('embed.title')}</summary>
+          <p className="hint" style={{ margin: 0 }}>{t('embed.hint')}</p>
+          <textarea readOnly rows={3} aria-label={t('embed.title')} value={`<iframe src="${origin}/embed/${p.id}?lang=${lang}" width="100%" height="250" style="border:0;max-width:480px" title="${p.title.replace(/"/g, '&quot;')} · UNIER" loading="lazy"></iframe>`} />
+        </details>)}
     </div>
   );
 }
