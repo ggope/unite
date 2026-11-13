@@ -245,6 +245,11 @@ export async function setAiMode(mode: 'off' | 'suggest' | 'auto') {
   if (!['off', 'suggest', 'auto'].includes(mode)) return;
   await done((await sb.from('site_settings').update({ ai_moderation: mode }).eq('id', true)).error);
 }
+// Automatic translations (0026): on or off.
+export async function setAutoTranslate(on: boolean) {
+  const sb = await mod();
+  await done((await sb.from('site_settings').update({ auto_translate: !!on }).eq('id', true)).error);
+}
 // AI check: looks at everything still waiting now, instead of waiting for the next new item or the nightly run.
 export async function runAiNow() {
   await mod();
