@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { APP, sql, one, newUser, login, check, expect, failed } from './lib.mjs';
+import { APP, sql, one, newUser, login, check, expect, failed, until } from './lib.mjs';
 const { chromium } = createRequire(import.meta.url)('playwright');
 
 const b = await chromium.launch();
@@ -36,13 +36,24 @@ const g = await as(null);
 for (const url of ['/', '/petitions', '/mylo', '/donate', '/login', '/start', '/post', '/updates', '/you', '/privacy', '/terms', '/imprint']) {
   await check(`guest opens ${url}`, async () => { const r = await go(g, url); expect(r.status() < 400, `status ${r.status()}`); await noCrash(g); });
 }
-const seedId = one(`select id from petitions where status = 'live' order by created_at limit 1`);
+const seedId = one(`select id from petitions where status = 'live' order by title like 'End bottom trawling%' desc, created_at limit 1`);   // seed rows share one created_at
 await check('petition list, welcome page and news show petitions with totals', async () => {
   await go(g, '/petitions'); expect(await g.locator('text=End bottom trawling').count(), 'petition list is empty');
+});
+await check('search finds the start of a word', async () => {
+  await go(g, '/petitions?q=trawl'); expect(await g.locator('text=End bottom trawling').count(), 'part of a word finds nothing');
+  await go(g, '/petitions?q=' + encodeURIComponent('bottom traw')); expect(await g.locator('text=End bottom trawling').count(), 'two words, the last one cut short, find nothing');
 });
 await check('guest opens a petition and its report', async () => {
   let r = await go(g, `/p/${seedId}`); expect(r.status() === 200, `status ${r.status()}`); await noCrash(g);
   r = await go(g, `/p/${seedId}/report`); expect(r.status() === 200, `report status ${r.status()}`);
+});
+await check('sign-in links only ever lead back into UNIER', async () => {
+  for (const bad of ['/%5Cevil.example', '//evil.example', '/%09/evil.example']) {
+    const r = await g.request.get(APP + '/auth/callback?next=' + bad, { maxRedirects: 0 });
+    const to = r.headers()['location'] ?? '';
+    expect(new URL(to, APP).host === new URL(APP).host && to.includes('next=%2F') && !to.includes('evil'), `${bad} -> ${to}`);
+  }
 });
 await check('guest sign asks for email and sends a code', async () => {
   await go(g, `/p/${seedId}`);
@@ -62,6 +73,7 @@ await check('signing with only an email: link, confirm, counted once, withdraw',
   await go(g, new URL(link).pathname); expect(total() === before, 'counted before pressing Confirm');
   await g.getByRole('button', { name: /confirm/i }).click(); await settle(g);
   await g.waitForSelector('.esign .ok', { timeout: 5000 }); expect(total() === before + 1, 'not counted after Confirm');
+  expect(await g.locator('.esign').getByRole('button', { name: /share/i }).count(), 'no share button right after confirming');
   await go(g, new URL(link).pathname); await g.getByRole('button', { name: /confirm/i }).count().then((n) => expect(n === 0, 'confirm shown twice'));
   // signing again with the same email says it already counts
   await go(g, `/p/${seedId}`); await g.getByRole('button', { name: /^Sign/ }).first().click();
@@ -125,10 +137,15 @@ await check('start a petition', async () => {
   await a.fill('[name=ask]', 'Install and maintain free drinking water fountains in every public park by next summer.');
   await a.fill('[name=why]', 'Summers are getting hotter and bottled water is expensive and wasteful for families and kids.');
   await a.fill('[name=organiser_name]', 'Anna Kovács');
-  await a.fill('[name=link_url]', 'https://example.org/fountains');
+  await a.fill('[name=link_url]', 'http://example.org/fountains');   // not https: the server says so, and nothing typed is lost
   await a.selectOption('[name=topic]', 'health').catch(async () => a.locator('[name=topic][value=health]').check());
   await a.selectOption('[name=goal]', '10000').catch(async () => a.locator('[name=goal][value="10000"]').check());
   await a.locator('[name=facts]').check();
+  await a.locator('form button[type=submit], form button:not([type])').last().click();
+  await a.waitForSelector('form .error', { timeout: 8000 });
+  expect(await a.inputValue('[name=title]') === 'Free drinking fountains in every Budapest park', 'the form was emptied after an error');
+  expect((await a.inputValue('[name=why]')).startsWith('Summers are getting hotter'), 'the reason was emptied after an error');
+  await a.fill('[name=link_url]', 'https://example.org/fountains');
   await a.locator('form button[type=submit], form button:not([type])').last().click();
   await a.waitForURL(/\/p\/[0-9a-f-]{36}/, { timeout: 10000 });
   pid = a.url().match(/\/p\/([0-9a-f-]{36})/)[1];
@@ -138,7 +155,12 @@ await check('admin approves the petition', async () => {
   await go(a, '/admin?tab=queue'); await noCrash(a);
   const card = a.locator('.panel', { hasText: 'Free drinking fountains' }).first();
   await card.getByRole('button', { name: /approve|make live|publish/i }).first().click(); await settle(a);
-  expect(one(`select status from petitions where id = '${pid}'`) === 'live', 'not live');
+  expect(await until(() => one(`select status from petitions where id = '${pid}'`) === 'live'), 'not live');
+  // the organiser hears it: a note under You and an email (0022)
+  expect(one(`select count(*) from notices where user_id = '${A.id}' and kind = 'petition_live' and petition_id = '${pid}'`) === '1', 'no note for the organiser');
+  const told = (await mailsTo(A.email)).filter((m) => m.text.includes('Free drinking fountains') && m.text.includes(`/p/${pid}`));
+  expect(told.length === 1, `organiser emails: ${told.length}`);
+  await go(a, '/you'); expect(await a.getByText(/is live\. Share it/).count(), 'the note is not shown under You');
 });
 await check('admin pins it as a big goal', async () => {
   await go(a, '/admin?tab=petitions&q=fountains');
@@ -257,6 +279,15 @@ await check('news import runs with the cron secret', async () => {
   expect(clean && !clean.status.startsWith('error'), `daily privacy clean-up did not run: ${JSON.stringify(clean)}`);
 });
 
+await check('moderators get a morning email when something waits for review', async () => {
+  const pending = one(`insert into petitions (title, target, region, ask, why, topic, goal, organiser_name, status) values ('Digest check petition waiting', 'Someone', 'EU', 'Please review this test petition soon.', 'It checks the morning email to moderators.', 'health', 1000, 'E2E', 'pending') returning id`);
+  const r = await g.request.get(APP + '/api/news/import', { headers: { authorization: 'Bearer e2e' } });
+  const d = (await r.json()).digest; expect(d && d.petitions >= 1, `digest: ${JSON.stringify(d)}`);
+  const m = (await mailsTo('owner@e2e.test')).filter((x) => x.subject.startsWith('UNIER: ') && x.text.includes('Waiting for a moderator'));
+  expect(m.length >= 1 && /new petition/.test(m.at(-1).text), 'no digest email');
+  sql(`delete from petitions where id = '${pending}'`);
+});
+
 console.log('Posters and translations');
 await check('petitions without a video show as poster cards in the feed', async () => {
   const hidden = one(`with h as (update videos set audience = 'friends' where status = 'approved' and audience = 'everyone' returning id) select coalesce(string_agg(id::text, ','), '') from h`);
@@ -341,11 +372,11 @@ await check('moderator clears a profile and the person is told why', async () =>
   await go(a, '/admin?tab=reports');
   await a.locator('.panel', { hasText: 'offensive name' }).first().locator('input[name=note]').fill('Your name insulted people');
   await a.locator('.panel', { hasText: 'offensive name' }).first().getByRole('button', { name: /clear name and bio/i }).click(); await settle(a);
-  expect(one(`select display_name from profiles where id = '${C.id}'`) === null, 'not cleared');
+  expect(await until(() => one(`select display_name from profiles where id = '${C.id}'`) === null), 'not cleared');
   const c = await as(C); await go(c, '/you');
   expect(await c.getByText('Your name insulted people').count(), 'person not told why');
   await c.getByRole('button', { name: /^OK$/ }).first().click(); await settle(c);
-  expect(one(`select count(*) from notices where user_id = '${C.id}'`) === '0', 'notice not dismissed');
+  expect(await until(() => one(`select count(*) from notices where user_id = '${C.id}'`) === '0'), 'notice not dismissed');
   await c.context().close();
 });
 await check('notifications: an update is queued for followers, sender is off without keys', async () => {
@@ -373,7 +404,7 @@ await check('admin: declining without a reason is refused', async () => {
   await go(a, '/admin?tab=queue');
   // A click can get lost while the page is still settling; pressing Reject again is harmless here.
   for (let i = 0; i < 3 && !(await a.locator('text=Write the reason first').count()); i++) {
-    await a.locator('.panel', { hasText: 'Clip without a reason' }).first().getByRole('button', { name: 'Reject' }).click();
+    await a.locator('.panel', { hasText: 'Clip without a reason' }).first().getByRole('button', { name: 'Reject' }).click({ timeout: 5000 }).catch(() => {});   // the page may be reloading from the last press
     await a.locator('text=Write the reason first').first().waitFor({ timeout: 5000 }).catch(() => {});
   }
   expect(one(`select status from videos where id = '${v3}'`) === 'pending', 'declined without a reason');
@@ -387,6 +418,10 @@ await check('admin: reject a video with a reason the author sees', async () => {
   await card.locator('input[name=note]').fill('Faces of children are visible'); await card.getByRole('button', { name: 'Reject' }).click(); await a.waitForTimeout(1200);
   expect(one(`select status || '|' || moderation_note from videos where id = '${v2}'`) === 'rejected|Faces of children are visible', 'not rejected with note');
   await go(bb, '/you'); expect(await bb.locator('text=Faces of children are visible').count(), 'author does not see the reason');
+  // told by email too, with the way to ask for a second look (0022)
+  const told = (await mailsTo(B.email)).filter((m) => m.text.includes('Faces of children are visible'));
+  expect(told.length === 1 && told[0].text.includes(`/appeal?kind=video&id=${v2}`), `uploader emails: ${told.length}`);
+  expect(await bb.locator('.panel', { hasText: 'Faces of children are visible' }).getByRole('link', { name: /second look|appeal/i }).count(), 'no appeal link on the note');
 });
 await check('admin: make someone a moderator and back', async () => {
   await go(a, '/admin?tab=people&q=bela_e2e');
@@ -443,7 +478,7 @@ console.log('Your data');
 await check('withdraw a signature from You', async () => {
   await go(bb, '/you');
   await bb.locator('form', { has: bb.locator(`input[value="${pid}"]`) }).getByRole('button').first().click(); await settle(bb);
-  expect(one(`select count(*) from signatures where user_id = '${B.id}' and petition_id = '${pid}'`) === '0', 'not withdrawn');
+  expect(await until(() => one(`select count(*) from signatures where user_id = '${B.id}' and petition_id = '${pid}'`) === '0'), 'not withdrawn');
 });
 await check('export my data, complete', async () => {
   const r = await bb.request.get(APP + '/api/account/export'); expect(r.status() === 200, `status ${r.status()}`);
@@ -612,6 +647,22 @@ await check('open numbers download as CSV without names', async () => {
   await go(g, '/transparency'); expect(await g.locator('a[href="/open/petitions.csv"]').count(), 'no download link');
 });
 
+await check('quality: no framing except the embed, cached open data, keyboard report sheet', async () => {
+  const home = await g.request.get(APP + '/'); const h = home.headers();
+  expect(h['x-frame-options'] === 'DENY' && /frame-ancestors 'none'/.test(h['content-security-policy'] ?? ''), 'pages can be framed by other sites');
+  const em = await g.request.get(APP + `/embed/${seedId}`); const eh = em.headers();
+  expect(em.ok() && !eh['x-frame-options'] && !/frame-ancestors/.test(eh['content-security-policy'] ?? ''), 'embed cannot be framed');
+  const html = await em.text(); expect(/<main/.test(html) && /role="progressbar" aria-label=/.test(html), 'embed landmarks or progress label missing');
+  expect(/s-maxage=\d+/.test((await g.request.get(APP + '/open/petitions.csv')).headers()['cache-control'] ?? ''), 'open data not cached at the edge');
+  // totals still match a full count after all the signing above
+  expect(one(`select count(*) from petition_stats s join petitions p using (id) where s.signatures <> p.imported_count + (select count(*) from signatures x where x.petition_id = p.id)`) === '0', 'signature counter drifted');
+  await go(bb, `/p/${seedId}`);
+  await bb.getByRole('button', { name: /^report$/i }).first().click();
+  expect(await bb.evaluate(() => !!document.activeElement?.closest('[role=dialog]')), 'focus did not move into the report sheet');
+  await bb.keyboard.press('Escape'); await bb.waitForTimeout(200);
+  expect(!(await bb.locator('[role=dialog]').count()), 'Escape did not close the report sheet');
+});
+
 await check('revoke consent, then signing asks again', async () => {
   await go(bb, '/you'); await bb.getByRole('button', { name: /withdraw consent|revoke/i }).first().click(); await bb.waitForTimeout(800);
   expect(one(`select count(*) from consents where user_id = '${B.id}' and revoked_at is null`) === '0', 'consent not revoked');
@@ -629,6 +680,23 @@ await check('admin sees errors, marks one fixed and sends a test alert', async (
   let got = false; for (let i = 0; i < 20 && !got; i++) { got = (await mailsTo('owner@e2e.test')).some((m) => m.subject === 'UNIER test alert'); if (!got) await a.waitForTimeout(250); }
   expect(got, 'no test alert');
 });
+console.log('Kids side');
+await check('kids corner, classroom pack and worksheets open for guests', async () => {
+  for (const url of ['/kids', '/kids/teachers', '/kids/teachers/print']) { const r = await go(g, url); expect(r.status() === 200, `${url}: ${r.status()}`); await noCrash(g); }
+  await go(g, '/kids/teachers/print'); expect(await g.locator('.ws').count() === 2, 'expected two worksheets');
+});
+await check('moderator writes an easy-read version; it shows in the kids corner and on the petition', async () => {
+  await go(a, `/admin?tab=petitions&tr=${seedId}`);
+  const f = a.locator(`#easy-${seedId}`);
+  await f.locator('input[name=title_en]').fill('Let the fish live');
+  await f.locator('textarea[name=text_en]').fill('Big boats scrape the sea floor. We ask them to stop in safe zones.');
+  await f.getByRole('button', { name: 'Save easy-read' }).click(); await settle(a);
+  expect(one(`select easy->'en'->>'title' from petitions where id = '${seedId}'`) === 'Let the fish live', 'easy-read not saved');
+  await go(g, '/kids'); expect(await g.getByText('Let the fish live').count(), 'not in the kids corner');
+  expect(!(await g.getByRole('button', { name: /^Sign/ }).count()), 'kids corner shows a sign button');
+  await go(g, `/p/${seedId}`); expect(await g.locator('.easy-box').getByText('Let the fish live').count(), 'no easy-read box on the petition');
+});
+
 await check('admin takes the sample petitions down before launch', async () => {
   await go(a, '/admin?tab=launch'); await a.getByRole('button', { name: 'Take the sample petitions down' }).click(); await settle(a);
   expect(one(`select count(*) from petitions where organiser_name ilike '%(sample)%' and status <> 'removed'`) === '0', 'samples still live');
@@ -728,7 +796,7 @@ console.log('Petition life cycle (0018)');
     expect(one(`select ends_on from petitions where id = '${quiet}'`) === day, 'end date not saved');
   });
   await check('an author appeals a removal and a moderator reverses it', async () => {
-    await go(d, '/you'); await d.locator(`a[href="/appeal?kind=petition&id=${gone}"]`).click(); await settle(d);
+    await go(d, '/you'); await d.locator(`a[href="/appeal?kind=petition&id=${gone}"]`).first().click(); await settle(d);
     expect(await d.getByText('Looks like a duplicate').count(), 'decision not shown');
     await d.locator('#appeal-body').fill('It is not a duplicate: it asks a different ministry.'); await d.getByRole('button', { name: 'Send appeal' }).click();
     await d.waitForURL(/appealed=1/, { timeout: 8000 }); await d.getByText(/Your appeal was sent/).waitFor({ timeout: 8000 });

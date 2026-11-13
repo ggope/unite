@@ -46,7 +46,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ file: st
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="unier-${name}.csv"`,
-      'Cache-Control': 'public, max-age=600',
+      'Cache-Control': 'public, max-age=600, s-maxage=600, stale-while-revalidate=3600',   // served from the CDN, not the database, on every download
       'Access-Control-Allow-Origin': '*',
     },
   });

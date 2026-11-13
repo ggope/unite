@@ -5,7 +5,7 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { makeT, isLang, type Lang } from '@/lib/i18n/dict';
-import { CONSENT_VERSION } from '@/lib/topics';
+import { CONSENT_VERSION, siteUrl } from '@/lib/topics';
 import { mailReady, sendMail, escapeHtml } from '@/lib/mail/send';
 import { reportProblem } from '@/lib/alert';
 import { pushReady, sendPending } from '@/lib/push/send';
@@ -18,7 +18,7 @@ const admin = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.
 const missingFn = (e: any) => !!e && /PGRST202|42883|could not find the function|does not exist/i.test(`${e.code} ${e.message}`);
 
 async function origin() {
-  const fixed = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '');
+  const fixed = siteUrl();
   if (fixed && !/localhost/.test(fixed)) return fixed;
   const h = await headers();
   return `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('x-forwarded-host') ?? h.get('host')}`;

@@ -502,6 +502,42 @@ main:focus{outline:none}
 .launch li.ok{border-color:var(--line);color:var(--muted)}
 .launch li.ok > span:first-child{color:#2F8E45}
 .launch code{font-size:12.5px;word-break:break-all}
+
+/* Kids side: Mylo's kids corner, easy-read box, classroom pack and worksheets */
+.kids{max-width:760px;margin:0 auto;width:100%}
+.kids-hero{display:flex;gap:18px;align-items:center;padding:18px;background:#FFF4E0;color:#2A2520;border:3px solid var(--edge);border-radius:var(--r)}
+.kids-hero h1{font-size:34px}
+.kids-say{margin:0;font-size:20px;font-weight:800;line-height:1.3}
+@media (max-width:560px){.kids-hero{flex-direction:column;text-align:center}}
+.kids-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.kids-tile{display:flex;flex-direction:column;gap:4px;padding:16px;background:var(--surface);border:3px solid var(--edge);border-radius:var(--r);color:var(--ink);text-decoration:none;font-size:15px;transition:transform .08s,box-shadow .08s}
+.kids-tile b{font-size:19px}
+.kids-tile:hover{color:var(--ink);box-shadow:var(--shadow);transform:translate(-2px,-2px)}
+.kids-ask{display:flex;flex-direction:column;gap:8px;padding:16px;background:var(--surface);border:3px solid var(--edge);border-radius:var(--r)}
+.kids-ask h3{margin:0;font-size:22px}
+.kids-ask p{margin:0;font-size:17px;line-height:1.5}
+.kids-ask .big{height:16px;border:3px solid var(--edge);background:var(--sunk);overflow:hidden;border-radius:999px}
+.kids-ask .big i{display:block;height:100%;background:var(--accent)}
+.kids-grownup{font-size:14px!important;color:var(--muted)}
+.kids-do{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px;font-size:16px}
+.teach-steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
+.easy-box{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;background:#FFF4E0;color:#2A2520;border:2px solid var(--edge);border-radius:var(--r);font-size:16px;line-height:1.45}
+.easy-box .label,.easy-box .hint{color:#5A5248}
+.easy-box .mylo-art{flex:none}
+.bigscreen:fullscreen{display:flex;align-items:center;justify-content:center;padding:3vh 3vw;background:#FFFDF6;overflow:auto}
+.bigscreen:fullscreen .bk-stage{max-width:min(1600px,150vh)}
+.ws{align-items:stretch;gap:12px}
+.ws-head{display:flex;align-items:center;gap:12px}
+.ws-head .pp-title{text-align:left;flex:1}
+.ws-mylo{width:80px;height:80px;flex:none}
+.ws-mylo svg{width:100%;height:100%}
+.ws-q{margin:6px 0 0;font-size:20px;font-weight:700}
+.ws-draw{flex:1;min-height:300px;border:2px solid #111;border-radius:8px;background:#fff}
+.ws-lines{display:flex;flex-direction:column}
+.ws-lines span{height:36px;border-bottom:2px solid #999}
+.ws-sign{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 18px}
+.ws-sign span{height:34px;border-bottom:2px solid #999}
+@media print{.ws{justify-content:flex-start!important}.ws-draw{min-height:0}.ws-q{font-size:16pt}}
 /* Petition life cycle (0018): closed note, days without an answer, end date, appeals */
 .life-closed{border-left:8px solid var(--ink)}
 .life-closed .btn{align-self:flex-start}

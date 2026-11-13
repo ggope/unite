@@ -33,3 +33,10 @@ export async function check(name, fn) {
 }
 export const failed = () => failures;
 export function expect(cond, msg) { if (!cond) throw new Error(msg); }
+
+// A server action can finish after the page looks idle: wait (up to `ms`) until the database shows the result.
+export async function until(cond, ms = 8000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) { if (cond()) return true; await new Promise((r) => setTimeout(r, 200)); }
+  return cond();
+}

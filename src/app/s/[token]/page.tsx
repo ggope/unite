@@ -5,6 +5,7 @@ import { getT } from '@/lib/i18n/server';
 import { fmtN } from '@/lib/i18n/dict';
 import { confirmEmailSign, withdrawEmailSign } from '../actions';
 import { hashToken } from '@/lib/mail/token';
+import { ShareButton } from '@/components/ShareButton';
 
 export const dynamic = 'force-dynamic';
 // The link is a key: keep it out of search engines and out of other sites' logs.
@@ -31,6 +32,8 @@ export default async function ConfirmSignature({ params, searchParams }: { param
       {q.err && <p className="error" role="alert">{t('sign.errOther')}</p>}
       {info.confirmed ? (<>
         <p className="ok" role="status">{q.ok ? t('esign.thanks') : t('esign.counted')}{st?.combined ? ` ${t('esign.total', { n: fmtN(st.combined, lang) })}` : ''}</p>
+        <p style={{ margin: 0 }}><b>{t('esign.shareAsk')}</b></p>
+        <div className="row"><ShareButton path={`/p/${info.petition_id}`} title={info.title} /><a className="btn ghost small" href={`/api/card/${info.petition_id}`} target="_blank" rel="noopener">{t('sign.shareCard')}</a></div>
         <div className="row"><Link className="btn" href={`/p/${info.petition_id}`}>{t('esign.see')}</Link><Link className="btn" href={`/login?next=/p/${info.petition_id}`}>{t('esign.account')}</Link></div>
         <p className="hint">{t('esign.accountWhy')}</p>
         {q.w ? <Form action={withdrawEmailSign} label={t('esign.withdraw')} danger /> : <Link className="hint" href={`/s/${encodeURIComponent(token)}?w=1`}>{t('esign.withdrawAsk')}</Link>}

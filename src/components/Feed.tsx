@@ -21,6 +21,8 @@ import { TOPICS } from '@/lib/topics';
 type Slot = { item: FeedItem; explore: boolean } | { news: NewsStory } | { ad: true } | { end: true };
 const NEWS_EVERY = 3;   // one headline after every three videos
 const AD_FIRST = 7, AD_EVERY = 15;   // the empty ad slot: after 7 videos, then every 15
+// The slot asks for support, so it only shows once there is a donation link to send people to.
+const CAN_DONATE = !!(process.env.NEXT_PUBLIC_DONATE_URL || process.env.NEXT_PUBLIC_DONATE_MONTHLY_URL);
 const LS = 'unite-weights';
 
 export function Feed({ items, news = [], viewer, signed, followed, serverWeights, chronological, autoplay, breakMinutes = 20, firstId }: {
@@ -81,7 +83,7 @@ export function Feed({ items, news = [], viewer, signed, followed, serverWeights
       while (next.length - active < 3) {
         let since = 0; for (let k = next.length - 1; k >= 0 && 'item' in next[k]; k--) since++;
         const vids = next.filter((s) => 'item' in s).length, ads = next.filter((s) => 'ad' in s).length;
-        if (since > 0 && vids >= AD_FIRST + ads * AD_EVERY) { next.push({ ad: true }); continue; }
+        if (CAN_DONATE && since > 0 && vids >= AD_FIRST + ads * AD_EVERY) { next.push({ ad: true }); continue; }
         if (since >= NEWS_EVERY) {
           // the headline closest to what this person cares about, among the biggest stories
           const n = news.filter((x) => !usedNews.has(x.id)).sort((a, b) => (weights[b.topic] ?? 0) + b.outlets - ((weights[a.topic] ?? 0) + a.outlets))[0];
