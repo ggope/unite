@@ -15,7 +15,9 @@ export type FeedItem = {
   goal: number; united_count: number; trim_start: number; trim_end: number; blur_faces: boolean;
   created_at: string; video_url: string | null; cover_url: string | null;
   link_url?: string | null; link_cta?: string | null;
-  kind?: 'video' | 'card'; target?: string;   // 'card': a petition with no video yet, shown as a poster
+  kind?: 'video' | 'card' | 'clip'; target?: string;   // 'card': a petition with no video yet, shown as a poster
+  penalty?: number;   // UNIER team content ranks lower when Admin → Team content is set to less (0023)
+  youtube_id?: string; source_name?: string;           // 'clip': a UNIER team pick from a trusted channel (0025)
 };
 
 export function score(item: FeedItem, w: Weights, ctx: { followed: Set<string>; signed: Set<string>; seen: Record<string, number>; mine?: string | null }) {
@@ -25,7 +27,7 @@ export function score(item: FeedItem, w: Weights, ctx: { followed: Set<string>; 
   const freshness = 1 / (1 + hours / 12);
   const social = ctx.followed.has(item.petition_id) || ctx.signed.has(item.petition_id) ? 1.5 : 0;
   const repeat = (ctx.seen[item.id] ?? 0) * 2.5;
-  return interest + popularity * 1.5 + freshness + social - repeat;
+  return interest + popularity * 1.5 + freshness + social - repeat - (item.penalty ?? 0);
 }
 
 export function pickNext(pool: FeedItem[], w: Weights, ctx: Parameters<typeof score>[2], chronological: boolean) {

@@ -50,6 +50,7 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
     sb.from('news_items').select('id, url, title, published_at, news_sources(name)').eq('petition_id', id).order('published_at', { ascending: false }).limit(10),
   ]);
   const { data: reasons } = await sb.rpc('public_reasons', { p_petition: id, p_limit: 8 });   // empty until 0016 has run; the report flag needs 0017
+  const { data: sources } = p.origin === 'team' ? await sb.from('petition_sources').select('url, outlet, title, published_at').eq('petition_id', id).order('published_at', { ascending: false }) : { data: null };   // 0023
   const combined = Number(st?.combined ?? 0);
   const isFounder = user && p.created_by === user.id;
   // after the end date signing stops, but the organiser keeps posting what happened next
@@ -68,6 +69,7 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
       {p.status === 'removed' && <p className="note">{t('p.removed')}{p.moderation_note ? ` ${t('mod.reason', { r: p.moderation_note })}` : ''}{isFounder && <> <Link href={`/appeal?kind=petition&id=${p.id}`}>{t('appeal.ask')}</Link></>}</p>}
       <span className="hint">{t(`topic.${p.topic as keyof typeof TOPICS}`)} · {t('p.startedBy', { name: p.organiser_name })} · {p.region}</span>
       <h1>{p.title}</h1>
+      {p.origin === 'team' && <span className="team-tag">{t('team.by')}</span>}
       <p className="muted" style={{ margin: 0 }}>{t('p.to', { target: p.target })}</p>
       <div className="panel">
         <div><span className="bignum">{fmt(combined)}</span> <span className="muted">{Number(st?.united_count) > 1 ? t('p.acrossUnited') : t('p.signatures')}</span></div>
@@ -104,7 +106,9 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
           <a className="btn small" href={p.official_url} target="_blank" rel="noopener nofollow">{t('off.go')} ↗</a></section>
       )}
       <section className="stack" style={{ gap: 8 }}><h2>{t('p.asks')}</h2><p style={{ margin: 0 }}>{p.ask}</p><h2>{t('p.whyMatters')}</h2><p style={{ margin: 0 }}>{p.why}</p>
-        {p.source_url && <a href={p.source_url} target="_blank" rel="noopener nofollow">{t('p.source')}</a>}</section>
+        {sources?.length ? <><h2>{t('team.sources')}</h2><p className="hint" style={{ margin: 0 }}>{t('team.about')}</p>
+          <ul className="team-sources">{sources.map((s: any) => <li key={s.url}><a href={s.url} target="_blank" rel="noopener nofollow">{s.title || s.outlet}</a> <span className="hint">· {s.outlet}{s.published_at ? ` · ${date(s.published_at)}` : ''}</span></li>)}</ul></>
+          : p.source_url && <a href={p.source_url} target="_blank" rel="noopener nofollow">{t('p.source')}</a>}</section>
       {(members?.length ?? 0) > 1 && (
         <section className="panel"><span className="label">{t('p.unitedLabel')}</span>
           <p style={{ margin: 0 }}>{t('p.unitedText', { n: members!.length })}</p>

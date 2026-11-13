@@ -13,6 +13,8 @@ ANON=$(grep ANON_KEY /tmp/e2e-mock.log | cut -d= -f2); SVC=$(grep SERVICE_KEY /t
 cd ..
 export NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON SUPABASE_SERVICE_ROLE_KEY=$SVC CRON_SECRET=e2e NEXT_PUBLIC_SITE_URL=http://localhost:3123
 # UNIER's own emails go to the mock instead of a mail server
+# the AI helpers (team petitions, the AI check) talk to the mock instead of the Claude API
+export ANTHROPIC_API_KEY=e2e ANTHROPIC_BASE_URL=http://localhost:54321/__claude
 export SMTP_HOST=mock SMTP_USER=e2e SMTP_PASS=e2e E2E_MAIL_URL=http://localhost:54321/__mail ALERT_EMAIL=owner@e2e.test
 # Donation settings, so the amount picker, the bank box and fixed-amount links are tested
 export NEXT_PUBLIC_DONATE_URL=https://pay.e2e.test/once NEXT_PUBLIC_DONATE_MONTHLY_URL=https://pay.e2e.test/monthly \

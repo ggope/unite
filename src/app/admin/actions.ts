@@ -155,6 +155,24 @@ export async function toggleSource(f: FormData) {
   await done((await sb.from('news_sources').update({ active: s(f, 'active') === 'true' }).eq('id', s(f, 'id'))).error);
 }
 
+// Team videos (0025): import now, pause a channel, hide a clip or move it to a better petition.
+export async function importClips() {
+  await mod();
+  const { runClipImport } = await import('@/lib/clips/importer');
+  await runClipImport();
+  await done();
+}
+export async function clipAction(op: 'attach' | 'hide' | 'show', f: FormData) {
+  const sb = await mod();
+  const patch = op === 'attach' ? { petition_id: pid(s(f, 'petition_id')) } : { status: op === 'hide' ? 'hidden' : 'live' };
+  if (op === 'attach' && !patch.petition_id) return done({ message: 'Pick a petition first.' });
+  await done((await sb.from('team_videos').update(patch).eq('id', s(f, 'clip'))).error);
+}
+export async function toggleVideoSource(f: FormData) {
+  const sb = await mod();
+  await done((await sb.from('video_sources').update({ active: s(f, 'active') === 'true' }).eq('id', s(f, 'source'))).error);
+}
+
 export async function setHumanCheck(f: FormData) {
   const sb = await mod();
   const on = s(f, 'on') === 'true';
@@ -199,4 +217,48 @@ export async function testAlert() {
   if (!process.env.ALERT_EMAIL || !mailReady()) return done({ message: 'Set ALERT_EMAIL and the SMTP settings in Vercel first.' });
   const r = await sendMail({ to: process.env.ALERT_EMAIL, subject: 'UNIER test alert', text: 'This is a test. Error alerts from UNIER will arrive like this.' });
   await done(r.ok ? null : { message: `Sending failed: ${r.error}` });
+}
+
+// AI check (0024): off, suggest (labels only) or auto (also handles the clearest petitions).
+export async function setAiMode(mode: 'off' | 'suggest' | 'auto') {
+  const sb = await mod();
+  if (!['off', 'suggest', 'auto'].includes(mode)) return;
+  await done((await sb.from('site_settings').update({ ai_moderation: mode }).eq('id', true)).error);
+}
+// AI check: looks at everything still waiting now, instead of waiting for the next new item or the nightly run.
+export async function runAiNow() {
+  await mod();
+  const { aiReady, runAiChecks } = await import('@/lib/ai/moderate');
+  if (!aiReady()) return done({ message: 'Add ANTHROPIC_API_KEY (and SUPABASE_SERVICE_ROLE_KEY) in Vercel first.' });
+  const r = await runAiChecks({ limit: 20, seconds: 50 });
+  await done(r.skipped === 'daily_limit' ? { message: 'The daily AI limit is reached (AI_DAILY_LIMIT).' } : r.skipped === 'off' ? { message: 'The AI check is switched off.' }
+    : r.skipped === 'run_0024' ? { message: 'Run 0024_ai_moderation.sql first.' } : r.errors ? { message: `${r.errors} check(s) failed. See Errors.` } : null);
+}
+
+// UNIER team content (0023): one switch for team petitions and team videos.
+export async function setTeamContent(f: FormData) {
+  const sb = await mod();
+  const level = s(f, 'level');
+  if (!['auto', 'full', 'less', 'off'].includes(level)) return;
+  const { error } = await sb.from('site_settings').update({ team_content: level }).eq('id', true);
+  await done(error && { message: /team_content/.test(error.message) ? 'Run 0023_team_content.sql first (see Launch checklist).' : error.message });
+}
+
+// Starts the daily drafting by hand. Drafts land in the review queue.
+export async function draftNow() {
+  await mod();
+  const { runDrafts } = await import('@/lib/team/draft');
+  const r = await runDrafts({ force: true });
+  const summary = `${r.status}: ${r.drafted} drafted, ${r.duplicates} already covered, ${r.skipped} skipped, ${r.failed} failed`;
+  const u = new URL((await headers()).get('referer') ?? '/admin?tab=team', 'http://x');
+  u.searchParams.delete('err'); u.searchParams.set('ran', summary.slice(0, 160));
+  revalidatePath('/admin'); redirect(u.pathname + u.search);
+}
+
+// A moderator fixes a team draft before approving it.
+export async function editDraft(f: FormData) {
+  const sb = await mod();
+  const row = { title: s(f, 'title'), target: s(f, 'target'), region: s(f, 'region'), ask: s(f, 'ask'), why: s(f, 'why') };
+  const { error } = await sb.from('petitions').update(row).eq('id', s(f, 'id')).eq('origin', 'team').eq('status', 'pending');
+  await done(error && { message: error.message.includes('check') ? 'A field is too short or too long.' : error.message });
 }

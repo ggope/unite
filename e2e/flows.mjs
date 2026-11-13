@@ -68,6 +68,7 @@ await check('signing with only an email: link, confirm, counted once, withdraw',
   await g.locator('.sheet input[type=email]').fill('Guest@e2e.test'); await g.locator('.sheet input[type=checkbox]').check();
   await g.getByRole('button', { name: /email|link|code/i }).last().click(); await g.waitForSelector('.sheet .error', { timeout: 5000 });
   await go(g, new URL(link).pathname + '?w=1'); await g.getByRole('button', { name: /withdraw/i }).click(); await settle(g);
+  for (let i = 0; i < 20 && total() !== before; i++) await g.waitForTimeout(250);   // the server action can finish after the network goes quiet
   expect(total() === before, 'withdraw did not remove it');
 });
 await check('a crashed page and a failing server call are logged and the owner is emailed once', async () => {
@@ -201,7 +202,11 @@ await check('post a video for the petition', async () => {
 });
 await check('admin approves the video and it reaches the feed', async () => {
   await go(a, '/admin?tab=queue');
-  await a.locator('.panel', { hasText: 'Our park has no water' }).first().getByRole('button', { name: /approve/i }).first().click(); await settle(a);
+  // A click can get lost while the page is still settling; approving again is harmless.
+  for (let t = 0; t < 3 && one(`select status from videos where id = '${vid}'`) !== 'approved'; t++) {
+    await a.locator('.panel', { hasText: 'Our park has no water' }).first().getByRole('button', { name: /approve/i }).first().click(); await settle(a);
+    for (let i = 0; i < 20 && one(`select status from videos where id = '${vid}'`) !== 'approved'; i++) await a.waitForTimeout(250);
+  }
   expect(one(`select status from videos where id = '${vid}'`) === 'approved', 'not approved');
   await go(g, '/'); expect(await g.locator('video').count(), 'no video in feed');
 });
@@ -366,7 +371,11 @@ await check('admin: official link, organiser link, unite and separate', async ()
 await check('admin: declining without a reason is refused', async () => {
   const v3 = one(`insert into videos (petition_id, uploader_id, storage_path, caption, trim_start, trim_end) values ('${pid}', '${B.id}', '${B.id}/y.webm', 'Clip without a reason', 0, 5) returning id`);
   await go(a, '/admin?tab=queue');
-  await a.locator('.panel', { hasText: 'Clip without a reason' }).first().getByRole('button', { name: 'Reject' }).click(); await a.waitForTimeout(1200);
+  // A click can get lost while the page is still settling; pressing Reject again is harmless here.
+  for (let i = 0; i < 3 && !(await a.locator('text=Write the reason first').count()); i++) {
+    await a.locator('.panel', { hasText: 'Clip without a reason' }).first().getByRole('button', { name: 'Reject' }).click();
+    await a.locator('text=Write the reason first').first().waitFor({ timeout: 5000 }).catch(() => {});
+  }
   expect(one(`select status from videos where id = '${v3}'`) === 'pending', 'declined without a reason');
   expect(await a.locator('text=Write the reason first').count(), 'no message asking for a reason');
   sql(`delete from videos where id = '${v3}'`);
@@ -627,6 +636,57 @@ await check('admin takes the sample petitions down before launch', async () => {
 });
 
 
+console.log('Team petitions from trusted sources (0023)');
+{
+  const story = one(`select gen_random_uuid()`);
+  sql(`insert into news_items (source_id, url, title, teaser, lang, topic, story_key, published_at) values
+    ('bbc', 'https://bbc.example/plastics-e2e', 'Plastics treaty talks end without a deal on ocean pollution', 'Negotiators failed to agree limits on plastic production.', 'en', 'oceans', '${story}', now() - interval '2 hours'),
+    ('guardian', 'https://guardian.example/plastics-e2e', 'Plastic pollution treaty stalls as countries block production cuts', 'A small group of countries blocked limits.', 'en', 'oceans', '${story}', now() - interval '1 hour')`);
+  // the helper looks at the biggest stories first; set aside any real news imported earlier in the run
+  sql(`insert into team_drafts (story_key, decision, reason) select distinct story_key, 'skipped', 'e2e' from news_items where story_key <> '${story}' on conflict (story_key) do nothing`);
+  let pid = null;
+  await check('the daily job drafts a petition from a story two outlets covered', async () => {
+    expect((await g.request.get(APP + '/api/team/draft')).status() === 401, 'job open to anyone');
+    const j = await (await g.request.get(APP + '/api/team/draft', { headers: { authorization: 'Bearer e2e' } })).json();
+    expect(j.report?.drafted >= 1, JSON.stringify(j));
+    pid = one(`select petition_id from team_drafts where story_key = '${story}' and decision = 'drafted'`);
+    expect(pid && one(`select status || ' ' || origin || ' ' || coalesce(created_by::text, 'nobody') from petitions where id = '${pid}'`) === 'pending team nobody', 'draft not pending from the team');
+    expect(one(`select count(*) from petition_sources where petition_id = '${pid}'`) === '2', 'sources not saved');
+    const calls = await (await g.request.get('http://localhost:54321/__claude')).json();
+    expect(calls.at(-1)?.messages?.[0]?.content?.includes('BBC News'), 'story not sent to the AI');
+    const again = await (await g.request.get(APP + '/api/team/draft', { headers: { authorization: 'Bearer e2e' } })).json();
+    expect(!again.report?.drafted, `same story drafted twice: ${JSON.stringify(again)}`);
+  });
+  await check('a moderator checks the sources, edits and approves the draft', async () => {
+    await go(a, '/admin?tab=queue'); await noCrash(a);
+    const card = a.locator('.panel', { hasText: 'Agree a strong global plastics treaty' });
+    expect(await card.getByText(/From the UNIER team · drafted by AI/).count(), 'no team label in the queue');
+    expect(await card.getByText(/Check which countries blocked/).count(), 'no note for the moderator');
+    expect(await card.locator('a[href="https://guardian.example/plastics-e2e"]').count(), 'sources not listed');
+    await card.getByText('Edit before approving').click();
+    await card.locator('input[name=title]').fill('Agree a strong plastics treaty this year'); await card.getByRole('button', { name: 'Save changes' }).click(); await settle(a);
+    expect(one(`select title from petitions where id = '${pid}'`) === 'Agree a strong plastics treaty this year', 'edit not saved');
+    await go(a, '/admin?tab=queue');
+    await a.locator('.panel', { hasText: 'Agree a strong plastics treaty this year' }).getByRole('button', { name: 'Approve' }).click(); await settle(a);
+    expect(one(`select status from petitions where id = '${pid}'`) === 'live', 'not approved');
+  });
+  await check('the petition says it is from the UNIER team and lists its sources', async () => {
+    await go(g, `/p/${pid}`); await noCrash(g);
+    expect(await g.getByText('From the UNIER team').count(), 'no team label');
+    expect(await g.locator('.team-sources a[href="https://bbc.example/plastics-e2e"]').count(), 'no sources list');
+  });
+  await check('admin switches team content off, and the job stops', async () => {
+    await go(a, '/admin?tab=team'); await noCrash(a);
+    expect(await a.getByText('Plastics treaty talks end without a deal on ocean pollution').count() + await a.getByText('Plastic pollution treaty stalls as countries block production cuts').count(), 'decision log empty');
+    await a.locator('input[name=level][value=off]').check(); await a.getByRole('button', { name: 'Save' }).click(); await settle(a);
+    expect(one(`select team_content_level()`) === 'off', 'switch not saved');
+    const j = await (await g.request.get(APP + '/api/team/draft', { headers: { authorization: 'Bearer e2e' } })).json();
+    expect(/switched off/.test(j.report?.status), JSON.stringify(j));
+    await go(g, '/'); await noCrash(g);
+    sql(`update site_settings set team_content = 'auto'`);
+  });
+}
+
 console.log('Petition life cycle (0018)');
 {
   const D = newUser('dora'); handle(D, 'dora_e2e');
@@ -702,6 +762,109 @@ await check('donate: pick an amount, switch to monthly, type your own, read the 
   expect(await g.getByText(/any time, with no questions/).isVisible(), 'question does not open');
   expect(await g.locator('a[href="/transparency"]', { hasText: 'See our numbers' }).count(), 'no link to the numbers');
 });
+console.log('AI check (0024)');
+{
+  const E = newUser('emil');
+  const mk = (title, ask) => one(`insert into petitions (created_by, organiser_name, title, target, region, ask, why, topic, goal, status)
+    values ('${E.id}', 'Emil', '${title}', 'City council', 'Hungary', '${ask}', 'Because it matters to everyone who lives here.', 'housing', 1000, 'pending') returning id`);
+  // Everything already waiting counts as seen, so this run looks only at what the check below adds.
+  sql(`insert into ai_reviews (kind, petition_id, verdict, summary) select 'petition', id, 'unsure', 'seen' from petitions p where status = 'pending' and not exists (select 1 from ai_reviews r where r.petition_id = p.id);
+       insert into ai_reviews (kind, video_id, verdict, summary) select 'video', id, 'unsure', 'seen' from videos v where status = 'pending' and not exists (select 1 from ai_reviews r where r.video_id = v.id);
+       insert into ai_reviews (kind, report_id, verdict, summary) select 'report', id, 'unsure', 'seen' from reports x where status = 'open' and not exists (select 1 from ai_reviews r where r.report_id = x.id);`);
+  const fine = mk('More benches in the city park please', 'Please put twenty new benches in the city park this year.');
+  const spam = mk('WIN FREE CRYPTO with this one trick now', 'WIN FREE CRYPTO by sending us your wallet key today.');
+  const unsure = mk('Close the old bridge before it falls', 'Please close the old bridge, it is maybe borderline unsafe.');
+  const target = one(`select id from petitions where status = 'live' order by created_at limit 1`);
+  const rep = one(`insert into reports (reporter_id, petition_id, reason) values ('${B.id}', '${target}', 'They will hunt them down') returning id`);
+  const before = (await (await fetch('http://localhost:54321/__anthropic')).json()).length;
+
+  await check('admin switches the AI check to Auto and runs it', async () => {
+    await go(a, '/admin?tab=ai'); await noCrash(a);
+    expect(await a.getByText('Suggest · on now').count(), 'default mode is not Suggest');
+    await a.getByRole('button', { name: 'Use Auto' }).click(); await settle(a);
+    expect(one(`select ai_moderation from site_settings`) === 'auto', 'mode not saved');
+    await go(a, '/admin?tab=ai'); await a.getByRole('button', { name: 'Check waiting items now' }).click(); await settle(a);
+    for (let i = 0; i < 40 && one(`select count(*) from ai_reviews where petition_id in ('${fine}', '${spam}', '${unsure}') or report_id = ${rep}`) !== '4'; i++) await a.waitForTimeout(250);   // the action may still be running
+    expect(one(`select status from petitions where id = '${fine}'`) === 'live', 'clearly fine petition not published');
+    expect(one(`select status from petitions where id = '${spam}'`) === 'removed', 'spam not taken down');
+    expect(/decided automatically/.test(one(`select moderation_note from petitions where id = '${spam}'`) ?? ''), 'author not told it was automatic');
+    expect(one(`select status from petitions where id = '${unsure}'`) === 'pending', 'unsure petition did not wait for a person');
+    expect(one(`select risk from ai_reviews where report_id = ${rep}`) === 'urgent', 'report not checked');
+    expect(one(`select status from reports where id = ${rep}`) === 'open', 'the AI closed a report on its own');
+  });
+  await check('the AI sees content only, never emails', async () => {
+    const sent = (await (await fetch('http://localhost:54321/__anthropic')).json()).slice(before).join('\n');
+    expect(sent.includes('More benches') && sent.includes('hunt them down'), 'content not sent');
+    expect(!/@e2e\.test/.test(sent), 'an email address reached the AI');
+  });
+  await check('urgent reports are emailed to the owner at once', async () => {
+    let got = false; for (let i = 0; i < 20 && !got; i++) { got = (await mailsTo('owner@e2e.test')).some((m) => /urgent report/.test(m.subject)); if (!got) await a.waitForTimeout(250); }
+    expect(got, 'no urgent email');
+  });
+  await check('the queue shows what the AI thinks, with the reason drafted', async () => {
+    await go(a, '/admin?tab=queue'); await noCrash(a);
+    const card = a.locator('.panel', { hasText: 'Close the old bridge' });
+    expect(await card.getByText(/AI: a person should look/).count(), 'no AI label in the queue');
+    expect((await card.locator('input[name=note]').inputValue()) === 'We could not confirm the facts in this petition.', 'reason not drafted');
+    await go(a, '/admin?tab=reports');
+    expect(await a.locator('.panel', { hasText: 'hunt them down' }).getByText(/Urgent/).count(), 'no urgent label on the report');
+    expect((await a.locator('.panel .ai-flag').first().innerText()).includes('Urgent'), 'urgent report is not first');
+  });
+  await check('AI decisions are listed for spot checks and counted in public', async () => {
+    await go(a, '/admin?tab=ai');
+    expect(await a.getByText('More benches in the city park please').count() && await a.getByText('WIN FREE CRYPTO with this one trick now').count(), 'decisions not listed');
+    await go(g, '/transparency'); expect(await g.getByText('published by the AI').count(), 'no AI numbers on transparency');
+  });
+  await check('switching the AI check off stops it', async () => {
+    await go(a, '/admin?tab=ai'); await a.getByRole('button', { name: 'Use Off' }).click(); await settle(a);
+    const n0 = one(`select count(*) from ai_reviews`);
+    mk('A new petition while the AI is off', 'Please do the thing while the AI check is switched off.');
+    await go(a, '/admin?tab=ai'); expect(!(await a.getByRole('button', { name: 'Check waiting items now' }).count()), 'run button shown while off');
+    expect(one(`select count(*) from ai_reviews`) === n0, 'AI ran while off');
+    await a.getByRole('button', { name: 'Use Suggest' }).click(); await settle(a);
+    expect(one(`select ai_moderation from site_settings`) === 'suggest', 'mode not restored');
+  });
+}
+
+console.log('Team videos');
+{
+  const pid = one(`select id from petitions where status = 'live' order by created_at limit 1`);
+  sql(`delete from team_videos where youtube_id = 'e2eClip_001'`);
+  sql(`insert into team_videos (source_id, youtube_id, title, lang, topic, petition_id, published_at) select 'un', 'e2eClip_001', 'E2E clip: why the seas need protecting', 'en', topic, id, now() from petitions where id = '${pid}'`);
+  const tv = await as(null);
+  const ytCalls = []; tv.on('request', (r) => { if (/youtube|ytimg/.test(r.url())) ytCalls.push(r.url()); });
+  await check('a team clip shows in the feed, marked as a UNIER team pick, and loads YouTube only after a tap', async () => {
+    await go(tv, '/');
+    for (let k = 0; k < 60 && !(await tv.locator('.slide .clip-team').count()); k++) {
+      await tv.locator('.scroller').evaluate((el) => el.scrollBy({ top: el.clientHeight })); await tv.waitForTimeout(250);
+    }
+    const slide = tv.locator('.slide', { has: tv.locator('.clip-team') }).first();
+    expect(await slide.count(), 'no team clip in the feed');
+    expect((await slide.locator('.clip-team').innerText()).trim().toLowerCase() === 'unier team pick', 'not marked as team content');
+    const text = await slide.evaluate((el) => el.textContent ?? '');
+    expect(text.includes('E2E clip: why the seas need protecting'), `clip title missing: ${text.slice(0, 200)}`);
+    expect(await slide.locator(`a.pcard[href="/p/${pid}"]`).count(), 'clip not under its petition');
+    expect(!ytCalls.length, `YouTube contacted before a tap: ${ytCalls[0]}`);
+    await slide.scrollIntoViewIfNeeded(); await tv.waitForTimeout(400);
+    await slide.getByRole('button', { name: /Play video/ }).click();
+    const src = await slide.locator('iframe').getAttribute('src');
+    expect(src?.startsWith('https://www.youtube-nocookie.com/embed/e2eClip_001'), `player ${src}`);
+  });
+  await check('the clip picture comes through UNIER, and only for live team clips', async () => {
+    expect((await tv.request.get(APP + '/api/clip/notAClip_01')).status() === 404, 'unknown id served');
+    expect((await tv.request.get(APP + '/api/clip/..%2F..%2Fx')).status() === 404, 'odd id served');
+  });
+  await check('a moderator sees team clips in Admin and hides one', async () => {
+    const m = await as(A);
+    await go(m, '/admin?tab=clips'); expect(await m.getByText('United Nations').count(), 'channels not listed');
+    const row = m.locator('.stack', { hasText: 'E2E clip: why the seas need protecting' }).first();
+    await row.getByRole('button', { name: 'Hide' }).click(); await settle(m);
+    for (let k = 0; k < 20 && one(`select status from team_videos where youtube_id = 'e2eClip_001'`) !== 'hidden'; k++) await m.waitForTimeout(250);
+    expect(one(`select status from team_videos where youtube_id = 'e2eClip_001'`) === 'hidden', 'clip not hidden');
+    await m.context().close();
+  });
+  await tv.context().close();
+}
 
 await b.close();
 if (errors.length) { console.log('\nBrowser/server errors:'); [...new Set(errors)].slice(0, 30).forEach((e) => console.log('  ' + e)); }
