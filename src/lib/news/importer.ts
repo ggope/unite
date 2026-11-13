@@ -50,5 +50,8 @@ export async function runImport() {
   // and anything a phone notification missed goes out now (0014_notify.sql)
   try { const p = await sendPending(50); report.push({ source: 'notifications', status: JSON.stringify(p), added: 0 }); }
   catch (e: any) { report.push({ source: 'notifications', status: `error: ${e?.message ?? e}`, added: 0 }); }
+  // and new clips from trusted channels for the feed (0025_team_videos.sql)
+  try { const { runClipImport } = await import('../clips/importer'); report.push(...await runClipImport()); }
+  catch (e: any) { report.push({ source: 'team videos', status: `error: ${e?.message ?? e}`, added: 0 }); }
   return report;
 }

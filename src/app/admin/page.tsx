@@ -2,11 +2,11 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN, LANGS, type Lang } from '@/lib/i18n/dict';
-import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, removeSamples, decideAppeal, runLifecycle, resolveError, testAlert } from './actions';
+import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, importClips, clipAction, toggleVideoSource, removeSamples, decideAppeal, runLifecycle, resolveError, testAlert } from './actions';
 import { legalPlaceholders } from '@/lib/legal';
 
 export const dynamic = 'force-dynamic';
-const TABS = [['overview', 'Overview'], ['launch', 'Launch checklist'], ['queue', 'Review queue'], ['reports', 'Reports'], ['appeals', 'Appeals'], ['petitions', 'Petitions'], ['news', 'News'], ['people', 'People'], ['errors', 'Errors']] as const;
+const TABS = [['overview', 'Overview'], ['launch', 'Launch checklist'], ['queue', 'Review queue'], ['reports', 'Reports'], ['appeals', 'Appeals'], ['petitions', 'Petitions'], ['news', 'News'], ['clips', 'Team videos'], ['people', 'People'], ['errors', 'Errors']] as const;
 type Tab = (typeof TABS)[number][0];
 const when = (d: string) => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const n = (x: number) => fmtN(x, 'en');
@@ -41,6 +41,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       {tab === 'appeals' && <Appeals sb={sb} me={user.id} />}
       {tab === 'petitions' && <Petitions sb={sb} q={q} open={open} />}
       {tab === 'news' && <News sb={sb} />}
+      {tab === 'clips' && <Clips sb={sb} />}
       {tab === 'people' && <People sb={sb} q={q} me={user.id} />}
       {tab === 'errors' && <Errors sb={sb} />}
     </div>
@@ -92,9 +93,9 @@ const MIGRATIONS: [string, string, string][] = [
   ['0002', 'invites', 'user_id'], ['0003', 'news_items', 'id'], ['0004', 'reports', 'resolved_at'], ['0005', 'petitions', 'official_url'],
   ['0006', 'profiles', 'bio'], ['0007', 'petitions', 'link_url'], ['0012', 'petitions', 'tr'], ['0014', 'notices', 'id'],
   ['0015', 'share_codes', 'code'], ['0016', 'answer_links', 'petition_id'], ['0017', 'signatures', 'reason_key'],
-  ['0018', 'appeals', 'id'], ['0021', 'error_events', 'fingerprint'],
+  ['0018', 'appeals', 'id'], ['0021', 'error_events', 'fingerprint'], ['0025', 'team_videos', 'id'],
 ];
-const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0021': '0021_email_sign' };
+const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0021': '0021_email_sign', '0025': '0025_team_videos' };
 const missing = (e: any) => !!e && /does not exist|PGRST20[45]|42703|42P01|schema cache/i.test(`${e.code} ${e.message}`);
 
 async function Launch({ sb }: { sb: any }) {
@@ -294,6 +295,41 @@ async function News({ sb }: { sb: any }) {
             <input name="petition_id" list="live-petitions" defaultValue={x.petition_id ?? ''} placeholder="Attach a petition (type a title)" style={{ flex: 1, minWidth: 0 }} />
             <button className="btn small">Attach</button>
             {x.status !== 'hidden' && <button className="btn small danger" formAction={newsAction.bind(null, 'hide')}>Hide</button>}</form>
+        </div>))}
+    </div>
+  </>);
+}
+
+// Team videos: clips from trusted channels that fill the feed until people post their own.
+async function Clips({ sb }: { sb: any }) {
+  const [{ data: sources, error }, { data: clips }, { data: live }, { data: level }] = await Promise.all([
+    sb.from('video_sources').select('*').order('name'),
+    sb.from('team_videos').select('id, youtube_id, title, topic, status, published_at, petition_id, video_sources(name), petitions(title)').order('published_at', { ascending: false }).limit(60),
+    sb.from('petitions').select('id, title').eq('status', 'live').order('title').limit(500),
+    sb.rpc('team_content_level'),
+  ]);
+  if (missing(error)) return <p className="hint">Team videos arrive here once the database update 0025_team_videos.sql has run (see Launch checklist).</p>;
+  return (<>
+    <LiveList items={live} />
+    <p className="hint">Short clips from trusted channels, each shown in the feed under the petition it fits, marked “UNIER team pick”. Only the link is stored; the clip plays in YouTube’s own player after a tap.
+      {' '}How many show follows the team content switch{level ? <> (now: <b>{level}</b>)</> : ''}: <i>less</i> shows a few and ranks them below people’s videos, <i>off</i> hides them.</p>
+    <form action={importClips} className="row"><button className="btn primary">Fetch new clips now</button><span className="hint">Also runs on its own every morning, with the news.</span></form>
+    <div className="panel" style={{ gap: 6 }}><b>Channels</b>
+      {sources?.map((x: any) => <form key={x.id} action={toggleVideoSource} className="row between"><input type="hidden" name="id" value={x.id} /><input type="hidden" name="active" value={String(!x.active)} />
+        <span style={{ flex: 1, minWidth: 0 }}>{x.active ? '' : '⏸ '}{x.name} <span className="hint">({x.lang}) · {x.last_fetched_at ? `${when(x.last_fetched_at)} · ${x.last_status} · +${x.last_count}` : 'never fetched'}</span></span>
+        <button className="btn ghost small">{x.active ? 'Pause' : 'Resume'}</button></form>)}
+    </div>
+    <div className="panel" style={{ gap: 12 }}><b>Clips ({clips?.length ?? 0})</b>
+      {!clips?.length && <span className="hint">None yet. Press “Fetch new clips now”.</span>}
+      {clips?.map((x: any) => (
+        <div key={x.id} className="stack" style={{ gap: 4, opacity: x.status === 'hidden' ? 0.45 : 1 }}>
+          <a href={`https://www.youtube.com/watch?v=${x.youtube_id}`} target="_blank" rel="noopener nofollow"><b>{x.title}</b></a>
+          <span className="hint">{x.video_sources?.name} · {x.topic} · {when(x.published_at)} · under “{x.petitions?.title ?? '?'}”{x.status === 'hidden' ? ' · hidden' : ''}</span>
+          <form action={clipAction.bind(null, 'attach')} className="row"><input type="hidden" name="id" value={x.id} />
+            <input name="petition_id" list="live-petitions" defaultValue={x.petition_id ?? ''} placeholder="Move to a petition (type a title)" aria-label="Petition for this clip" style={{ flex: 1, minWidth: 0 }} />
+            <button className="btn small">Move</button>
+            {x.status === 'hidden' ? <button className="btn small" formAction={clipAction.bind(null, 'show')}>Show again</button>
+              : <button className="btn small danger" formAction={clipAction.bind(null, 'hide')}>Hide</button>}</form>
         </div>))}
     </div>
   </>);
