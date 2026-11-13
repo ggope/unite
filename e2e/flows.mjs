@@ -897,16 +897,18 @@ console.log('AI check (0024)');
 console.log('Team videos');
 {
   const pid = one(`select id from petitions where status = 'live' order by created_at limit 1`);
-  sql(`delete from team_videos where youtube_id = 'e2eClip_001'`);
+  // the morning import earlier in this run may have fetched real clips (CI has internet); keep only ours
+  sql(`delete from team_videos`);
   sql(`insert into team_videos (source_id, youtube_id, title, lang, topic, petition_id, published_at) select 'un', 'e2eClip_001', 'E2E clip: why the seas need protecting', 'en', topic, id, now() from petitions where id = '${pid}'`);
   const tv = await as(null);
   const ytCalls = []; tv.on('request', (r) => { if (/youtube|ytimg/.test(r.url())) ytCalls.push(r.url()); });
   await check('a team clip shows in the feed, marked as a UNIER team pick, and loads YouTube only after a tap', async () => {
     await go(tv, '/');
-    for (let k = 0; k < 60 && !(await tv.locator('.slide .clip-team').count()); k++) {
+    const ours = tv.locator('.slide', { has: tv.locator('.clip-team') }).filter({ hasText: 'E2E clip: why the seas need protecting' });
+    for (let k = 0; k < 60 && !(await ours.count()); k++) {
       await tv.locator('.scroller').evaluate((el) => el.scrollBy({ top: el.clientHeight })); await tv.waitForTimeout(250);
     }
-    const slide = tv.locator('.slide', { has: tv.locator('.clip-team') }).first();
+    const slide = ours.first();
     expect(await slide.count(), 'no team clip in the feed');
     expect((await slide.locator('.clip-team').innerText()).trim().toLowerCase() === 'unier team pick', 'not marked as team content');
     const text = await slide.evaluate((el) => el.textContent ?? '');
@@ -925,7 +927,7 @@ console.log('Team videos');
   await check('a moderator sees team clips in Admin and hides one', async () => {
     const m = await as(A);
     await go(m, '/admin?tab=clips'); expect(await m.getByText('United Nations').count(), 'channels not listed');
-    const row = m.locator('.stack', { hasText: 'E2E clip: why the seas need protecting' }).first();
+    const row = m.locator('.clip-row', { hasText: 'E2E clip: why the seas need protecting' });
     await row.getByRole('button', { name: 'Hide' }).click(); await settle(m);
     for (let k = 0; k < 20 && one(`select status from team_videos where youtube_id = 'e2eClip_001'`) !== 'hidden'; k++) await m.waitForTimeout(250);
     expect(one(`select status from team_videos where youtube_id = 'e2eClip_001'`) === 'hidden', 'clip not hidden');
