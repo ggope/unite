@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { localize } from '@/lib/petitionText';
+import { after } from 'next/server';
+import { translateIds, untranslatedIds } from '@/lib/ai/translate';
 import { loadViewer } from '@/lib/viewer';
 import { TOPICS, TOPIC_KEYS } from '@/lib/topics';
 import { getT } from '@/lib/i18n/server';
@@ -36,6 +38,8 @@ export default async function Petitions({ searchParams }: { searchParams: Promis
   if (words.length) query = query.textSearch('search', words.map((w) => `${w}:*`).join(' & '), { config: 'simple' });
   if (topic && topic in TOPICS) query = query.eq('topic', topic);
   const { data } = await query.order('created_at', { ascending: false });
+  const toTranslate = untranslatedIds(data ?? [], lang);   // automatic translations (0026), done after the page is sent
+  if (toTranslate.length) after(() => translateIds(toTranslate));
   // one row per united group
   const seen = new Set<string>();
   let rows = (data ?? []).map((p: any) => localize(p, lang)).filter((p: any) => !p.cluster_id || (!seen.has(p.cluster_id) && seen.add(p.cluster_id)));

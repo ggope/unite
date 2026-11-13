@@ -13,7 +13,10 @@ import { ReportButton } from '@/components/ReportButton';
 import { ShareButton } from '@/components/ShareButton';
 import { LinkBar } from '@/components/LinkBar';
 import { AnswerLink } from '@/components/AnswerLink';
-import { localize } from '@/lib/petitionText';
+import { localize, isMachine } from '@/lib/petitionText';
+import { after } from 'next/server';
+import { needsTranslation, translatePetition } from '@/lib/ai/translate';
+import { LANGS, type Lang } from '@/lib/i18n/langs';
 import { easyOf } from '@/lib/easy';
 import { MyloArt } from '@/components/mylo/MyloArt';
 import { headers } from 'next/headers';
@@ -35,13 +38,17 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: `${p.title} · UNIER`, description, openGraph: { title: p.title, description, type: 'article', siteName: 'UNIER' }, twitter: { card: 'summary_large_image', title: p.title, description } };
 }
 
-export default async function Petition({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function Petition({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ orig?: string }> }) {
+  const [{ id }, { orig }] = await Promise.all([params, searchParams]);
   const [{ sb, user, viewer, signed, followed }, { lang, t }] = await Promise.all([loadViewer(), getT()]);
   const fmt = (n: number) => fmtN(n, lang);
   const { data: raw } = await sb.from('petitions').select('*').eq('id', id).maybeSingle();
   if (!raw) notFound();
-  const p = localize(raw, lang);
+  // automatic translations (0026): label them, and let the reader switch to the original
+  const machine = isMachine(raw, lang); const showOrig = machine && orig === '1';
+  const p = showOrig ? raw : localize(raw, lang);
+  const textLang = showOrig || (raw.lang !== lang && p.title === raw.title) ? (raw.lang ?? 'en') : lang;   // for screen readers
+  if (needsTranslation(raw)) after(() => translatePetition(raw).then(() => undefined, () => undefined));
   const easy = easyOf(raw, lang);   // the easy-read version for kids (0019)
   const [{ data: st }, { data: members }, { data: updates }, { data: videos }, friends, { data: me }, { data: news }, { data: reasons }] = await Promise.all([
     sb.from('petition_stats').select('*').eq('id', id).maybeSingle(),
@@ -71,7 +78,9 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
       {p.status === 'pending' && <p className="note">{t('p.pending')}</p>}
       {p.status === 'removed' && <p className="note">{t('p.removed')}{p.moderation_note ? ` ${t('mod.reason', { r: p.moderation_note })}` : ''}{isFounder && <> <Link href={`/appeal?kind=petition&id=${p.id}`}>{t('appeal.ask')}</Link></>}</p>}
       <span className="hint">{t(`topic.${p.topic as keyof typeof TOPICS}`)} · {t('p.startedBy', { name: p.organiser_name })} · {p.region}</span>
-      <h1>{p.title}</h1>
+      <h1 lang={textLang}>{p.title}</h1>
+      {machine && <p className="mt-note hint" lang={lang}><span>{showOrig ? t('tr.original', { lang: LANGS[(raw.lang ?? 'en') as Lang] ?? raw.lang }) : t('tr.machine', { lang: LANGS[(raw.lang ?? 'en') as Lang] ?? raw.lang })}</span>
+        <Link href={showOrig ? `/p/${p.id}` : `/p/${p.id}?orig=1`} replace scroll={false}>{showOrig ? t('tr.showTranslation') : t('tr.showOriginal')}</Link></p>}
       {p.origin === 'team' && <span className="team-tag">{t('team.by')}</span>}
       <p className="muted" style={{ margin: 0 }}>{t('p.to', { target: p.target })}</p>
       {easy && (
@@ -120,7 +129,7 @@ export default async function Petition({ params }: { params: Promise<{ id: strin
         <section className="panel official"><b>{t('off.title')}</b><p className="muted" style={{ margin: 0 }}>{t('off.text')}</p>
           <a className="btn small" href={p.official_url} target="_blank" rel="noopener nofollow">{t('off.go')} ↗</a></section>
       )}
-      <section className="stack" style={{ gap: 8 }}><h2>{t('p.asks')}</h2><p style={{ margin: 0 }}>{p.ask}</p><h2>{t('p.whyMatters')}</h2><p style={{ margin: 0 }}>{p.why}</p>
+      <section className="stack" style={{ gap: 8 }}><h2>{t('p.asks')}</h2><p style={{ margin: 0 }} lang={textLang}>{p.ask}</p><h2>{t('p.whyMatters')}</h2><p style={{ margin: 0 }} lang={textLang}>{p.why}</p>
         {sources?.length ? <><h2>{t('team.sources')}</h2><p className="hint" style={{ margin: 0 }}>{t('team.about')}</p>
           <ul className="team-sources">{sources.map((s: any) => <li key={s.url}><a href={s.url} target="_blank" rel="noopener nofollow">{s.title || s.outlet}</a> <span className="hint">· {s.outlet}{s.published_at ? ` · ${date(s.published_at)}` : ''}</span></li>)}</ul></>
           : p.source_url && <a href={p.source_url} target="_blank" rel="noopener nofollow">{t('p.source')}</a>}</section>
