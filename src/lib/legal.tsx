@@ -32,7 +32,7 @@ const privacyEn: Doc = { title: 'Privacy policy', updated: 'Last updated: 13 Nov
     <li><b>Login cookie</b> (<code>sb-…-auth-token</code>): keeps you signed in, until you sign out.</li>
     <li><b>lang</b>: the language you chose, for 1 year.</li>
     <li><b>geo</b>: the approximate country of your connection, for 24 hours. Used only to add your signature to the per-country totals.</li>
-    <li><b>Browser storage</b>, which stays on your device: what the feed learned if you are not signed in (<code>unite-weights</code>), a signature you started before signing in, until it is done (<code>unier-pending-sign</code>), and that you closed a tip or Mylo already said hello today (<code>unier-install-dismissed</code>, <code>mylo-greeted</code>, <code>mylo-run-best</code>).</li>
+    <li><b>Browser storage</b>, which stays on your device: what the feed learned if you are not signed in (<code>unite-weights</code>), a signature you started before signing in, until it is done (<code>unier-pending-sign</code>), and that you closed a tip or Mylo already said hello today (<code>unier-install-dismissed</code>, <code>mylo-greeted</code>, <code>mylo-run</code>).</li>
   </ul>
   <h2>Who handles data for us</h2>
   <ul>
@@ -89,7 +89,7 @@ const privacyHu: Doc = { title: 'Adatvédelmi tájékoztató', updated: 'Utolsó
     <li><b>Bejelentkezési süti</b> (<code>sb-…-auth-token</code>): bejelentkezve tart, amíg ki nem lépsz.</li>
     <li><b>lang</b>: a választott nyelv, 1 évig.</li>
     <li><b>geo</b>: az internetkapcsolatod hozzávetőleges országa, 24 óráig. Csak arra használjuk, hogy az aláírásod az országonkénti összesítésbe kerüljön.</li>
-    <li><b>Böngészőtárhely</b>, ami a saját eszközödön marad: amit a hírfolyam tanult, ha nem vagy bejelentkezve (<code>unite-weights</code>), egy bejelentkezés előtt elkezdett aláírás, amíg el nem készül (<code>unier-pending-sign</code>), valamint hogy bezártál egy tippet, vagy Mylo ma már köszönt (<code>unier-install-dismissed</code>, <code>mylo-greeted</code>, <code>mylo-run-best</code>).</li>
+    <li><b>Böngészőtárhely</b>, ami a saját eszközödön marad: amit a hírfolyam tanult, ha nem vagy bejelentkezve (<code>unite-weights</code>), egy bejelentkezés előtt elkezdett aláírás, amíg el nem készül (<code>unier-pending-sign</code>), valamint hogy bezártál egy tippet, vagy Mylo ma már köszönt (<code>unier-install-dismissed</code>, <code>mylo-greeted</code>, <code>mylo-run</code>).</li>
   </ul>
   <h2>Kik kezelnek adatot a megbízásunkból</h2>
   <ul>

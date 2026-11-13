@@ -957,10 +957,28 @@ for (const [label, opts] of [['desktop', { viewport: { width: 1280, height: 900 
     await p.getByRole('button', { name: 'Keep going' }).click();
     // no jumping: a thorn ends the round soon
     await p.getByRole('button', { name: 'Play again' }).waitFor({ timeout: 20000 });
-    const best = Number(await p.evaluate(() => localStorage.getItem('mylo-run-best')));
+    const best = Number(await p.evaluate(() => JSON.parse(localStorage.getItem('mylo-run') || '{}').best));
     expect(best > 0, `best not saved: ${best}`);
     expect(await p.getByRole('link', { name: /Sign one for real/ }).count(), 'no nudge to sign');
     expect((await p.locator('.mrun-live').textContent())?.includes('Game over'), 'result not announced');
+    // missions, level and outfits are shown; the hearts caught go to the bank
+    expect(await p.locator('.mrun-missions li').count() === 3, 'three missions expected');
+    expect(await p.getByText('Level 1').count(), 'no level');
+    expect(await p.locator('.mrun-outfit').count() === 7, 'outfits missing');
+    if (label === 'desktop') {
+      // give enough hearts for a cap, wear it, and play today's challenge once for the streak
+      await p.evaluate(() => { const s = JSON.parse(localStorage.getItem('mylo-run') || '{}'); s.bank = 50; localStorage.setItem('mylo-run', JSON.stringify(s)); });
+      await go(p, '/mylo/play');
+      await p.getByRole('button', { name: /^Cap ♥/ }).click();
+      expect(JSON.parse(await p.evaluate(() => localStorage.getItem('mylo-run') || '{}')).outfit === 'cap', 'cap not worn');
+      await p.getByRole('button', { name: /Today's challenge/ }).click();
+      await p.getByRole('button', { name: 'Start' }).click();
+      await p.keyboard.down('ArrowDown'); await p.waitForTimeout(300); await p.keyboard.up('ArrowDown');
+      await p.getByRole('button', { name: 'Play again' }).waitFor({ timeout: 25000 });
+      const st = JSON.parse(await p.evaluate(() => localStorage.getItem('mylo-run') || '{}'));
+      expect(st.streak?.n === 1 && st.daily?.played, `streak not started ${JSON.stringify(st.streak)}`);
+      expect(await p.getByText('1-day streak').count(), 'streak not shown');
+    }
     await ctx.close();
   });
 }

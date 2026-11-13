@@ -40,6 +40,7 @@ export default async function PlayPage() {
           <li>{t('game.how2')}</li>
           <li>{t('game.how3')}</li>
           <li>{t('game.how4')}</li>
+          <li>{t('game.how5')}</li>
         </ul>
         <p className="hint" style={{ margin: 0 }}>{t('game.private')}</p>
       </section>
