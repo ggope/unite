@@ -93,7 +93,8 @@ function spawnRow(g: Game, emit: (e: GameEvent) => void) {
   let free: number[] = [];
   if (lvl === 0 || r < 0.4) {
     // one thing in one lane
-    const lane = lanes[Math.floor(f() * 3)];
+    // often right in front of Mylo, so standing still is never safe for long
+    const lane = f() < 0.5 ? g.lane : lanes[Math.floor(f() * 3)];
     const k: Ob = lvl === 0 ? (f() < 0.55 ? 'low' : 'block') : pickOb(g, f);
     put(lane, k); free = lanes.filter((l) => l !== lane);
   } else if (r < 0.8) {
