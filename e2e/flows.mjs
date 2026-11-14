@@ -204,7 +204,8 @@ await check('admin approves the petition', async () => {
   expect(await until(() => one(`select status from petitions where id = '${pid}'`) === 'live'), 'not live');
   // the organiser hears it: a note under You and an email (0022)
   expect(one(`select count(*) from notices where user_id = '${A.id}' and kind = 'petition_live' and petition_id = '${pid}'`) === '1', 'no note for the organiser');
-  const told = (await mailsTo(A.email)).filter((m) => m.text.includes('Free drinking fountains') && m.text.includes(`/p/${pid}`));
+  let told = [];   // the email goes out just after the status changes
+  for (let i = 0; i < 40 && told.length === 0; i++) { told = (await mailsTo(A.email)).filter((m) => m.text.includes('Free drinking fountains') && m.text.includes(`/p/${pid}`)); if (!told.length) await a.waitForTimeout(200); }
   expect(told.length === 1, `organiser emails: ${told.length}`);
   await go(a, '/you'); expect(await a.getByText(/is live\. Share it/).count(), 'the note is not shown under You');
 });
@@ -321,7 +322,7 @@ for (const tab of ['overview', 'queue', 'reports', 'petitions', 'news', 'people'
 await check('admin resolves the report', async () => {
   await go(a, '/admin?tab=reports');
   await a.getByRole('button', { name: /resolve|dismiss|keep/i }).first().click(); await settle(a);
-  expect(one(`select count(*) from reports where status = 'open'`) === '0', 'report still open');
+  expect(await until(() => one(`select count(*) from reports where status = 'open'`) === '0'), 'report still open');   // the server action can finish after the page settles
 });
 await check('news import runs with the cron secret', async () => {
   const r = await g.request.get(APP + '/api/news/import', { headers: { authorization: 'Bearer e2e' } });
