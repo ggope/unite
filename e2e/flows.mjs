@@ -59,7 +59,7 @@ await check('guest sign asks for email and sends a code', async () => {
   await go(g, `/p/${seedId}`);
   await g.getByRole('button', { name: /^Sign/ }).first().click();
   await g.locator('.sheet input[type=email]').fill('guest@e2e.test');
-  await g.locator('.sheet input[type=checkbox]').check();
+  await g.locator('.sheet input[type=checkbox]').first().check();
   await g.getByRole('button', { name: /email|link|code/i }).last().click();
   await g.waitForSelector('.sheet .ok', { timeout: 5000 });
 });
@@ -77,11 +77,51 @@ await check('signing with only an email: link, confirm, counted once, withdraw',
   await go(g, new URL(link).pathname); await g.getByRole('button', { name: /confirm/i }).count().then((n) => expect(n === 0, 'confirm shown twice'));
   // signing again with the same email says it already counts
   await go(g, `/p/${seedId}`); await g.getByRole('button', { name: /^Sign/ }).first().click();
-  await g.locator('.sheet input[type=email]').fill('Guest@e2e.test'); await g.locator('.sheet input[type=checkbox]').check();
+  await g.locator('.sheet input[type=email]').fill('Guest@e2e.test'); await g.locator('.sheet input[type=checkbox]').first().check();
   await g.getByRole('button', { name: /email|link|code/i }).last().click(); await g.waitForSelector('.sheet .error', { timeout: 5000 });
   await go(g, new URL(link).pathname + '?w=1'); await g.getByRole('button', { name: /withdraw/i }).click(); await settle(g);
   for (let i = 0; i < 20 && total() !== before; i++) await g.waitForTimeout(250);   // the server action can finish after the network goes quiet
   expect(total() === before, 'withdraw did not remove it');
+});
+await check('email signers can opt in to updates: encrypted, emailed on news, one click stops it (phone width)', async () => {
+  const pctx = await b.newContext({ viewport: { width: 375, height: 740 }, isMobile: true, hasTouch: true });
+  await pctx.addInitScript(() => { try { localStorage.setItem('mylo-intro', '1'); } catch {} });
+  const ph = await pctx.newPage();
+  await go(ph, `/p/${seedId}`); await ph.getByRole('button', { name: /^Sign/ }).first().click();
+  await ph.locator('.sheet input[type=email]').fill('news@e2e.test');
+  await ph.locator('.sheet input[type=checkbox]').first().check();
+  const box = ph.locator('.sheet input[name=notify]'); expect(!(await box.isChecked()), 'updates ticked by default');
+  await box.check();
+  if (process.env.SHOTS) await ph.locator('.sheet').screenshot({ path: `${process.env.SHOTS}/sign-sheet-phone.png` });
+  const sheetW = await ph.locator('.sheet').evaluate((el) => el.scrollWidth <= el.clientWidth + 1);
+  expect(sheetW, 'sign sheet scrolls sideways on a phone');
+  await ph.getByRole('button', { name: /email|link|code/i }).last().click(); await ph.waitForSelector('.sheet .ok', { timeout: 5000 });
+  const first = (await mailsTo('news@e2e.test'))[0]; expect(first && /news about this petition/i.test(first.text), 'confirm email does not mention updates');
+  expect(one(`select count(*) from email_signatures e where e::text ilike '%news@%'`) === '0', 'address stored in clear');
+  await go(ph, new URL(first.text.match(/http\S+\/s\/[\w-]+/)[0]).pathname); await ph.getByRole('button', { name: /confirm/i }).click();
+  await ph.waitForSelector('.esign .ok', { timeout: 5000 });
+  sql(`insert into push_events (petition_id, kind, title) values ('${seedId}', 'delivered', 'Handed over at the town hall')`);
+  await ph.request.post(APP + '/api/push');
+  let news = [];
+  for (let i = 0; i < 20 && !news.length; i++) { news = (await mailsTo('news@e2e.test')).filter((m) => m.text.includes('Handed over at the town hall')); if (!news.length) await ph.waitForTimeout(250); }
+  expect(news.length === 1, `update emails: ${news.length}`);
+  expect(/List-Unsubscribe=One-Click/.test(JSON.stringify(news[0].headers ?? {})), 'no one-click unsubscribe header');
+  expect((await mailsTo('guest@e2e.test')).every((m) => !m.text.includes('Handed over')), 'someone who did not opt in got news');
+  await ph.request.post(APP + '/api/push');
+  expect((await mailsTo('news@e2e.test')).filter((m) => m.text.includes('Handed over')).length === 1, 'news sent twice');
+  // the email itself reads well on a phone
+  await ph.setContent(news[0].html); const mailW = await ph.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1);
+  expect(mailW, 'update email scrolls sideways on a phone');
+  if (process.env.SHOTS) await ph.screenshot({ path: `${process.env.SHOTS}/update-email-phone.png` });
+  // a browser opening the stop link changes nothing; pressing the button forgets the address
+  const stop = news[0].text.match(/http\S+\/stop\/[\w-]+/)?.[0]; expect(stop, 'no stop link');
+  await go(ph, new URL(stop).pathname);
+  if (process.env.SHOTS) await ph.screenshot({ path: `${process.env.SHOTS}/stop-page-phone.png` });
+  expect(one(`select count(*) from email_signatures where notify_email is not null and petition_id = '${seedId}'`) === '1', 'opening the link stopped it');
+  await ph.getByRole('button', { name: /stop these emails/i }).click(); await settle(ph);
+  expect(await until(() => one(`select count(*) from email_signatures where notify_email is not null and petition_id = '${seedId}'`) === '0'), 'address kept after stop');
+  expect(one(`select count(*) from email_signatures where petition_id = '${seedId}' and confirmed_at is not null`) === '1', 'stopping removed the signature');
+  await pctx.close();
 });
 await check('a crashed page and a failing server call are logged and the owner is emailed once', async () => {
   const r = await g.request.post(APP + '/api/errors', { headers: { origin: APP, 'content-type': 'application/json' }, data: { message: 'E2E test crash for a@b.io', path: '/p/x?token=secret' } });
@@ -164,7 +204,8 @@ await check('admin approves the petition', async () => {
   expect(await until(() => one(`select status from petitions where id = '${pid}'`) === 'live'), 'not live');
   // the organiser hears it: a note under You and an email (0022)
   expect(one(`select count(*) from notices where user_id = '${A.id}' and kind = 'petition_live' and petition_id = '${pid}'`) === '1', 'no note for the organiser');
-  const told = (await mailsTo(A.email)).filter((m) => m.text.includes('Free drinking fountains') && m.text.includes(`/p/${pid}`));
+  let told = [];   // the email goes out just after the status changes
+  for (let i = 0; i < 40 && told.length === 0; i++) { told = (await mailsTo(A.email)).filter((m) => m.text.includes('Free drinking fountains') && m.text.includes(`/p/${pid}`)); if (!told.length) await a.waitForTimeout(200); }
   expect(told.length === 1, `organiser emails: ${told.length}`);
   await go(a, '/you'); expect(await a.getByText(/is live\. Share it/).count(), 'the note is not shown under You');
 });
@@ -281,7 +322,7 @@ for (const tab of ['overview', 'queue', 'reports', 'petitions', 'news', 'people'
 await check('admin resolves the report', async () => {
   await go(a, '/admin?tab=reports');
   await a.getByRole('button', { name: /resolve|dismiss|keep/i }).first().click(); await settle(a);
-  expect(one(`select count(*) from reports where status = 'open'`) === '0', 'report still open');
+  expect(await until(() => one(`select count(*) from reports where status = 'open'`) === '0'), 'report still open');   // the server action can finish after the page settles
 });
 await check('news import runs with the cron secret', async () => {
   const r = await g.request.get(APP + '/api/news/import', { headers: { authorization: 'Bearer e2e' } });
@@ -666,7 +707,7 @@ await check('quality: no framing except the embed, cached open data, keyboard re
   const html = await em.text(); expect(/<main/.test(html) && /role="progressbar" aria-label=/.test(html), 'embed landmarks or progress label missing');
   expect(/s-maxage=\d+/.test((await g.request.get(APP + '/open/petitions.csv')).headers()['cache-control'] ?? ''), 'open data not cached at the edge');
   // totals still match a full count after all the signing above
-  expect(one(`select count(*) from petition_stats s join petitions p using (id) where s.signatures <> p.imported_count + (select count(*) from signatures x where x.petition_id = p.id)`) === '0', 'signature counter drifted');
+  expect(one(`select count(*) from petition_stats s join petitions p using (id) where s.signatures <> p.imported_count + (select count(*) from signatures x where x.petition_id = p.id) + (select count(*) from email_signatures e where e.petition_id = p.id and e.confirmed_at is not null)`) === '0', 'signature counter drifted');
   await go(bb, `/p/${seedId}`);
   await bb.locator('details.more-actions summary').focus(); await bb.keyboard.press('Enter');   // "More" opens from the keyboard
   await bb.locator('details.more-actions').getByRole('button', { name: /^report$/i }).click();

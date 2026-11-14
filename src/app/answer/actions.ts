@@ -1,7 +1,7 @@
 'use server';
 import { createClient } from '@supabase/supabase-js';
 import { getT } from '@/lib/i18n/server';
-import { pushReady, sendPending } from '@/lib/push/send';
+import { notifyFollowers } from '@/lib/notify';
 
 export type AnswerState = { ok?: boolean; error?: string };
 
@@ -15,6 +15,6 @@ export async function postAnswer(_: AnswerState, fd: FormData): Promise<AnswerSt
     const m = error.message;
     return { error: m.includes('bad_name') ? t('ans.errName') : m.includes('bad_body') ? t('ans.errBody') : m.includes('slow_down') ? t('ans.errSlow') : m.includes('bad_link') ? t('ans.dead') : t('ans.errOther') };
   }
-  if (pushReady()) await sendPending(50).catch(() => {});   // tell signers' and followers' phones
+  await notifyFollowers(50);   // tell signers' and followers' phones, and email signers who asked
   return { ok: true };
 }
