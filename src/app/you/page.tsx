@@ -12,13 +12,14 @@ import { SaveForm } from './SaveForm';
 import { Icon } from '@/components/Icon';
 import { PushToggle } from '@/components/PushToggle';
 import { localize } from '@/lib/petitionText';
+import { ExploreStrip } from '@/components/ExploreStrip';
 
 export const dynamic = 'force-dynamic';
 
 export default async function You({ searchParams }: { searchParams: Promise<{ friend?: string; appealed?: string }> }) {
   const { friend, appealed } = await searchParams;
   const [{ sb, user, viewer, settings, weights }, { lang, t }] = await Promise.all([loadViewer(), getT()]);
-  if (!user) return <div className="stack"><div className="empty"><h1>{t('you.title')}</h1><p>{t('you.signedOut')}</p><Link className="btn primary" href="/login?next=/you">{t('common.signIn')}</Link></div><InstallApp /><div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div><LegalLinks /></div>;
+  if (!user) return <div className="stack"><div className="empty"><h1>{t('you.title')}</h1><p>{t('you.signedOut')}</p><Link className="btn primary" href="/login?next=/you">{t('common.signIn')}</Link></div><ExploreStrip t={t} /><InstallApp /><div className="panel"><span className="label">{t('lang.label')}</span><LangSwitch /></div><LegalLinks /></div>;
   const [{ data: profile }, { data: sigs }, { data: vids }, { data: code }, { data: fr }, { data: mine }] = await Promise.all([
     sb.from('profiles').select('*').eq('id', user.id).single(),
     sb.from('signatures').select('petition_id, why, created_at, petitions(title)').order('created_at', { ascending: false }),
@@ -42,6 +43,7 @@ export default async function You({ searchParams }: { searchParams: Promise<{ fr
   return (
     <div className="stack">
       <div className="row between"><h1>{t('you.title')}</h1><div className="row">{profile?.handle && <Link className="btn small" href={`/u/${profile.handle}`}>{t('pr.view')}</Link>}{profile?.is_moderator && <Link className="btn small" href="/admin">Admin</Link>}</div></div>
+      <ExploreStrip t={t} />
       {friend && <p className="note" style={{ margin: 0 }}>{t('invite.done')}</p>}
       {appealed && <p className="ok" role="status" style={{ margin: 0 }}>{t('appeal.sent')}</p>}
       {(notices ?? []).map((n: any) => {

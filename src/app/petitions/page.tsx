@@ -9,6 +9,7 @@ import { fmtN, LANGS, locale } from '@/lib/i18n/dict';
 import { cookies } from 'next/headers';
 import { SignButton } from '@/components/SignButton';
 import { MyloArt } from '@/components/mylo/MyloArt';
+import { ExploreStrip } from '@/components/ExploreStrip';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +52,7 @@ export default async function Petitions({ searchParams }: { searchParams: Promis
   return (
     <div className="stack">
       <div className="row between"><h1>{t('pet.title')}</h1><div className="row"><Link className="btn small" href="/targets">{t('board.title')}</Link><Link className="btn primary" href="/start">{t('common.startPetition')}</Link></div></div>
+      <ExploreStrip t={t} />
       <Link className="mylolink" href="/mylo"><MyloArt mood="fired" size={44} id="pet" label="" /><span>{t('mylo.goals')}<br /><span className="hint" style={{ color: '#4A453E', fontWeight: 600 }}>{t('mylo.goalsText')}</span></span>→</Link>
       <form className="field" action="/petitions"><input name="q" type="search" defaultValue={q} placeholder={t('pet.search')} aria-label={t('pet.search')} /><input type="hidden" name="topic" value={topic} /></form>
       <div className="chips">
