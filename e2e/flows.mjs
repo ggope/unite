@@ -948,6 +948,73 @@ console.log('Team videos');
   await tv.context().close();
 }
 
+console.log('More pages in the left bar');
+{
+  // a petition of its own: earlier checks close or remove the seed ones
+  const navId = one(`insert into petitions (organiser_name, title, target, region, ask, why, topic, goal, status)
+    values ('Nav test group', 'Keep the Danube shore open to everyone', 'Budapest city council', 'Budapest, Hungary',
+    'Keep every metre of the Danube shore in Budapest open to the public.', 'Fences are going up along the river where people used to walk.', 'oceans', 1000, 'live') returning id`);
+  const gp = await as(null);
+  for (const url of ['/causes', '/near', '/near?country=HU', '/deadlines', '/saved', '/how', '/explore']) {
+    await check(`guest opens ${url}`, async () => { const r = await go(gp, url); expect(r.status() < 400, `status ${r.status()}`); await noCrash(gp); });
+  }
+  await check('the left bar links every new page, in groups', async () => {
+    await go(gp, '/causes');
+    for (const name of ['Causes', 'Near you', 'Deadlines', 'Saved', 'How it works', 'Who listens', 'Transparency', 'Support UNIER']) expect(await gp.locator('.rail').getByRole('link', { name }).count(), `left bar has no ${name}`);
+    expect(await gp.locator('.rail .rail-group a[aria-current=page]', { hasText: 'Causes' }).count(), 'current page not marked');
+  });
+  await check('Causes groups petitions by topic', async () => {
+    await go(gp, '/causes');
+    const oceans = gp.locator('.cause', { has: gp.getByRole('heading', { name: 'Oceans' }) });
+    expect(await oceans.getByText('Keep the Danube shore').count(), 'oceans card misses its petition');
+  });
+  await check('Near you finds petitions by place', async () => {
+    await go(gp, '/near?place=' + encodeURIComponent('Budapest'));
+    expect(await gp.locator('.prow', { hasText: 'Keep the Danube shore' }).count(), 'place search finds nothing');
+    await go(gp, '/near?place=' + encodeURIComponent('a,b)(c'));   // odd characters cannot break the filter
+    await noCrash(gp);
+  });
+  await check('Deadlines lists petitions that close soon', async () => {
+    sql(`update petitions set ends_on = unier_today() + 3 where id = '${navId}'`);
+    try {
+      await go(gp, '/deadlines');
+      const row = gp.locator('.prow', { hasText: 'Keep the Danube shore' });
+      expect(await row.count(), 'closing petition missing'); expect(/3 days left/.test(await row.innerText()), 'days left missing');
+    } finally { sql(`update petitions set ends_on = null where id = '${navId}'`); }
+  });
+  await check('a signed-in person saves a petition for later and removes it again', async () => {
+    const sp = await as(B);
+    await go(sp, `/p/${navId}`);
+    await sp.locator('.save-btn').click();
+    expect(await until(() => one(`select count(*) from saved_petitions where user_id = '${B.id}' and petition_id = '${navId}'`) === '1'), 'not saved');
+    await go(sp, '/saved');
+    const row = sp.locator('.prow', { hasText: 'Keep the Danube shore' });
+    expect(await row.count(), 'saved list empty');
+    await row.locator('.save-btn').click();
+    expect(await until(() => one(`select count(*) from saved_petitions where user_id = '${B.id}'`) === '0'), 'not removed');
+    await sp.context().close();
+  });
+  await check('on a phone the new pages sit one swipe away, with nothing wider than the screen', async () => {
+    const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    await ctx.addInitScript(() => { try { localStorage.setItem('mylo-intro', '1'); } catch {} });
+    const ph = await ctx.newPage(); ph.on('pageerror', (e) => errors.push(`phone ${ph.url()}: ${e.message}`));
+    await go(ph, '/petitions');
+    expect(!(await ph.locator('.rail').isVisible()), 'left bar shows on a phone');
+    expect(await ph.locator('.exstrip').isVisible(), 'explore row missing on a phone');
+    expect(await ph.locator('.exstrip a[href="/explore"]').count(), 'no More link in the explore row');
+    await go(ph, '/explore');
+    expect(await ph.locator('.ex-tile').count() >= 10, 'explore page misses tiles');
+    expect(await ph.locator('.tabbar a[aria-current=page]', { hasText: 'Petitions' }).count(), 'Petitions tab not lit on Explore');
+    for (const url of ['/explore', '/causes', '/near?country=HU', '/deadlines', '/saved', '/how', '/petitions']) {
+      await go(ph, url);
+      const over = await ph.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      expect(over <= 0, `${url} is ${over}px wider than the phone`);
+    }
+    await ctx.close();
+  });
+  await gp.context().close();
+}
+
 console.log('Automatic translations (0026)');
 {
   const E = newUser('ferenc');

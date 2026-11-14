@@ -44,7 +44,7 @@ Next.js 15 App Router, React 19, TypeScript, Supabase (Postgres, auth, storage),
 - Every new function: `revoke execute … from public, anon` unless anon truly needs it, then grant to the right role.
 - Add tests in `supabase/tests/*.sql` and list new migrations and test files in `supabase/tests/run.sh`.
 - Gug runs migrations by hand in the Supabase SQL editor. Copy each new migration to the shared project files `sql/` folder and add a line to the README "Updates after the first launch" list.
-- **Run so far by Gug: 0001 to 0013. Still to run: 0014 to 0026, in order (0019 kids, 0020 quality, 0021 email signing, 0022 decision notes, 0023 team petitions, 0024 AI check, 0025 team videos, 0026 automatic translations)** (Admin → Launch checklist shows the live state).
+- **Run so far by Gug: 0001 to 0013. Still to run: 0014 to 0026 and 0028, in order (0019 kids, 0020 quality, 0021 email signing, 0022 decision notes, 0023 team petitions, 0024 AI check, 0025 team videos, 0026 automatic translations, 0028 saved petitions)** (Admin → Launch checklist shows the live state).
 - Front end must keep working (empty, not crashing) when a newer migration has not been run yet.
 
 ## Test before every push
@@ -78,5 +78,6 @@ Several Claude threads may work on the repo at once. Keep to your area, pull/reb
 - AI moderation (`src/lib/ai/moderate.ts`, Admin → AI check, migration 0024). Only petitions can be decided automatically, only in Auto mode; videos and reports always go to a person.
 - Quality check (security, accessibility, speed)
 - Team content (petitions drafted from trusted sources, `src/lib/team/`); the switch `site_settings.team_content` and `team_content_level()` are shared with team videos
+- Left bar and phone navigation: extra links live in one list, `src/lib/nav.ts` (shown in the left bar and on the phone Explore page `/explore`). Add new pages there, not in `Nav.tsx`. Pages: `/causes`, `/near`, `/deadlines`, `/saved` (0028), `/how`.
 - Automatic translations (`src/lib/ai/translate.ts`, migration 0026): machine translations sit in `petitions.tr` marked `"auto": true`; a moderator's translation always wins; `isMachine()` in `src/lib/petitionText.ts` drives the "Machine translated · Show original" label.
 - More languages: wait until the others are merged, since it touches every text.

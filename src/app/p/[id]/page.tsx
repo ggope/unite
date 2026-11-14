@@ -8,6 +8,7 @@ import { getT } from '@/lib/i18n/server';
 import { fmtN, locale } from '@/lib/i18n/dict';
 import { SignButton } from '@/components/SignButton';
 import { FollowButton } from '@/components/FollowButton';
+import { SaveButton } from '@/components/SaveButton';
 import { PostUpdate, RemoveUpdate } from '@/components/PostUpdate';
 import { ReportButton } from '@/components/ReportButton';
 import { ShareButton } from '@/components/ShareButton';
@@ -68,6 +69,7 @@ export default async function Petition({ params, searchParams }: { params: Promi
   const canUpdate = !!user && (p.status === 'live' || p.status === 'closed') && (isFounder || !!me?.is_moderator);
   const left = open ? daysLeft(p.ends_on) : null;
   const sil = silence(updates);
+  const { data: savedRow } = user ? await sb.from('saved_petitions').select('petition_id').eq('petition_id', id).maybeSingle() : { data: null };   // 0028
   const date = (d: string) => new Date(d).toLocaleDateString(locale(lang), { year: 'numeric', month: 'long', day: 'numeric' });
   const stat = (m: any) => (Array.isArray(m.petition_stats) ? m.petition_stats[0] : m.petition_stats)?.signatures ?? 0;
 
@@ -103,6 +105,7 @@ export default async function Petition({ params, searchParams }: { params: Promi
         {open && <div className="sign-main"><SignButton petitionId={p.id} title={p.title} signed={signed.has(p.id)} viewer={viewer} /></div>}
         <div className="row p-actions">
           <FollowButton petitionId={p.id} following={followed.has(p.id)} loggedIn={viewer.loggedIn} />
+          {open && <SaveButton petitionId={p.id} saved={!!savedRow} loggedIn={viewer.loggedIn} />}
           <ShareButton path={`/p/${p.id}`} title={p.title} />
           {(isFounder || !!me?.is_moderator) && <Link className="btn small" href={`/p/${p.id}/dashboard`}>{t('dash.open')}</Link>}
         </div>
