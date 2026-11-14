@@ -1,5 +1,5 @@
 'use client';
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { createPetition, type StartState } from './actions';
 import { TOPIC_KEYS, GOALS } from '@/lib/topics';
 import { useT } from '@/lib/i18n/client';
@@ -33,7 +33,7 @@ function Checklist({ d }: { d: Draft }) {
   );
 }
 
-export function StartForm({ then, source, topic }: { then: 'video' | 'page'; source?: string; topic?: string }) {
+export function StartForm({ then, source, topic, organiser }: { then: 'video' | 'page'; source?: string; topic?: string; organiser?: string }) {
   const { lang, t } = useT();
   const [state, action, pending] = useActionState<StartState, FormData>(createPetition, {});
   const [d, setD] = useState<Draft>({ title: '', target: '', ask: '', why: '', source: source ?? '', ends: '' });
@@ -41,8 +41,20 @@ export function StartForm({ then, source, topic }: { then: 'video' | 'page'; sou
     const v = (n: string) => String((f.elements.namedItem(n) as HTMLInputElement | null)?.value ?? '');
     setD({ title: v('title'), target: v('target'), ask: v('ask'), why: v('why'), source: v('source_url'), ends: v('ends_on') });
   };
+  // The extras sit folded away. They open by themselves when the browser or the server finds a problem inside,
+  // so nobody is told "fix this" about a field they cannot see.
+  const form = useRef<HTMLFormElement>(null); const more = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const f = form.current; if (!f) return;
+    const open = (e: Event) => { const d = (e.target as HTMLElement).closest('details'); if (d) d.open = true; };
+    f.addEventListener('invalid', open, true);
+    return () => f.removeEventListener('invalid', open, true);
+  }, []);
+  useEffect(() => {
+    if (state.error && more.current && [...more.current.querySelectorAll('input')].some((i) => i.value)) more.current.open = true;
+  }, [state]);
   return (
-    <form onSubmit={keepForm(action)} className="panel" style={{ gap: 16 }} onInput={(e) => read(e.currentTarget)} onChange={(e) => read(e.currentTarget)}>
+    <form ref={form} onSubmit={keepForm(action)} className="panel" style={{ gap: 16 }} onInput={(e) => read(e.currentTarget)} onChange={(e) => read(e.currentTarget)}>
       <input type="hidden" name="then" value={then} />
       <div className="field"><label htmlFor="title">{t('start.tTitle')}</label><input id="title" name="title" required minLength={10} maxLength={90} placeholder={t('start.tTitlePh')} /><span className="hint">{t('start.tTitleHint')}</span></div>
       <div className="field"><label htmlFor="target">{t('start.target')}</label><input id="target" name="target" required placeholder={t('start.targetPh')} /></div>
@@ -51,14 +63,18 @@ export function StartForm({ then, source, topic }: { then: 'video' | 'page'; sou
         <datalist id="regions"><option value={t('start.rWorld')} /><option value={t('start.rEu')} /><option value={t('start.rHu')} /><option value="Budapest" /></datalist></div>
       <div className="field"><label htmlFor="ask">{t('start.ask')}</label><textarea id="ask" name="ask" required minLength={20} placeholder={t('start.askPh')} /></div>
       <div className="field"><label htmlFor="why">{t('start.why')}</label><textarea id="why" name="why" required minLength={20} placeholder={t('start.whyPh')} /></div>
-      <div className="field"><label htmlFor="source_url">{t('start.source')}</label><input id="source_url" name="source_url" type="url" defaultValue={source} placeholder="https://" /></div>
-      <div className="field"><label htmlFor="link_url">{t('start.link')}</label><input id="link_url" name="link_url" type="url" placeholder="https://" /><span className="hint">{t('start.linkHint')}</span></div>
-      <div className="field"><label htmlFor="link_cta">{t('start.linkCta')}</label><select id="link_cta" name="link_cta" defaultValue="learn">{CTAS.map((c) => <option key={c} value={c}>{t(`link.${c}`)}</option>)}</select></div>
-      <div className="field"><label htmlFor="official_url">{t('start.official')}</label><input id="official_url" name="official_url" type="url" placeholder="https://" /><span className="hint">{t('start.officialHint')}</span></div>
       <div className="field"><label htmlFor="topic">{t('start.topic')}</label><select id="topic" name="topic" defaultValue={topic && (TOPIC_KEYS as string[]).includes(topic) ? topic : undefined}>{TOPIC_KEYS.map((k) => <option key={k} value={k}>{t(`topic.${k}`)}</option>)}</select></div>
-      <div className="field"><label htmlFor="goal">{t('start.goal')}</label><select id="goal" name="goal" defaultValue="10000">{GOALS.map((g) => <option key={g} value={g}>{fmtN(g, lang)}</option>)}</select></div>
-      <div className="field"><label htmlFor="organiser_name">{t('start.organiser')}</label><input id="organiser_name" name="organiser_name" required placeholder={t('start.organiserPh')} /></div>
-      <div className="field"><label htmlFor="ends_on">{t('start.ends')}</label><input id="ends_on" name="ends_on" type="date" min={addDays(unierToday(), 1)} max={addDays(unierToday(), 366)} aria-describedby="ends_hint" /><span className="hint" id="ends_hint">{t('start.endsHint')}</span></div>
+      <div className="field"><label htmlFor="organiser_name">{t('start.organiser')}</label><input id="organiser_name" name="organiser_name" required defaultValue={organiser} maxLength={80} placeholder={t('start.organiserPh')} /></div>
+      <details className="more-opts" ref={more} open={!!source}>
+        <summary>{t('start.more')}</summary>
+        <span className="hint">{t('start.moreHint')}</span>
+        <div className="field"><label htmlFor="source_url">{t('start.source')}</label><input id="source_url" name="source_url" type="url" defaultValue={source} placeholder="https://" /></div>
+        <div className="field"><label htmlFor="link_url">{t('start.link')}</label><input id="link_url" name="link_url" type="url" placeholder="https://" /><span className="hint">{t('start.linkHint')}</span></div>
+        <div className="field"><label htmlFor="link_cta">{t('start.linkCta')}</label><select id="link_cta" name="link_cta" defaultValue="learn">{CTAS.map((c) => <option key={c} value={c}>{t(`link.${c}`)}</option>)}</select></div>
+        <div className="field"><label htmlFor="official_url">{t('start.official')}</label><input id="official_url" name="official_url" type="url" placeholder="https://" /><span className="hint">{t('start.officialHint')}</span></div>
+        <div className="field"><label htmlFor="goal">{t('start.goal')}</label><select id="goal" name="goal" defaultValue="10000">{GOALS.map((g) => <option key={g} value={g}>{fmtN(g, lang)}</option>)}</select></div>
+        <div className="field"><label htmlFor="ends_on">{t('start.ends')}</label><input id="ends_on" name="ends_on" type="date" min={addDays(unierToday(), 1)} max={addDays(unierToday(), 366)} aria-describedby="ends_hint" /><span className="hint" id="ends_hint">{t('start.endsHint')}</span></div>
+      </details>
       <Checklist d={d} />
       <label className="check"><input type="checkbox" name="facts" required /><span>{t('start.facts')}</span></label>
       {state.error && <p className="error">{state.error}</p>}

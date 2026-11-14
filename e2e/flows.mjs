@@ -131,6 +131,10 @@ console.log('Start a petition and approve it');
 let pid;
 await check('start a petition', async () => {
   await go(a, '/start');
+  // the short form: extras are folded away, and the organiser name comes from the profile
+  expect(!(await a.locator('details.more-opts[open]').count()) && !(await a.locator('#link_url').isVisible()), 'extras not folded away');
+  expect((await a.inputValue('[name=organiser_name]')) === 'Anna K.', 'organiser name not filled from the profile');
+  await a.locator('details.more-opts summary').click();
   await a.fill('[name=title]', 'Free drinking fountains in every Budapest park');
   await a.fill('[name=target]', 'Budapest City Council');
   await a.fill('[name=region]', 'Budapest');
@@ -140,9 +144,11 @@ await check('start a petition', async () => {
   await a.fill('[name=link_url]', 'http://example.org/fountains');   // not https: the server says so, and nothing typed is lost
   await a.selectOption('[name=topic]', 'health').catch(async () => a.locator('[name=topic][value=health]').check());
   await a.selectOption('[name=goal]', '10000').catch(async () => a.locator('[name=goal][value="10000"]').check());
+  await a.locator('details.more-opts summary').click();   // fold it again: the server's complaint must open it
   await a.locator('[name=facts]').check();
   await a.locator('form button[type=submit], form button:not([type])').last().click();
   await a.waitForSelector('form .error', { timeout: 8000 });
+  expect(await a.locator('details.more-opts[open]').count(), 'extras folded shut over the field with the problem');
   expect(await a.inputValue('[name=title]') === 'Free drinking fountains in every Budapest park', 'the form was emptied after an error');
   expect((await a.inputValue('[name=why]')).startsWith('Summers are getting hotter'), 'the reason was emptied after an error');
   await a.fill('[name=link_url]', 'https://example.org/fountains');
@@ -193,7 +199,12 @@ await check('signing follows automatically; unfollow and follow again', async ()
 });
 await check('report the petition', async () => {
   await go(bb, `/p/${pid}`);
-  await bb.getByRole('button', { name: /^Report/ }).first().click();
+  // Sign is the one big button; reporting sits under "More"
+  expect(await bb.locator('.panel .btn.primary.big').count() <= 1, 'more than one main button');
+  const more = bb.locator('details.more-actions');
+  expect(!(await more.getByRole('button', { name: /^Report/ }).isVisible()), 'report not folded under More');
+  await more.locator('summary').click();
+  await more.getByRole('button', { name: /^Report/ }).click();
   await bb.locator('.sheet input[type=radio], .sheet select').first().check().catch(() => {});
   await bb.locator('.sheet').getByRole('button', { name: /send|report/i }).last().click(); await bb.waitForTimeout(800);
   expect(one(`select count(*) from reports where reporter_id = '${B.id}'`) === '1', 'no report');
@@ -657,7 +668,8 @@ await check('quality: no framing except the embed, cached open data, keyboard re
   // totals still match a full count after all the signing above
   expect(one(`select count(*) from petition_stats s join petitions p using (id) where s.signatures <> p.imported_count + (select count(*) from signatures x where x.petition_id = p.id)`) === '0', 'signature counter drifted');
   await go(bb, `/p/${seedId}`);
-  await bb.getByRole('button', { name: /^report$/i }).first().click();
+  await bb.locator('details.more-actions summary').focus(); await bb.keyboard.press('Enter');   // "More" opens from the keyboard
+  await bb.locator('details.more-actions').getByRole('button', { name: /^report$/i }).click();
   expect(await bb.evaluate(() => !!document.activeElement?.closest('[role=dialog]')), 'focus did not move into the report sheet');
   await bb.keyboard.press('Escape'); await bb.waitForTimeout(200);
   expect(!(await bb.locator('[role=dialog]').count()), 'Escape did not close the report sheet');
