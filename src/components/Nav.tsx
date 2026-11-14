@@ -38,7 +38,8 @@ export function Nav() {
         {ITEMS.map((i) => (
           <Link key={i.href} href={i.href} aria-current={active(i.href) ? 'page' : undefined}><Icon name={i.icon} />{t(i.label)}{dot(i.href)}</Link>
         ))}
-        <Link href="/mylo" aria-current={path.startsWith('/mylo') ? 'page' : undefined}><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="14" r="8" fill="#FF8A2A" stroke="currentColor" strokeWidth="2" /><path d="M12 6c-1-3 1-4 2-4 0 2-1 3-2 4zm0 0c2-2 4-2 5-1-1 2-3 2-5 1z" fill="#3DBA5C" /></svg>{t('mylo.meet')}</Link>
+        <Link href="/mylo" aria-current={path.startsWith('/mylo') && !path.startsWith('/mylo/play') ? 'page' : undefined}><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="14" r="8" fill="#FF8A2A" stroke="currentColor" strokeWidth="2" /><path d="M12 6c-1-3 1-4 2-4 0 2-1 3-2 4zm0 0c2-2 4-2 5-1-1 2-3 2-5 1z" fill="#3DBA5C" /></svg>{t('mylo.meet')}</Link>
+        <Link href="/mylo/play" aria-current={path.startsWith('/mylo/play') ? 'page' : undefined}><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="20" height="11" rx="5.5" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M7 10.5v4M5 12.5h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><circle cx="15.5" cy="11.5" r="1.3" fill="#FF8A2A" /><circle cx="18" cy="14" r="1.3" fill="#E2412B" /></svg>{t('game.nav')}</Link>
         <div style={{ marginTop: 'auto' }}><LangSwitch compact /></div>
       </aside>
       <nav className="tabbar" aria-label={t('nav.main')}>
