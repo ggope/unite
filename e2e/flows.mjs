@@ -171,6 +171,10 @@ console.log('Start a petition and approve it');
 let pid;
 await check('start a petition', async () => {
   await go(a, '/start');
+  // the short form: extras are folded away, and the organiser name comes from the profile
+  expect(!(await a.locator('details.more-opts[open]').count()) && !(await a.locator('#link_url').isVisible()), 'extras not folded away');
+  expect((await a.inputValue('[name=organiser_name]')) === 'Anna K.', 'organiser name not filled from the profile');
+  await a.locator('details.more-opts summary').click();
   await a.fill('[name=title]', 'Free drinking fountains in every Budapest park');
   await a.fill('[name=target]', 'Budapest City Council');
   await a.fill('[name=region]', 'Budapest');
@@ -180,9 +184,11 @@ await check('start a petition', async () => {
   await a.fill('[name=link_url]', 'http://example.org/fountains');   // not https: the server says so, and nothing typed is lost
   await a.selectOption('[name=topic]', 'health').catch(async () => a.locator('[name=topic][value=health]').check());
   await a.selectOption('[name=goal]', '10000').catch(async () => a.locator('[name=goal][value="10000"]').check());
+  await a.locator('details.more-opts summary').click();   // fold it again: the server's complaint must open it
   await a.locator('[name=facts]').check();
   await a.locator('form button[type=submit], form button:not([type])').last().click();
   await a.waitForSelector('form .error', { timeout: 8000 });
+  expect(await a.locator('details.more-opts[open]').count(), 'extras folded shut over the field with the problem');
   expect(await a.inputValue('[name=title]') === 'Free drinking fountains in every Budapest park', 'the form was emptied after an error');
   expect((await a.inputValue('[name=why]')).startsWith('Summers are getting hotter'), 'the reason was emptied after an error');
   await a.fill('[name=link_url]', 'https://example.org/fountains');
@@ -233,7 +239,12 @@ await check('signing follows automatically; unfollow and follow again', async ()
 });
 await check('report the petition', async () => {
   await go(bb, `/p/${pid}`);
-  await bb.getByRole('button', { name: /^Report/ }).first().click();
+  // Sign is the one big button; reporting sits under "More"
+  expect(await bb.locator('.panel .btn.primary.big').count() <= 1, 'more than one main button');
+  const more = bb.locator('details.more-actions');
+  expect(!(await more.getByRole('button', { name: /^Report/ }).isVisible()), 'report not folded under More');
+  await more.locator('summary').click();
+  await more.getByRole('button', { name: /^Report/ }).click();
   await bb.locator('.sheet input[type=radio], .sheet select').first().check().catch(() => {});
   await bb.locator('.sheet').getByRole('button', { name: /send|report/i }).last().click(); await bb.waitForTimeout(800);
   expect(one(`select count(*) from reports where reporter_id = '${B.id}'`) === '1', 'no report');
@@ -697,7 +708,8 @@ await check('quality: no framing except the embed, cached open data, keyboard re
   // totals still match a full count after all the signing above
   expect(one(`select count(*) from petition_stats s join petitions p using (id) where s.signatures <> p.imported_count + (select count(*) from signatures x where x.petition_id = p.id) + (select count(*) from email_signatures e where e.petition_id = p.id and e.confirmed_at is not null)`) === '0', 'signature counter drifted');
   await go(bb, `/p/${seedId}`);
-  await bb.getByRole('button', { name: /^report$/i }).first().click();
+  await bb.locator('details.more-actions summary').focus(); await bb.keyboard.press('Enter');   // "More" opens from the keyboard
+  await bb.locator('details.more-actions').getByRole('button', { name: /^report$/i }).click();
   expect(await bb.evaluate(() => !!document.activeElement?.closest('[role=dialog]')), 'focus did not move into the report sheet');
   await bb.keyboard.press('Escape'); await bb.waitForTimeout(200);
   expect(!(await bb.locator('[role=dialog]').count()), 'Escape did not close the report sheet');
@@ -974,6 +986,63 @@ console.log('Team videos');
     await m.context().close();
   });
   await tv.context().close();
+}
+
+console.log('Automatic translations (0026)');
+{
+  const E = newUser('ferenc');
+  const tp = one(`insert into petitions (created_by, organiser_name, title, target, region, ask, why, topic, goal, status, lang, tr)
+    values ('${E.id}', 'Ferenc', 'Shade trees on every school yard', 'City council', 'Hungary', 'Plant shade trees on every school yard before next summer.',
+            'Children play outside in record heat and the yards have no shade at all.', 'housing', 1000, 'live', 'en',
+            '{"hu": {"title": "Árnyékot adó fák minden iskolaudvarra", "ask": "Ültessenek fákat minden iskolaudvarra jövő nyárig."}}') returning id`);
+  await check('a petition is translated after the first view, labelled, and the original is one tap away (phone)', async () => {
+    const ctx = await b.newContext({ locale: 'de-DE', viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
+    await ctx.addCookies([{ name: 'lang', value: 'de', url: APP }]);
+    const ph = await ctx.newPage();
+    ph.on('response', (r) => { if (r.status() >= 500) errors.push(`${r.status()} ${r.url()}`); });
+    await ph.goto(APP + `/p/${tp}`);
+    expect(await ph.locator('h1', { hasText: 'Shade trees on every school yard' }).count(), 'first view should show the original');
+    for (let k = 0; k < 40 && one(`select coalesce(tr->'de'->>'auto', '') from petitions where id = '${tp}'`) !== 'true'; k++) await ph.waitForTimeout(250);
+    expect(one(`select tr->'de'->>'title' from petitions where id = '${tp}'`) === '[de] Shade trees on every school yard', 'German machine translation not saved');
+    expect(one(`select tr->'hu'->>'title' from petitions where id = '${tp}'`) === 'Árnyékot adó fák minden iskolaudvarra', "moderator's Hungarian replaced");
+    expect(one(`select tr->'fr'->>'why' from petitions where id = '${tp}'`).startsWith('[fr] Children play'), 'not translated into every language');
+    await ph.goto(APP + `/p/${tp}`);
+    expect(await ph.locator('h1', { hasText: '[de] Shade trees' }).count(), 'German reader does not see the translation');
+    const note = ph.locator('.mt-note');
+    expect((await note.innerText()).includes('Maschinell übersetzt'), 'no machine translation label');
+    const fits = await ph.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+    expect(fits, 'page scrolls sideways on a phone');
+    const box = await note.getByRole('link').boundingBox();
+    expect(box && box.height >= 44, `"Show original" too small to tap: ${box?.height}`);
+    await note.getByRole('link', { name: 'Original anzeigen' }).tap(); await ph.waitForURL(/orig=1/); await settle(ph);
+    expect(await ph.locator('h1[lang=en]', { hasText: 'Shade trees on every school yard' }).count(), 'original not shown (or not marked as English)');
+    await ph.locator('.mt-note').getByRole('link', { name: 'Übersetzung anzeigen' }).tap(); await ph.waitForURL((u) => !u.search.includes('orig')); await settle(ph);
+    expect(await ph.locator('h1', { hasText: '[de] Shade trees' }).count(), 'cannot switch back to the translation');
+    await ctx.close();
+  });
+  await check('people see their own language without a label; a person\'s translation is not labelled', async () => {
+    const hu = await b.newContext({ locale: 'hu-HU' }); await hu.addCookies([{ name: 'lang', value: 'hu', url: APP }]);
+    const hp = await hu.newPage(); await hp.goto(APP + `/p/${tp}`);
+    expect(await hp.locator('h1', { hasText: 'Árnyékot adó fák' }).count(), 'Hungarian translation not shown');
+    expect(!(await hp.locator('.mt-note').count()), "a moderator's translation is labelled as machine-made");
+    await hu.close();
+    await go(g, `/p/${tp}`); expect(!(await g.locator('.mt-note').count()), 'English reader of an English petition sees a label');
+  });
+  await check('changing the text drops machine translations; switching off stops new ones', async () => {
+    sql(`update petitions set ask = 'Plant shade trees on every school yard before next summer, starting with the hottest ones.' where id = '${tp}'`);
+    expect(one(`select (tr ? 'de')::text || (tr ? 'hu')::text from petitions where id = '${tp}'`) === 'falsetrue', 'old machine translation kept after an edit');
+    const m = await as(A);
+    await go(m, '/admin?tab=ai'); expect(await m.locator('#translations').count(), 'no translations panel in Admin');
+    await m.locator('#translations').getByRole('button', { name: 'Switch off' }).click(); await settle(m);
+    for (let k = 0; k < 20 && one(`select auto_translate::text from site_settings`) !== 'false'; k++) await m.waitForTimeout(250);
+    expect(one(`select auto_translate::text from site_settings`) === 'false', 'switch did not work');
+    const n0 = (await (await fetch('http://localhost:54321/__translate')).json()).length;
+    const es = await b.newContext({ locale: 'es-ES' }); const ep = await es.newPage(); await ep.goto(APP + `/p/${tp}`); await ep.waitForTimeout(1500); await es.close();
+    expect((await (await fetch('http://localhost:54321/__translate')).json()).length === n0, 'translated while switched off');
+    await go(m, '/admin?tab=ai'); await m.locator('#translations').getByRole('button', { name: 'Switch on' }).click(); await settle(m);
+    for (let k = 0; k < 20 && one(`select auto_translate::text from site_settings`) !== 'true'; k++) await m.waitForTimeout(250);
+    await m.context().close();
+  });
 }
 
 await b.close();

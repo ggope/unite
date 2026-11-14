@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/supabase/server';
 import { fmtN, LANGS, type Lang } from '@/lib/i18n/dict';
-import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, setEasy, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, importClips, clipAction, toggleVideoSource, removeSamples, decideAppeal, runLifecycle, resolveError, testAlert, setTeamContent, draftNow, editDraft, setAiMode, runAiNow } from './actions';
+import { noop, review, petitionStatus, setOfficial, setLink, setFeatured, setTranslation, setOriginalLang, setEasy, unite, separate, resolveReport, setModerator, setHumanCheck, importNews, newsAction, toggleSource, importClips, clipAction, toggleVideoSource, removeSamples, decideAppeal, runLifecycle, resolveError, testAlert, setTeamContent, draftNow, editDraft, setAiMode, runAiNow, setAutoTranslate } from './actions';
+import { translateModel, translateDailyLimit } from '@/lib/ai/translate';
 import { aiReady } from '@/lib/team/draft';
 import { aiKeySet, aiModel, aiDailyLimit } from '@/lib/ai/moderate';
 import { legalPlaceholders } from '@/lib/legal';
@@ -109,11 +110,11 @@ const MIGRATIONS: [string, string, string][] = [
   ['0002', 'invites', 'user_id'], ['0003', 'news_items', 'id'], ['0004', 'reports', 'resolved_at'], ['0005', 'petitions', 'official_url'],
   ['0006', 'profiles', 'bio'], ['0007', 'petitions', 'link_url'], ['0012', 'petitions', 'tr'], ['0014', 'notices', 'id'],
   ['0015', 'share_codes', 'code'], ['0016', 'answer_links', 'petition_id'], ['0017', 'signatures', 'reason_key'],
-  ['0018', 'appeals', 'id'], ['0019', 'petitions', 'easy'], ['0021', 'error_events', 'fingerprint'], ['0023', 'petition_sources', 'id'], ['0024', 'ai_reviews', 'id'], ['0025', 'team_videos', 'id'],
+  ['0018', 'appeals', 'id'], ['0019', 'petitions', 'easy'], ['0021', 'error_events', 'fingerprint'], ['0023', 'petition_sources', 'id'], ['0024', 'ai_reviews', 'id'], ['0025', 'team_videos', 'id'], ['0026', 'petitions', 'mt_tried_at'],
   ['0020', 'petition_counts', 'petition_id'],   // private table: "permission denied" means it exists
   ['0027', 'mail_sent', 'day'],                 // private table too
 ];
-const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0019': '0019_kids', '0020': '0020_quality', '0021': '0021_email_sign', '0023': '0023_team_content', '0024': '0024_ai_moderation', '0025': '0025_team_videos', '0027': '0027_email_updates' };
+const FILES: Record<string, string> = { '0002': '0002_updates_invites', '0003': '0003_news', '0004': '0004_trust', '0005': '0005_report', '0006': '0006_social', '0007': '0007_links', '0012': '0012_translations', '0014': '0014_notify', '0015': '0015_reach', '0016': '0016_answers', '0017': '0017_safety_wins', '0018': '0018_lifecycle', '0019': '0019_kids', '0020': '0020_quality', '0021': '0021_email_sign', '0023': '0023_team_content', '0024': '0024_ai_moderation', '0025': '0025_team_videos', '0026': '0026_auto_translate', '0027': '0027_email_updates' };
 const missing = (e: any) => !!e && /does not exist|PGRST20[45]|42703|42P01|schema cache/i.test(`${e.code} ${e.message}`);
 
 async function Launch({ sb }: { sb: any }) {
@@ -253,7 +254,7 @@ function Translation({ p, open, q }: { p: any; open: boolean; q: string }) {
         const tr = (p.tr ?? {})[l] ?? {};
         return (
           <form key={l} action={setTranslation} className="stack" lang={l}>
-            <b className="hint">{LANGS[l]} {count(l) === 4 ? '· complete' : count(l) ? `· ${count(l)} of 4 fields` : '· missing'}</b>
+            <b className="hint">{LANGS[l]} {count(l) === 4 ? '· complete' : count(l) ? `· ${count(l)} of 4 fields` : '· missing'}{tr.auto ? ' · machine translated (saving it makes it yours, and it will not be replaced)' : ''}</b>
             <input type="hidden" name="id" value={p.id} /><input type="hidden" name="to" value={l} />
             <input name="title" maxLength={90} defaultValue={tr.title ?? ''} placeholder={`Title (${l})`} aria-label={`Title (${LANGS[l]})`} />
             <input name="target" maxLength={120} defaultValue={tr.target ?? ''} placeholder={`Target (${l})`} aria-label={`Target (${LANGS[l]})`} />
@@ -516,6 +517,27 @@ async function AiLine() {
   return aiKeySet() ? null : <p className="hint" style={{ margin: 0 }}>The AI check is not set up, so nothing here is pre-sorted. See <Link href="/admin?tab=ai">AI check</Link>.</p>;
 }
 
+// Automatic translations (0026): petitions show in each visitor's language.
+async function Translations({ sb }: { sb: any }) {
+  const [{ data: site, error }, { count: done }, { count: today }] = await Promise.all([
+    sb.from('site_settings').select('auto_translate').maybeSingle(),
+    sb.from('petitions').select('id', { count: 'exact', head: true }).not('tr', 'eq', '{}').in('status', ['live', 'closed']),
+    sb.from('petitions').select('id', { count: 'exact', head: true }).gte('mt_tried_at', new Date(Date.now() - 864e5).toISOString()),
+  ]);
+  if (missing(error) || !site || site.auto_translate === undefined) return <div className="panel"><span className="hint">Run <code>0026_auto_translate.sql</code> in Supabase to translate petitions automatically.</span></div>;
+  const on = !!site.auto_translate;
+  return (
+    <div className="panel stack" style={{ gap: 8 }} id="translations">
+      <span className="label">Automatic translations</span>
+      <span className="hint">The first time someone opens a published petition, the AI translates it into the other site languages and keeps the result. Visitors see it marked as a machine translation, with a link to the original. Your own translations (under Petitions) always win and are never replaced. When a petition&apos;s text changes, it is translated again.</span>
+      <span className="hint">{aiKeySet() ? <>Model <code>{translateModel()}</code></> : <>Needs <code>ANTHROPIC_API_KEY</code> in Vercel; until then visitors see the original text.</>} · Petitions with a translation: {n(done ?? 0)} · Translated in the last 24 hours: {n(today ?? 0)} of {n(translateDailyLimit())} (<code>AI_TRANSLATE_DAILY_LIMIT</code>)</span>
+      <form action={setAutoTranslate.bind(null, !on)} className="row between" style={{ gap: 8 }}>
+        <b>{on ? 'On' : 'Off'}</b>
+        <button className="btn small">{on ? 'Switch off' : 'Switch on'}</button>
+      </form>
+    </div>);
+}
+
 async function AiCheck({ sb }: { sb: any }) {
   const [{ data: site, error }, { data: recent }, { count: today }, { data: stats }] = await Promise.all([
     sb.from('site_settings').select('ai_moderation').maybeSingle(),
@@ -544,6 +566,7 @@ async function AiCheck({ sb }: { sb: any }) {
         </form>))}
       {key && mode !== 'off' && <form action={runAiNow}><button className="btn small">Check waiting items now</button></form>}
     </div>
+    <Translations sb={sb} />
     <div className="tiles">{([['Checked (30 days)', st.checked_30d], ['Published by the AI', st.approved_30d], ['Taken down by the AI', st.removed_30d], ['Sent to a person', st.to_people_30d]] as const).map(([k, v]) =>
       <div className="tile" key={k}><span className="label">{k}</span><b className="num">{n(Number(v ?? 0))}</b></div>)}</div>
     <div className="panel" style={{ gap: 6 }}><b>Decided by the AI, newest first</b>
