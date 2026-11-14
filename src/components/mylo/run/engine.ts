@@ -4,7 +4,7 @@
 
 export const LANE = 1.4;
 export const SPAWN_Z = 72;
-const GRAV = 30, JUMP = 9.6, SLIDE = 0.7, SHIFT = 0.13;
+const GRAV = 26, JUMP = 9.2, SLIDE = 0.75;
 export const WORLD_SPAN = 500;   // points per world
 export const MYLO_H = 1.3, SLIDE_H = 0.62, LOW_H = 0.62, CLOUD_BOTTOM = 0.86;
 
@@ -19,7 +19,7 @@ export type Thing = {
 export type Bit = { x: number; y: number; z: number; vx: number; vy: number; life: number; max: number; c: string; r: number; text?: string; size?: number };
 export type GameEvent =
   | { t: 'heart'; combo: number } | { t: 'litter' } | { t: 'jump' } | { t: 'roll' } | { t: 'power'; p: Power }
-  | { t: 'near' } | { t: 'world'; visited: number; world: number } | { t: 'smash' } | { t: 'shield' }
+  | { t: 'near' } | { t: 'stumble' } | { t: 'world'; visited: number; world: number } | { t: 'smash' } | { t: 'shield' }
   | { t: 'tip'; tip: 'lanes' | 'low' | 'cloud' | 'block' | 'power' } | { t: 'over' };
 export type Phase = 'ready' | 'run' | 'pause' | 'over';
 
@@ -35,7 +35,7 @@ export function newGame(opts: { seed?: number; mod?: Mod; tips?: Record<string, 
   const mod = opts.mod ?? 'none';
   const startWorld = mod === 'night' ? 3 : 0;
   return {
-    phase: 'ready' as Phase, mod, t: 0, dist: 0, speed: 17, bonus: 0, score: 0,
+    phase: 'ready' as Phase, mod, t: 0, dist: 0, speed: 15, camX: 0, lean: 0, stumble: 0, shake: 0, hitFlash: 0, lastFree: 0, bonus: 0, score: 0,
     hearts: 0, litter: 0, combo: 0, comboT: 9, maxCombo: 0,
     // Mylo
     lane: 0, x: 0, y: 0, vy: 0, ground: true, slide: 0, slideHeld: false, landed: 0, laneT: 9, fromLane: 0,
@@ -43,7 +43,7 @@ export function newGame(opts: { seed?: number; mod?: Mod; tips?: Record<string, 
     big: 0, shield: false, magnet: 0, invuln: 0, chase: 0.8,
     // world
     startWorld, world: startWorld, prevWorld: startWorld, worldFade: 0, visited: 1, banner: 0,
-    things: [] as Thing[], bits: [] as Bit[], nextRow: 26, powIn: 8, curve: 0, curveT: 0,
+    things: [] as Thing[], bits: [] as Bit[], nextRow: 48, powIn: 8, curve: 0, curveT: 0,
     obs: rng(seed), loot: rng(seed ^ 0x9E3779B9), pow: rng(seed ^ 0x85EBCA6B),
     blink: 2, flash: 0, flashText: '', tip: '' as '' | 'lanes' | 'low' | 'cloud' | 'block' | 'power', tipT: 0, tips: { ...(opts.tips ?? {}) },
     toast: '', toastT: 0, hitAt: 0, nextFlash: 100,
@@ -86,21 +86,28 @@ function spawnRow(g: Game, emit: (e: GameEvent) => void) {
     g.things.push({ k, lane, x: lane * LANE, z, y: 0, d, seed: f() * 6, world: w });
     tip(g, emit, k);
   };
+  // patterns get harder slowly; there is always a way through, and the open lane never jumps two lanes at once early on
+  const lvl = g.t < 20 ? 0 : g.t < 45 ? 1 : 2;
+  const near = (l: number) => lanes.filter((x) => Math.abs(x - l) <= 1);
   const r = f();
   let free: number[] = [];
-  if (g.t < 3) free = lanes;
-  else if (r < 0.45 || g.t < 10) {
-    const lane = lanes[Math.floor(f() * 3)]; put(lane, pickOb(g, f)); free = lanes.filter((l) => l !== lane);
-  } else if (r < 0.82) {
-    const open = lanes[Math.floor(f() * 3)];
-    for (const l of lanes) if (l !== open) put(l, f() < 0.6 ? 'block' : pickOb(g, f));
+  if (lvl === 0 || r < 0.4) {
+    // one thing in one lane
+    const lane = lanes[Math.floor(f() * 3)];
+    const k: Ob = lvl === 0 ? (f() < 0.55 ? 'low' : 'block') : pickOb(g, f);
+    put(lane, k); free = lanes.filter((l) => l !== lane);
+  } else if (r < 0.8) {
+    // two blocked, one open lane next to the last open one
+    const opts = near(g.lastFree), open = opts[Math.floor(f() * opts.length)];
+    for (const l of lanes) if (l !== open) put(l, f() < 0.65 ? 'block' : pickOb(g, f));
     free = [open];
   } else {
-    // a full row: everyone has to jump or slide
-    const k: Ob = g.t > 7 && f() < 0.45 ? 'cloud' : 'low';
+    // a full row: everyone jumps (or, later on, slides)
+    const k: Ob = lvl === 2 && f() < 0.45 ? 'cloud' : 'low';
     for (const l of lanes) put(l, k);
     if (k === 'low' && f() < 0.6) { const l = lanes[Math.floor(f() * 3)]; for (let i = 0; i < 4; i++) g.things.push({ k: 'heart', lane: l, x: l * LANE, z: z - 1.6 + i * 1.1, y: 0.6 + Math.sin(((i + 0.5) / 4) * Math.PI) * 1.1, d: 0.3, seed: 0, world: w }); }
   }
+  if (free.length === 1) g.lastFree = free[0];
   // a line of hearts (or litter) in a free lane
   const lf = g.loot;
   if (free.length && lf() < (g.mod === 'hearts' ? 0.95 : 0.65)) {
@@ -115,8 +122,9 @@ function spawnRow(g: Game, emit: (e: GameEvent) => void) {
     g.powIn = g.mod === 'power' ? rr(pf, 5, 8) : rr(pf, 10, 16);
     tip(g, emit, 'power');
   }
-  const min = Math.max(11, g.speed * 0.72);
-  g.nextRow = rr(f, min, min * 1.6);
+  // about a second between rows, a little less later on
+  const min = Math.max(14, g.speed * (g.t < 30 ? 1.05 : 0.85));
+  g.nextRow = rr(f, min, min * 1.45);
 }
 
 // ----- one small step of time -----
@@ -138,7 +146,8 @@ export function step(g: Game, dt: number, emit: (e: GameEvent) => void) {
   if (g.phase !== 'run') return;
 
   g.t += dt;
-  g.speed = Math.min(40, 17 + g.t * 0.32) * (g.mod === 'wind' ? 1.12 : 1);
+  const topSpeed = (15 + 19 * (1 - Math.exp(-g.t / 75))) * (g.mod === 'wind' ? 1.12 : 1);
+  g.speed = g.stumble > 0 ? Math.min(topSpeed, g.speed + dt * 12) : topSpeed;   // after a stumble Mylo picks up speed again
   const dz = g.speed * dt;
   g.dist += dz;
   if (g.t < 0.2) tip(g, emit, 'lanes');
@@ -152,8 +161,11 @@ export function step(g: Game, dt: number, emit: (e: GameEvent) => void) {
   if (g.magnet > 0) g.magnet -= dt;
   if (g.invuln > 0) g.invuln -= dt;
   if (g.slide > 0) g.slide -= dt;
+  if (g.stumble > 0) g.stumble -= dt;
+  if (g.shake > 0) g.shake -= dt;
+  if (g.hitFlash > 0) g.hitFlash -= dt;
   g.laneT += dt;
-  g.chase = Math.max(0, g.chase - dt * 0.35);
+  g.chase = Math.max(g.stumble > 0 ? 0.35 : 0, g.chase - dt * 0.35);
   g.comboT += dt; if (g.comboT > 1.8) g.combo = 0;
   g.powIn -= dt;
 
@@ -170,8 +182,12 @@ export function step(g: Game, dt: number, emit: (e: GameEvent) => void) {
       g.slide = SLIDE;
     }
   }
+  // ease into the new lane; the camera follows more softly
   const target = g.lane * LANE;
-  g.x += Math.sign(target - g.x) * Math.min(Math.abs(target - g.x), (LANE / SHIFT) * dt);
+  g.x += (target - g.x) * (1 - Math.exp(-dt * 16));
+  if (Math.abs(target - g.x) < 0.002) g.x = target;
+  g.lean = (target - g.x) / LANE;
+  g.camX += (g.x * 0.5 - g.camX) * (1 - Math.exp(-dt * 5));
   if (!g.ground) {
     g.vy -= GRAV * dt; g.y += g.vy * dt;
     if (g.y <= 0) { g.y = 0; g.vy = 0; g.ground = true; g.landed = 0.12; burst(g, g.x, 0, 0, 4, ['#C9B48A', '#A8936A']); }
@@ -211,7 +227,7 @@ export function step(g: Game, dt: number, emit: (e: GameEvent) => void) {
       }
       continue;
     }
-    const inLane = Math.abs(o.x - g.x) < 0.78 * s;
+    const inLane = Math.abs(o.x - g.x) < 0.6 * s;   // a little forgiving at the edges
     const overlapZ = o.z < 0.3 && o.z + o.d > -0.3;
     if (overlapZ && inLane) {
       const clear = o.k === 'low' ? g.y > LOW_H : o.k === 'cloud' ? top < CLOUD_BOTTOM : false;
@@ -229,7 +245,14 @@ export function step(g: Game, dt: number, emit: (e: GameEvent) => void) {
           burst(g, o.x, 0.8, 0.3, 12, ['#2F6FD6', '#FFFFFF', '#7EC8E3']); emit({ t: 'shield' });
           continue;
         }
-        g.phase = 'over'; g.hitAt = performance.now(); g.vy = 5; g.ground = false; g.slide = 0;
+        if (g.stumble <= 0) {
+          // the first bump is a stumble: Mylo slows down and the gloom catches up
+          g.stumble = 8; g.invuln = 1.2; g.chase = 1; g.speed *= 0.6; g.shake = 0.3; g.hitFlash = 0.25; o.got = true;
+          burst(g, o.x, 0.8, 0.3, 10, ['#8D909B', '#FFFFFF', '#E2412B']);
+          emit({ t: 'stumble' });
+          continue;
+        }
+        g.phase = 'over'; g.hitAt = performance.now(); g.vy = 5; g.ground = false; g.slide = 0; g.shake = 0.35; g.hitFlash = 0.3;
         emit({ t: 'over' });
         return;
       }

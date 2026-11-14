@@ -2,19 +2,21 @@
 // and closer to the horizon, and the path bends a little. The canvas is 300 units tall; its width follows the screen.
 import { LANE, CLOUD_BOTTOM, WORLDS, scaleOf, sliding, type Game, type Thing } from './engine';
 import type { Outfit } from './progress';
-import { P, TAU, myloBack, myloSprite, powerIcon, setUnit, shade } from './sprite';
+import { P, TAU, myloBack, myloSprite, powerIcon, setUnit } from './sprite';
 
 export const H = 300;
+let calm = false;   // people who ask for less motion get no screen shake
+export const setCalm = (on: boolean) => { calm = on; };
 export type TipKey = 'lanes' | 'low' | 'cloud' | 'block' | 'power';
 export type Labels = { best: string; worlds: string[]; tips: Record<TipKey, string>; daily?: string };
 type Ctx = CanvasRenderingContext2D;
 
 type Theme = { sky: [string, string]; hill: string; grass: [string, string]; road: [string, string]; line: string; ink: string; soft: string; fog: string };
 export const THEMES: Theme[] = [
-  { sky: ['#FFF6E6', '#FCE2C2'], hill: '#C9DFA6', grass: ['#A9D18A', '#9CC77C'], road: ['#E8D2A6', '#E0C895'], line: '#FFF4DC', ink: '#1A1A1A', soft: '#6B6457', fog: '#FCE2C2' },
-  { sky: ['#EEF3F8', '#F9E4CF'], hill: '#BFC6D2', grass: ['#C2C7CF', '#B6BBC4'], road: ['#8E8C8A', '#858381'], line: '#F2F2F2', ink: '#1A1A1A', soft: '#5C6270', fog: '#F9E4CF' },
-  { sky: ['#E3F4FF', '#FFF0D8'], hill: '#9FD3E6', grass: ['#F3DFAE', '#ECD49E'], road: ['#D9B98A', '#D1AF7E'], line: '#FFF7E6', ink: '#1A1A1A', soft: '#5B6B73', fog: '#FFF0D8' },
-  { sky: ['#1E2747', '#3F4677'], hill: '#2B3F33', grass: ['#2F4A3A', '#2A4334'], road: ['#6F6250', '#675B4A'], line: '#B9AE8E', ink: '#F7EFE0', soft: '#C9C3E6', fog: '#3F4677' },
+  { sky: ['#FFF6E6', '#FCE2C2'], hill: '#C9DFA6', grass: ['#A9D18A', '#A2CC83'], road: ['#E8D2A6', '#E3CC9C'], line: '#FFF4DC', ink: '#1A1A1A', soft: '#6B6457', fog: '#FCE2C2' },
+  { sky: ['#EEF3F8', '#F9E4CF'], hill: '#BFC6D2', grass: ['#C2C7CF', '#BCC1CA'], road: ['#8E8C8A', '#898785'], line: '#F2F2F2', ink: '#1A1A1A', soft: '#5C6270', fog: '#F9E4CF' },
+  { sky: ['#E3F4FF', '#FFF0D8'], hill: '#9FD3E6', grass: ['#F3DFAE', '#EFD9A6'], road: ['#D9B98A', '#D4B383'], line: '#FFF7E6', ink: '#1A1A1A', soft: '#5B6B73', fog: '#FFF0D8' },
+  { sky: ['#1E2747', '#3F4677'], hill: '#2B3F33', grass: ['#2F4A3A', '#2C4637'], road: ['#6F6250', '#6B5F4D'], line: '#B9AE8E', ink: '#F7EFE0', soft: '#C9C3E6', fog: '#3F4677' },
 ];
 
 // ---------- camera ----------
@@ -69,12 +71,12 @@ function sky(ctx: Ctx, c: Cam, world: number, g: Game) {
 function ground(ctx: Ctx, c: Cam, world: number, g: Game) {
   const th = THEMES[world], name = WORLDS[world];
   ctx.fillStyle = th.grass[0]; ctx.fillRect(0, c.hy, c.W, H - c.hy);
-  const N = 44, near = -2.4, far = 74, edge = LANE * 1.5;
+  const N = 34, near = -2.4, far = 74, edge = LANE * 1.5;
   const zs: number[] = [];
   for (let i = 0; i <= N; i++) zs.push(near + (far - near) * Math.pow(i / N, 1.7));
   for (let i = N; i > 0; i--) {
     const z0 = zs[i], z1 = zs[i - 1];
-    const band = Math.floor((z1 + g.dist) / 2.2) % 2;
+    const band = Math.floor((z1 + g.dist) / 3) % 2;
     const pl0 = proj(c, -edge, 0, z0), pr0 = proj(c, edge, 0, z0), pl1 = proj(c, -edge, 0, z1), pr1 = proj(c, edge, 0, z1);
     if (!pl0 || !pr0 || !pl1 || !pr1) continue;
     ctx.globalAlpha = fogA(z1);
@@ -96,6 +98,14 @@ function ground(ctx: Ctx, c: Cam, world: number, g: Game) {
     }
   }
   ctx.globalAlpha = 1;
+  // a soft light strip shows which lane Mylo is in
+  const lx = g.lane * LANE, hw = LANE * 0.42;
+  const a = proj(c, lx - hw, 0, 9), b = proj(c, lx + hw, 0, 9), cc = proj(c, lx + hw * 1.05, 0, -1.2), d = proj(c, lx - hw * 1.05, 0, -1.2);
+  if (a && b && cc && d) {
+    const gr = ctx.createLinearGradient(0, a.y, 0, d.y);
+    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(1, name === 'night' ? 'rgba(255,240,190,.22)' : 'rgba(255,255,255,.38)');
+    ctx.fillStyle = gr; quad(ctx, a, b, cc, d);
+  }
 }
 
 // ---------- things by the path ----------
@@ -202,42 +212,37 @@ function drawThing(ctx: Ctx, c: Cam, o: Thing, t: number) {
     }
     case 'low': {
       const b = proj(c, o.x, 0, o.z); if (!b) break; const s = b.s;
-      shade(ctx, true);
-      if (name === 'city') {
+            if (name === 'city') {
         // a striped road barrier
         ctx.fillStyle = '#3B3B44'; ctx.fillRect(b.x - 0.5 * s, b.y - 0.62 * s, 0.07 * s, 0.62 * s); ctx.fillRect(b.x + 0.43 * s, b.y - 0.62 * s, 0.07 * s, 0.62 * s);
         ctx.fillStyle = '#FFFFFF'; ctx.fillRect(b.x - 0.6 * s, b.y - 0.62 * s, 1.2 * s, 0.24 * s);
-        shade(ctx, false); ctx.fillStyle = '#E2412B'; for (let i = 0; i < 4; i++) { ctx.beginPath(); const x0 = b.x - 0.6 * s + i * 0.3 * s; ctx.moveTo(x0, b.y - 0.38 * s); ctx.lineTo(x0 + 0.15 * s, b.y - 0.62 * s); ctx.lineTo(x0 + 0.27 * s, b.y - 0.62 * s); ctx.lineTo(x0 + 0.12 * s, b.y - 0.38 * s); ctx.fill(); }
+        ctx.fillStyle = '#E2412B'; for (let i = 0; i < 4; i++) { ctx.beginPath(); const x0 = b.x - 0.6 * s + i * 0.3 * s; ctx.moveTo(x0, b.y - 0.38 * s); ctx.lineTo(x0 + 0.15 * s, b.y - 0.62 * s); ctx.lineTo(x0 + 0.27 * s, b.y - 0.62 * s); ctx.lineTo(x0 + 0.12 * s, b.y - 0.38 * s); ctx.fill(); }
       } else if (name === 'sea') {
         if (o.seed > 3) {
           // a crab, sidestepping
           const st = Math.sin(t * 16 + o.seed) * 0.08 * s;
           ctx.fillStyle = '#E2412B'; ctx.beginPath(); ctx.ellipse(b.x + st, b.y - 0.25 * s, 0.45 * s, 0.25 * s, 0, 0, TAU); ctx.fill();
           ctx.beginPath(); ctx.arc(b.x - 0.5 * s + st, b.y - 0.5 * s, 0.17 * s, 0, TAU); ctx.arc(b.x + 0.5 * s + st, b.y - 0.5 * s, 0.17 * s, 0, TAU); ctx.fill();
-          shade(ctx, false); ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(b.x - 0.12 * s + st, b.y - 0.55 * s, 0.09 * s, 0, TAU); ctx.arc(b.x + 0.12 * s + st, b.y - 0.55 * s, 0.09 * s, 0, TAU); ctx.fill();
+          ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(b.x - 0.12 * s + st, b.y - 0.55 * s, 0.09 * s, 0, TAU); ctx.arc(b.x + 0.12 * s + st, b.y - 0.55 * s, 0.09 * s, 0, TAU); ctx.fill();
           ctx.fillStyle = '#1A1A1A'; ctx.beginPath(); ctx.arc(b.x - 0.12 * s + st, b.y - 0.55 * s, 0.045 * s, 0, TAU); ctx.arc(b.x + 0.12 * s + st, b.y - 0.55 * s, 0.045 * s, 0, TAU); ctx.fill();
         } else {
-          ctx.fillStyle = '#9A958C'; ctx.beginPath(); ctx.ellipse(b.x, b.y - 0.05 * s, 0.6 * s, 0.6 * s, 0, Math.PI, 0); ctx.fill(); shade(ctx, false);
-          ctx.fillStyle = '#B9B4AA'; ctx.beginPath(); ctx.ellipse(b.x - 0.2 * s, b.y - 0.4 * s, 0.15 * s, 0.07 * s, -0.3, 0, TAU); ctx.fill();
+          ctx.fillStyle = '#9A958C'; ctx.beginPath(); ctx.ellipse(b.x, b.y - 0.05 * s, 0.6 * s, 0.6 * s, 0, Math.PI, 0); ctx.fill();           ctx.fillStyle = '#B9B4AA'; ctx.beginPath(); ctx.ellipse(b.x - 0.2 * s, b.y - 0.4 * s, 0.15 * s, 0.07 * s, -0.3, 0, TAU); ctx.fill();
         }
       } else {
         // a thorny bush
         ctx.fillStyle = name === 'night' ? '#24502C' : '#2E6B35';
         ctx.beginPath(); ctx.moveTo(b.x - 0.6 * s, b.y);
         for (let i = 0; i < 6; i++) { const x0 = b.x - 0.6 * s + (i / 6) * 1.2 * s; ctx.lineTo(x0 + 0.1 * s, b.y - (0.5 + ((i * 7 + Math.floor(o.seed * 10)) % 3) * 0.06) * s); ctx.lineTo(x0 + 0.2 * s, b.y - 0.2 * s); }
-        ctx.lineTo(b.x + 0.6 * s, b.y); ctx.closePath(); ctx.fill(); shade(ctx, false);
-        ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = Math.max(1, 0.025 * s); ctx.stroke();
+        ctx.lineTo(b.x + 0.6 * s, b.y); ctx.closePath(); ctx.fill();         ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = Math.max(1, 0.025 * s); ctx.stroke();
       }
-      shade(ctx, false);
-      break;
+            break;
     }
     case 'cloud': {
       const bob = Math.sin(t * 3 + o.seed) * 0.04;
       const b = proj(c, o.x, CLOUD_BOTTOM + 0.38 + bob, o.z); if (!b) break; const s = b.s / 40;
       const top = name === 'city' ? '#A2988C' : name === 'night' ? '#6B6890' : '#8D909B';
       const under = name === 'city' ? '#857B70' : name === 'night' ? '#55527A' : '#767985';
-      shade(ctx, true); puff(ctx, b.x - 18 * s * 1.3, b.y, s * 1.3, top); shade(ctx, false);
-      puff(ctx, b.x - 15 * s * 1.3, b.y + 4 * s, s * 1.1, under);
+      puff(ctx, b.x - 18 * s * 1.3, b.y, s * 1.3, top);       puff(ctx, b.x - 15 * s * 1.3, b.y + 4 * s, s * 1.1, under);
       ctx.strokeStyle = '#2B2D33'; ctx.lineWidth = Math.max(1, 2.4 * s); ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(b.x - 12 * s, b.y - 7 * s); ctx.lineTo(b.x - 4 * s, b.y - 3 * s); ctx.moveTo(b.x + 12 * s, b.y - 7 * s); ctx.lineTo(b.x + 4 * s, b.y - 3 * s);
       ctx.moveTo(b.x - 7 * s, b.y + 7 * s); ctx.quadraticCurveTo(b.x, b.y + 1 * s, b.x + 7 * s, b.y + 7 * s); ctx.stroke();
@@ -250,8 +255,7 @@ function drawThing(ctx: Ctx, c: Cam, o: Thing, t: number) {
       const b = proj(c, o.x, o.y + Math.sin(t * 5 + o.z) * 0.05, o.z); const hp = P()?.heart; if (!b || !hp) break;
       const k = (0.42 * b.s) / 24;
       ctx.save(); ctx.translate(b.x, b.y); ctx.scale(k, k);
-      shade(ctx, true); ctx.fillStyle = '#E2412B'; ctx.fill(hp); shade(ctx, false);
-      ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 1.6; ctx.stroke(hp); ctx.restore();
+      ctx.fillStyle = '#E2412B'; ctx.fill(hp);       ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 1.6; ctx.stroke(hp); ctx.restore();
       break;
     }
     case 'litter': {
@@ -269,7 +273,7 @@ function drawThing(ctx: Ctx, c: Cam, o: Thing, t: number) {
       const b = proj(c, o.x, o.y + Math.sin(t * 3 + o.seed) * 0.08, o.z); if (!b) break; const k = b.s / 34;
       ctx.save(); ctx.translate(b.x, b.y); ctx.scale(k, k);
       ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 1.6;
-      shade(ctx, true); ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill(); shade(ctx, false); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill(); ctx.stroke();
       powerIcon(ctx, o.p!, 0, 0, 1);
       ctx.strokeStyle = 'rgba(255,200,74,.85)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 17 + Math.sin(t * 6) * 1.5, 0, TAU); ctx.stroke();
       ctx.restore();
@@ -289,8 +293,7 @@ function drawMylo(ctx: Ctx, c: Cam, g: Game, outfit: Outfit) {
   const k = (1.55 * b.s * s) / 240;   // the drawing box is 240 tall
   if (g.shield && !hit) {
     const u = proj(c, g.x, g.y + (slid ? 0.8 : 1.3) * s, 0)!;
-    shade(ctx, true); ctx.fillStyle = '#2F6FD6'; ctx.beginPath(); ctx.arc(u.x, u.y, 0.55 * u.s * s, Math.PI, 0); ctx.closePath(); ctx.fill(); shade(ctx, false);
-    ctx.fillStyle = '#7EC8E3'; ctx.beginPath(); ctx.moveTo(u.x, u.y); ctx.arc(u.x, u.y, 0.55 * u.s * s, Math.PI * 1.35, Math.PI * 1.65); ctx.fill();
+    ctx.fillStyle = '#2F6FD6'; ctx.beginPath(); ctx.arc(u.x, u.y, 0.55 * u.s * s, Math.PI, 0); ctx.closePath(); ctx.fill();     ctx.fillStyle = '#7EC8E3'; ctx.beginPath(); ctx.moveTo(u.x, u.y); ctx.arc(u.x, u.y, 0.55 * u.s * s, Math.PI * 1.35, Math.PI * 1.65); ctx.fill();
   }
   if (g.magnet > 0 && !hit) {
     ctx.strokeStyle = `rgba(226,65,43,${0.3 + 0.2 * Math.sin(g.t * 10)})`; ctx.lineWidth = 2;
@@ -299,6 +302,7 @@ function drawMylo(ctx: Ctx, c: Cam, g: Game, outfit: Outfit) {
   if (g.invuln > 0 && !hit && Math.floor(g.t * 12) % 2) return;
   ctx.save();
   ctx.translate(b.x, b.y);
+  if (!hit) ctx.rotate(g.lean * 0.22);   // lean into a lane change
   if (g.landed > 0 && !slid) ctx.scale(1.08, 0.92);
   ctx.scale(k, k); ctx.translate(-100, -224);
   if (hit) myloSprite(ctx, { t: g.t, run: false, ground: g.ground, up: false, roll: false, hit: true, blink: false, landed: false, outfit });
@@ -324,8 +328,8 @@ export function drawFrame(ctx: Ctx, g: Game, v: { W: number; scale: number; dpr:
   const { W, scale, dpr } = v;
   setUnit(dpr * scale);
   ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
-  shade(ctx, false);
-  const cam: Cam = { W, f: Math.min(250, W * 0.86), hy: 104, camX: g.x * 0.55, camH: 2.5, camZ: -4.3, curve: g.curve };
+    const cam: Cam = { W, f: Math.min(250, W * 0.86), hy: 104, camX: g.camX, camH: 2.5, camZ: -4.3, curve: g.curve };
+  if (g.shake > 0 && !calm) ctx.translate((Math.random() - 0.5) * g.shake * 16, (Math.random() - 0.5) * g.shake * 10);
   const world = g.worldFade > 0 && g.prevWorld !== g.world && g.worldFade > 0.5 ? g.prevWorld : g.world;
   sky(ctx, cam, world, g);
   ground(ctx, cam, world, g);
@@ -338,6 +342,7 @@ export function drawFrame(ctx: Ctx, g: Game, v: { W: number; scale: number; dpr:
   for (const it of items) it.draw();
   if (g.worldFade > 0 && g.prevWorld !== g.world) { ctx.globalAlpha = 1 - Math.abs(g.worldFade - 0.5) * 2; ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   gloom(ctx, cam, g);
+  if (g.hitFlash > 0) { ctx.globalAlpha = Math.min(0.35, g.hitFlash * 1.4); ctx.fillStyle = '#E2412B'; ctx.fillRect(-20, -20, W + 40, H + 40); ctx.globalAlpha = 1; }
   for (const b of g.bits) {
     const p = proj(cam, b.x, b.y, b.z); if (!p) continue;
     ctx.globalAlpha = Math.max(0, 1 - b.life / b.max);

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@/lib/i18n/client';
 import type { Key } from '@/lib/i18n/langs';
 import { WORLDS, hashStr, move, newGame, slideHold, step, type Game, type GameEvent } from './run/engine';
-import { H, drawFrame, type Labels } from './run/draw';
+import { H, drawFrame, setCalm, type Labels } from './run/draw';
 import { myloSprite } from './run/sprite';
 import { OUTFITS, PRICE, buy, dailyMod, finishRun, freshRun, level, load, reward, save, startRun, today, track, type Mission, type Outfit, type Progress, type RunStats } from './run/progress';
 
@@ -31,6 +31,8 @@ export function MyloRun({ signHref, signTitle }: { signHref: string; signTitle?:
   const [mode, setModeState] = useState<Mode>('endless');
   const [result, setResult] = useState<Result | null>(null);
   const [live, setLive] = useState('');
+  const quality = useRef(2);   // pixel density; lowered on its own if a phone struggles
+  const refit = useRef<() => void>(() => {});
   const swipe = useRef<{ id: number; x: number; y: number; at: number; done: boolean } | null>(null);
 
   const p = prog.current;
@@ -106,14 +108,17 @@ export function MyloRun({ signHref, signTitle }: { signHref: string; signTitle?:
     if (!box || !c) return;
     const fit = () => {
       const cssW = box.clientWidth;
+      const maxDpr = quality.current;
       const cssH = Math.round(Math.max(280, Math.min(480, cssW * 1.05, window.innerHeight * 0.62)));
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const dpr = Math.min(maxDpr, window.devicePixelRatio || 1);
       c.style.height = cssH + 'px';
       c.width = Math.round(cssW * dpr); c.height = Math.round(cssH * dpr);
       const scale = cssH / H;
       view.current = { W: cssW / scale, scale, dpr };
     };
     fit();
+    refit.current = fit;
+    try { setCalm(window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch {}
     const ro = new ResizeObserver(fit); ro.observe(box);
     window.addEventListener('resize', fit);
     return () => { ro.disconnect(); window.removeEventListener('resize', fit); };
@@ -131,6 +136,7 @@ export function MyloRun({ signHref, signTitle }: { signHref: string; signTitle?:
     const onEvent = (e: GameEvent | { t: 'score'; score: number }) => {
       const gm = g.current, pr = prog.current; if (!pr) return;
       if (e.t === 'tip') { gm.tip = e.tip; gm.tipT = 2.6; pr.tips[e.tip] = true; return; }
+      if (e.t === 'stumble') { gm.toast = t('game.stumble'); gm.toastT = 2.6; try { navigator.vibrate?.(40); } catch {} return; }
       if (e.t === 'over') {
         track(pr, run.current, { t: 'score', score: gm.score });
         const daily = modeRef.current === 'daily';
@@ -150,10 +156,16 @@ export function MyloRun({ signHref, signTitle }: { signHref: string; signTitle?:
         save(pr);
       }
     };
-    let raf = 0, last = performance.now(), scoreSeen = 0;
+    let raf = 0, last = performance.now(), scoreSeen = 0, slow = 0, smooth = 1 / 60;
     const frame = (now: number) => {
       let dt = (now - last) / 1000; last = now;
       if (dt > 0.25) dt = 0;   // back from a pause or a hidden tab
+      else {
+        // even out small timing jitter so the run glides
+        smooth += (dt - smooth) * 0.2; if (Math.abs(dt - smooth) < 0.006) dt = smooth;
+        // if frames keep coming slowly, draw fewer pixels
+        if (g.current.phase === 'run') { slow = dt > 0.024 ? slow + dt : Math.max(0, slow - dt * 0.5); if (slow > 1.5 && quality.current > 1) { quality.current = Math.max(1, quality.current - 0.5); slow = 0; refit.current(); } }
+      }
       const gm = g.current;
       // small fixed steps keep fast speeds from skipping through thin obstacles
       while (dt > 0) { const s = Math.min(dt, 1 / 120); step(gm, s, onEvent); dt -= s; }
@@ -181,6 +193,7 @@ export function MyloRun({ signHref, signTitle }: { signHref: string; signTitle?:
     const dx = e.clientX - s.x, dy = e.clientY - s.y;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 22) return;
     s.done = true;
+    try { navigator.vibrate?.(8); } catch {}
     if (Math.abs(dx) > Math.abs(dy)) move(g.current, dx < 0 ? 'left' : 'right');
     else move(g.current, dy < 0 ? 'up' : 'down');
   };
